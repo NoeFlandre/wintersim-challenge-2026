@@ -143,3 +143,73 @@ def test_path_helpers_under_repo_root() -> None:
     assert paths.dist_submissions_dir() == root / "dist" / "submissions"
     assert paths.submission_strategies_dir() == root / "submission" / "response_strategies"
     assert paths.downloads_dir() == root / ".challenge" / "downloads"
+
+
+# --- missing-fields surface as actionable RoundConfigError -------------------
+
+
+def test_missing_expected_sha256_raises_actionable_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A round missing ``expected_sha256`` must NOT raise KeyError.
+
+    The error must identify the field and the round id so the operator can fix
+    config/rounds.toml without reading a traceback.
+    """
+    _use_config(
+        monkeypatch,
+        "[[rounds]]\nround_id='r0'\narchive_filename='a.zip'\nextract_dir_name='r0'\n"
+        "practice_only=true\nmarker_relpaths=['main.py']\n",
+        tmp_path,
+    )
+    with pytest.raises(RoundConfigError) as exc:
+        paths.load_rounds()
+    msg = str(exc.value).lower()
+    assert "expected_sha256" in msg
+    assert "r0" in msg
+
+
+def test_missing_archive_filename_raises_actionable_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _use_config(
+        monkeypatch,
+        "[[rounds]]\nround_id='r0'\nextract_dir_name='r0'\n"
+        "expected_sha256='" + "0" * 64 + "'\npractice_only=true\nmarker_relpaths=['main.py']\n",
+        tmp_path,
+    )
+    with pytest.raises(RoundConfigError) as exc:
+        paths.load_rounds()
+    msg = str(exc.value).lower()
+    assert "archive_filename" in msg
+
+
+def test_missing_extract_dir_name_raises_actionable_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _use_config(
+        monkeypatch,
+        "[[rounds]]\nround_id='r0'\narchive_filename='a.zip'\n"
+        "expected_sha256='" + "0" * 64 + "'\npractice_only=true\nmarker_relpaths=['main.py']\n",
+        tmp_path,
+    )
+    with pytest.raises(RoundConfigError) as exc:
+        paths.load_rounds()
+    msg = str(exc.value).lower()
+    assert "extract_dir_name" in msg
+
+
+def test_load_round_unknown_id_raises_actionable_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _use_config(
+        monkeypatch,
+        "[[rounds]]\nround_id='r0'\narchive_filename='a.zip'\nextract_dir_name='r0'\n"
+        "expected_sha256='" + "0" * 64 + "'\npractice_only=true\nmarker_relpaths=['main.py']\n",
+        tmp_path,
+    )
+    with pytest.raises(RoundConfigError) as exc:
+        paths.load_round("round42")
+    msg = str(exc.value)
+    assert "round42" in msg
+    assert "r0" in msg

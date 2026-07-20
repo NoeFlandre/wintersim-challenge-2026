@@ -168,9 +168,16 @@ def load_rounds() -> dict[str, RoundConfig]:
         if round_id in result:
             raise RoundConfigError(f"duplicate round id {round_id!r} in config")
 
-        required_strings = ("archive_filename", "extract_dir_name")
+        # Validate every required field BEFORE indexing into entry[...] so a
+        # missing key surfaces as a clear, actionable RoundConfigError instead
+        # of a bare KeyError traceback.
+        required_strings = ("archive_filename", "extract_dir_name", "expected_sha256")
         for key in required_strings:
-            val = entry.get(key)
+            if key not in entry:
+                raise RoundConfigError(
+                    f"round {round_id!r}: required field '{key}' is missing from config/rounds.toml"
+                )
+            val = entry[key]
             if not isinstance(val, str) or not val:
                 raise RoundConfigError(f"round {round_id!r}: '{key}' must be a non-empty string")
 

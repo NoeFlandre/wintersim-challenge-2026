@@ -353,7 +353,16 @@ def test_cli_run_full_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 # --- run_full against a synthetic tree --------------------------------------
 
 
-def test_run_full_invokes_organizer_run_simulation(tmp_path: Path) -> None:
+def test_run_full_invokes_organizer_run_simulation(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Full-run streams stdout/stderr live and captures the subprocess exit code.
+
+    The captured stdout field of SmokeResult is empty by design (we don't
+    buffer output for long-running simulations); instead, the live subprocess
+    output is written to the parent's terminal file descriptors, which capfd
+    captures.
+    """
     source = tmp_path / "source"
     (source / "o2despy").mkdir(parents=True)
     (source / "main.py").write_text(
@@ -366,7 +375,11 @@ def test_run_full_invokes_organizer_run_simulation(tmp_path: Path) -> None:
     )
     result = cli.run_full(source, timeout=30.0)
     assert result.returncode == 0, result.stderr
-    assert "FULL_RAN" in result.stdout
+    # stdout field is intentionally empty (live-streaming mode).
+    assert result.stdout == ""
+    # The live-streamed output reached the parent's stdout (file descriptor).
+    captured = capfd.readouterr()
+    assert "FULL_RAN" in captured.out
 
 
 # --- defensive / branch coverage -------------------------------------------

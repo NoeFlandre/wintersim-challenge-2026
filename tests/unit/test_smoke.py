@@ -175,3 +175,96 @@ def test_smoke_subprocess_uses_current_python(tmp_path: Path) -> None:
     result = run_smoke(tmp_path / "source", days=1, timeout=30.0)
     assert result.returncode == 0, result.stderr
     assert report.read_text() == sys.executable
+
+
+# --- precondition hardening -------------------------------------------------
+
+
+def test_smoke_rejects_days_zero() -> None:
+    """Smoke must reject days < 1; zero days is a meaningless simulation."""
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)days|positive|>=1"):
+        run_smoke(Path("/tmp"), days=0, timeout=30.0)
+
+
+def test_smoke_rejects_negative_days() -> None:
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)days|positive|>=1"):
+        run_smoke(Path("/tmp"), days=-1, timeout=30.0)
+
+
+def test_smoke_rejects_zero_timeout() -> None:
+    """timeout=0 means 'kill instantly' which is almost certainly a bug."""
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)timeout|>0|positive"):
+        run_smoke(Path("/tmp"), days=1, timeout=0.0)
+
+
+def test_smoke_rejects_negative_timeout() -> None:
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)timeout|>0|positive"):
+        run_smoke(Path("/tmp"), days=1, timeout=-5.0)
+
+
+# --- full-run construction is non-launching ---------------------------------
+
+
+def test_run_full_constructs_subprocess_without_capturing(tmp_path: Path, monkeypatch) -> None:
+    """The full runner must stream stdout/stderr live (no capture_output).
+
+    We assert by patching subprocess.run and inspecting the kwargs. The patched
+    call returns a fake CompletedProcess with returncode 0 so the runner exits
+    cleanly.
+    """
+    import subprocess
+
+    from wsc2026_tools.cli import run_full
+
+    source = _synthetic_tree(tmp_path / "source")
+    captured_kwargs: dict = {}
+
+    class _FakeProc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(cmd, **kwargs):
+        captured_kwargs["cmd"] = cmd
+        captured_kwargs.update(kwargs)
+        return _FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    result = run_full(source, timeout=None)
+    assert result.returncode == 0
+    # The runner must NOT buffer output (no capture_output, no text=True).
+    assert "capture_output" not in captured_kwargs
+    assert "text" not in captured_kwargs
+    # The runner must invoke sys.executable and use the driver string.
+    assert captured_kwargs["cmd"][0] == sys.executable
+    assert "main.run_simulation" in captured_kwargs["cmd"][2]
+
+
+def test_run_full_uses_timeout_when_provided(tmp_path: Path, monkeypatch) -> None:
+    import subprocess
+
+    from wsc2026_tools.cli import run_full
+
+    source = _synthetic_tree(tmp_path / "source")
+    captured_kwargs: dict = {}
+
+    class _FakeProc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return _FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    run_full(source, timeout=600.0)
+    assert captured_kwargs["timeout"] == 600.0

@@ -96,6 +96,14 @@ def _ensure_source(source: Path) -> None:
         raise SmokeError(f"o2despy missing under {source}; source tree looks incomplete.")
 
 
+def _validate_smoke_args(*, days: int, timeout: float) -> None:
+    """Reject nonsensical smoke arguments up front."""
+    if not isinstance(days, int) or days < 1:
+        raise SmokeError(f"smoke days must be a positive integer >= 1; got {days!r}")
+    if not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise SmokeError(f"smoke timeout must be a positive number > 0 (seconds); got {timeout!r}")
+
+
 def run_smoke(
     source_root: Path,
     *,
@@ -108,7 +116,12 @@ def run_smoke(
     round source and its o2despy directory, constructs the disruption scenario
     and model, and steps ``days`` days. Returns the subprocess outcome; does not
     raise on simulation failure (callers inspect ``returncode``).
+
+    Preconditions: ``days >= 1`` and ``timeout > 0``. Anything else is rejected
+    with :class:`SmokeError` because the resulting subprocess would either be
+    useless or instantly killed.
     """
+    _validate_smoke_args(days=days, timeout=timeout)
     _ensure_source(Path(source_root))
     env = _driver_env(Path(source_root), {"WSC2026_SMOKE_DAYS": str(int(days))})
     try:
@@ -147,28 +160,35 @@ def run_full(
 
     The full run is intentionally long (140-day warm-up + the experiment) and is
     NOT part of CI. ``timeout`` defaults to None (no limit).
+
+    Unlike :func:`run_smoke`, this runner streams the subprocess's stdout and
+    stderr live to the parent's terminal. We deliberately do NOT pass
+    ``capture_output`` or ``text=True`` so the operator can watch progress and
+    ``Ctrl-C`` the run; the returned :class:`SmokeResult` therefore has empty
+    ``stdout`` / ``stderr`` fields and the meaningful result is ``returncode``.
     """
     _ensure_source(Path(source_root))
     env = _driver_env(Path(source_root))
     driver = "import main; main.run_simulation()"
+    kwargs: dict = {"env": env, "cwd": str(source_root), "check": False}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
     try:
         proc = subprocess.run(
             [sys.executable, "-c", driver],
-            env=env,
-            cwd=str(source_root),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
+            **kwargs,
         )
-    except subprocess.TimeoutExpired as exc:
-        msg = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        out = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        return SmokeResult(returncode=124, stdout=out, stderr=msg, timed_out=True)
+    except subprocess.TimeoutExpired:
+        return SmokeResult(
+            returncode=124,
+            stdout="",
+            stderr=f"\nfull run timed out after {timeout}s",
+            timed_out=True,
+        )
     return SmokeResult(
         returncode=proc.returncode,
-        stdout=proc.stdout,
-        stderr=proc.stderr,
+        stdout="",
+        stderr="",
         timed_out=False,
     )
 

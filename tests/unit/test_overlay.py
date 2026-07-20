@@ -139,3 +139,36 @@ def test_overlay_refuses_symlink_submission_file(tmp_path: Path) -> None:
 def test_overlay_requires_directories(tmp_path: Path) -> None:
     with pytest.raises(OverlayError, match="(?i)not a directory|missing"):
         overlay_response_strategies(tmp_path / "nope1", tmp_path / "nope2")
+
+
+def test_overlay_rejects_subdirectory_in_submission(tmp_path: Path) -> None:
+    submission, dest = _setup(tmp_path)
+    (submission / "subpkg").mkdir()
+    (submission / "subpkg" / "x.py").write_text("x")
+
+    with pytest.raises(OverlayError, match="(?i)subpkg|not allowlisted|refus|disallow"):
+        overlay_response_strategies(submission, dest)
+
+
+def test_overlay_rejects_non_file_entry(tmp_path: Path) -> None:
+    submission, dest = _setup(tmp_path)
+    # A FIFO / socket entry triggers the `not entry.is_file()` branch.
+    import os
+
+    fifo_path = submission / "fifo"
+    os.mkfifo(fifo_path)
+    try:
+        with pytest.raises(OverlayError, match="(?i)not allowlisted|refus|disallow"):
+            overlay_response_strategies(submission, dest)
+    finally:
+        os.remove(fifo_path)
+
+
+def test_overlay_skips_pycache_suffix_at_top_level(tmp_path: Path) -> None:
+    submission, dest = _setup(tmp_path)
+    # A loose .pyc next to allowlisted files must still be skipped via the
+    # _SKIP_SUFFIXES branch of _is_skip (not just via the __pycache__ dir name).
+    (submission / "user_strategy.pyc").write_text("pyc")
+    copied = overlay_response_strategies(submission, dest)
+    assert "user_strategy.py" in copied
+    assert not (dest / "user_strategy.pyc").exists()

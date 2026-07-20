@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+import wsc2026_tools.artifacts as artifacts
 from wsc2026_tools.artifacts import BootstrapError, extract_archive
 from wsc2026_tools.paths import RoundConfig, RoundConfigError, load_round, repo_root
 
@@ -181,3 +182,82 @@ def test_repo_root_points_at_workspace() -> None:
     root = repo_root()
     assert (root / "pyproject.toml").exists()
     assert (root / "src" / "wsc2026_tools" / "__init__.py").exists()
+
+
+# --- additional extraction edge cases ---------------------------------------
+
+
+def test_extract_rejects_drive_anchored_member(tmp_path: Path) -> None:
+    members = dict(VALID_MEMBERS)
+    members["C:/evil.txt"] = b"x"
+    archive = tmp_path / "drive.zip"
+    _make_zip(archive, members)
+    with pytest.raises(BootstrapError, match="(?i)drive|unsafe|absolute"):
+        extract_archive(archive, _hash_of(archive), tmp_path / "out", marker_relpaths=["main.py"])
+
+
+def test_extract_rejects_empty_member_name(tmp_path: Path) -> None:
+    members = dict(VALID_MEMBERS)
+    members[""] = b"x"
+    archive = tmp_path / "empty.zip"
+    _make_zip(archive, members)
+    with pytest.raises(BootstrapError, match="(?i)empty|unsafe"):
+        extract_archive(archive, _hash_of(archive), tmp_path / "out", marker_relpaths=["main.py"])
+
+
+def test_extract_refuses_to_overwrite_existing_dest(tmp_path: Path) -> None:
+    archive = _valid_zip(tmp_path)
+    dest = tmp_path / "out"
+    dest.mkdir(parents=True)
+    with pytest.raises(BootstrapError, match="(?i)already exists|overwrite"):
+        extract_archive(archive, _hash_of(archive), dest, marker_relpaths=["main.py"])
+
+
+def test_extract_rejects_missing_archive(tmp_path: Path) -> None:
+    with pytest.raises(BootstrapError, match="(?i)not found"):
+        extract_archive(
+            tmp_path / "nope.zip", "0" * 64, tmp_path / "out", marker_relpaths=["main.py"]
+        )
+
+
+def test_sha256_of_file_matches_hashlib(tmp_path: Path) -> None:
+    import hashlib
+
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"hello world\n")
+    assert artifacts.sha256_of_file(f) == hashlib.sha256(b"hello world\n").hexdigest()
+
+
+def test_bootstrap_round_success_with_monkeypatched_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Build a synthetic round config so we can fabricate a matching archive.
+    from wsc2026_tools.paths import RoundConfig
+
+    archive = _valid_zip(tmp_path)
+    digest = _hash_of(archive)
+
+    config = RoundConfig(
+        round_id="synthetic",
+        archive_filename=archive.name,
+        expected_sha256=digest,
+        extract_dir_name="synthetic",
+        practice_only=True,
+        marker_relpaths=("main.py",),
+    )
+    monkeypatch.setattr(artifacts, "load_round", lambda r: config)
+    # Redirect the extract destination into tmp_path's ignored area.
+    dest_root = tmp_path / "challenge"
+    monkeypatch.setattr(artifacts, "round_source_dir", lambda name: dest_root / name / "source")
+
+    out = artifacts.bootstrap_round("synthetic", archive)
+    assert (out / "main.py").exists()
+
+
+def test_bootstrap_round_rejects_relative_archive_under_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Non-absolute archives are resolved under the repo root and should be
+    # reported as not found when absent.
+    with pytest.raises(BootstrapError, match="(?i)not found"):
+        artifacts.bootstrap_round("round0", tmp_path / "definitely_missing.zip")

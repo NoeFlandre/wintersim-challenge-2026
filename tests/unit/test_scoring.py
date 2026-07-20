@@ -236,3 +236,101 @@ def test_write_score_output_human_no_premature_round(
     captured = capsys.readouterr().out
     # loss = (1 - 100/80) * 1 = -0.25 ; must show full precision, not "0" or "-0".
     assert "-0.25" in captured
+
+
+# --- additional validation branches -----------------------------------------
+
+
+def test_malformed_period_index_rejected(tmp_path: Path) -> None:
+    scenario = [{"PeriodIndex": "abc", "StartDay": "0", "EndDay": "4", "AverageTransitTime": "100"}]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(ScoringError, match="(?i)malformed|integer"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_malformed_start_day_rejected(tmp_path: Path) -> None:
+    scenario = [{"PeriodIndex": "1", "StartDay": "x", "EndDay": "4", "AverageTransitTime": "100"}]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(ScoringError, match="(?i)malformed|StartDay"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_malformed_end_day_rejected(tmp_path: Path) -> None:
+    scenario = [{"PeriodIndex": "1", "StartDay": "0", "EndDay": "y", "AverageTransitTime": "100"}]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(ScoringError, match="(?i)malformed|EndDay"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_non_finite_att_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 4, float("inf"))]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(ScoringError, match="(?i)non-finite|infinite"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_nan_att_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 4, float("nan"))]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(ScoringError, match="(?i)non-finite"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_att_file_not_found(tmp_path: Path) -> None:
+    with pytest.raises(ScoringError, match="(?i)not found"):
+        compute_resilience_loss(tmp_path / "nope_s.csv", tmp_path / "nope_b.csv")
+
+
+def test_missing_required_columns_rejected(tmp_path: Path) -> None:
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    sp.write_text("foo,bar\n1,2\n")
+    bp.write_text("foo,bar\n1,2\n")
+    with pytest.raises(ScoringError, match="(?i)missing required columns"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_empty_headerless_csv_rejected(tmp_path: Path) -> None:
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    sp.write_text("")
+    bp.write_text("")
+    with pytest.raises(ScoringError, match="(?i)empty|headerless"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_no_data_rows_rejected(tmp_path: Path) -> None:
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    header = "PeriodIndex,StartDay,EndDay,AverageTransitTime\n"
+    sp.write_text(header)
+    bp.write_text(header)
+    with pytest.raises(ScoringError, match="(?i)no data rows"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_load_round_zero_handling_both_zero_branch(tmp_path: Path) -> None:
+    """Covers both-zero branch in _ratio."""
+    scenario = [_period(1, 0, 0, 0.0)]
+    baseline = [_period(1, 0, 0, -5.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    result = compute_resilience_loss(sp, bp)
+    # ratio for both <=0 returns 1.0; loss = (1-1)*1 = 0
+    assert result.per_period[0] == 0.0

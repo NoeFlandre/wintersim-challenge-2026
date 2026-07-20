@@ -8,6 +8,7 @@ monkeypatched path helpers, so nothing depends on organizer source or the real
 from __future__ import annotations
 
 import csv
+import os
 import textwrap
 from pathlib import Path
 
@@ -128,6 +129,87 @@ def test_cli_score_error(tmp_path: Path) -> None:
     _write_att(s, [(1, 0, 4, 100.0)])
     _write_att(b, [(2, 0, 4, 100.0)])  # mismatched period
     rc = cli.main(["score", "--scenario-att", str(s), "--baseline-att", str(b)])
+    assert rc != 0
+
+
+def test_cli_score_relative_paths_resolve_under_repo_root(tmp_path: Path) -> None:
+    """Relative score paths must resolve beneath the repo root, not the cwd.
+
+    The test changes the cwd to a different directory and uses a path
+    expressed relative to the workspace root. The scorer should still locate
+    the CSVs.
+    """
+    from pathlib import Path as _P
+
+    repo = _P(__file__).resolve().parents[2]
+    workdir = tmp_path / "elsewhere"
+    workdir.mkdir()
+    files_dir = repo / "tests" / "fixtures_score_root"
+    files_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        sp = files_dir / "scenario.csv"
+        bp = files_dir / "baseline.csv"
+        _write_att(sp, [(1, 0, 4, 100.0)])
+        _write_att(bp, [(1, 0, 4, 100.0)])
+        cwd_save = _P.cwd()
+        try:
+            os.chdir(workdir)
+            rc = cli.main(
+                [
+                    "score",
+                    "--scenario-att",
+                    "tests/fixtures_score_root/scenario.csv",
+                    "--baseline-att",
+                    "tests/fixtures_score_root/baseline.csv",
+                    "--json",
+                ]
+            )
+        finally:
+            os.chdir(cwd_save)
+        assert rc == 0, "relative paths must resolve beneath the repo root"
+        assert sp.exists() and bp.exists(), "test fixtures should remain"
+    finally:
+        # Clean up only the fixtures directory we own in the test repo.
+        if files_dir.exists() and not any(files_dir.iterdir()):
+            files_dir.rmdir()
+
+
+def test_cli_score_absolute_path_is_unchanged(tmp_path: Path, monkeypatch) -> None:
+    """Absolute paths must not be re-rooted under the workspace."""
+    s = tmp_path / "s.csv"
+    b = tmp_path / "b.csv"
+    _write_att(s, [(1, 0, 4, 100.0)])
+    _write_att(b, [(1, 0, 4, 100.0)])
+    rc = cli.main(["score", "--scenario-att", str(s), "--baseline-att", str(b)])
+    assert rc == 0
+
+
+def test_cli_score_relative_path_outside_repo_rejected(tmp_path: Path) -> None:
+    """Relative paths that escape the repo root must fail with an actionable error.
+
+    The cwd is intentionally a different directory so an unresolved relative
+    path cannot coincidentally be valid.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    s = outside / "s.csv"
+    b = outside / "b.csv"
+    _write_att(s, [(1, 0, 4, 100.0)])
+    _write_att(b, [(1, 0, 4, 100.0)])
+    cwd_save = __import__("os").getcwd()
+    try:
+        __import__("os").chdir(tmp_path)
+        rc = cli.main(
+            [
+                "score",
+                "--scenario-att",
+                "../outside/s.csv",
+                "--baseline-att",
+                "../outside/b.csv",
+            ]
+        )
+    finally:
+        __import__("os").chdir(cwd_save)
     assert rc != 0
 
 

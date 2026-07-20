@@ -19,6 +19,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+class RepoPathError(ValueError):
+    """Raised when a relative path cannot be resolved under the repo root."""
+
+
 def repo_root() -> Path:
     """Return the workspace repository root.
 
@@ -29,6 +33,33 @@ def repo_root() -> Path:
     """
     # src/wsc2026_tools/paths.py -> up three levels to the repo root.
     return Path(__file__).resolve().parents[2]
+
+
+def resolve_repo_path(path: str | Path, *, base: Path | None = None) -> Path:
+    """Resolve a user-supplied path against the repository root.
+
+    * Absolute paths are returned unchanged (still resolved as absolute paths).
+    * Relative paths are resolved beneath ``base`` (default: the repo root).
+      The caller’s current working directory is intentionally not consulted.
+
+    Resolution rules:
+
+    * Traversal operators (``..``) are honoured, so a relative ``../outside``
+      path resolves to ``base/../outside`` and may leave the repo. The CLI
+      caller is responsible for treating such paths as user errors.
+    * Empty strings raise :class:`RepoPathError`.
+
+    This helper makes the documented "paths resolve relative to the repo
+    root, not the cwd" contract explicit and shared.
+    """
+    p = Path(path)
+    if p.is_absolute():
+        return p.resolve()
+    text = str(path)
+    if not text.strip():
+        raise RepoPathError("empty path is not allowed")
+    base_path = Path(base) if base is not None else repo_root()
+    return (base_path / p).resolve()
 
 
 def challenge_dir() -> Path:

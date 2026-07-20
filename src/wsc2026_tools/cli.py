@@ -26,6 +26,7 @@ from wsc2026_tools.paths import (
     RoundConfigError,
     dist_submissions_dir,
     load_round,
+    resolve_repo_path,
     round_source_dir,
     submission_strategies_dir,
 )
@@ -239,8 +240,11 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
 
 def _cmd_score(args: argparse.Namespace) -> int:
-    scenario = Path(args.scenario_att)
-    baseline = Path(args.baseline_att)
+    try:
+        scenario = resolve_repo_path(args.scenario_att)
+        baseline = resolve_repo_path(args.baseline_att)
+    except Exception as exc:
+        return _error(str(exc))
     try:
         result = compute_resilience_loss(scenario, baseline)
     except ScoringError as exc:

@@ -201,6 +201,60 @@ def test_documented_organizer_module_import_allowed(tmp_path: Path) -> None:
     assert archive.exists()
 
 
+def test_relative_import_to_missing_participant_module_rejected(tmp_path: Path) -> None:
+    """``from .missing import x`` must fail if no 'missing' file is packaged."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from .missing import foo  # no such file in this submission\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)missing|relative"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_absolute_import_to_missing_participant_module_rejected(tmp_path: Path) -> None:
+    """``from response_strategies.missing import x`` must fail."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from response_strategies.missing import foo  # not packaged\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)missing|response_strategies\.missing"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_relative_import_escaping_package_rejected(tmp_path: Path) -> None:
+    """``from ..other import foo`` escapes the response_strategies package.
+
+    It must fail because there is no parent package and certainly no packaged
+    module called 'other' outside the submission.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from ..other import foo  # parent traversal\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)relative|parent|escape"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_relative_import_to_existing_participant_module_allowed(tmp_path: Path) -> None:
+    """A relative import whose target IS in the packaged set is allowed.
+
+    A self-import from inside user_strategy.py resolves to
+    ``response_strategies.user_strategy`` -- which is itself. This must be
+    accepted: the validator should distinguish between 'relative to a missing
+    module' and 'relative to a packaged module'.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from .user_strategy import UserStrategy  # self-reference; valid Python\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
 # --- report (path/sha/size) -------------------------------------------------
 
 

@@ -230,47 +230,149 @@ def _walk_submission(submission_dir: Path) -> list[Path]:
 
 
 def _validate_imports(files: list[Path], submission_dir: Path) -> None:
-    """Inspect every packaged .py file's imports with ast."""
-    participant_module_names = {
-        f.relative_to(submission_dir).with_suffix("").as_posix().replace("/", "."): f
+    """Inspect every packaged .py file's imports with ast.
+
+    Imports are validated against the actual set of packaged files:
+
+    * ``ast.Import name`` may be a stdlib module or an entry in
+      ``_ALLOWED_IMPORT_MODULES`` (the documented organizer modules).
+    * ``ast.ImportFrom module=`` may be stdlib, allowed organizer, or a
+      module that resolves to a packaged file in the submission.
+    * ``ast.ImportFrom level > 0`` is a relative import; the level + module
+      are resolved relative to the importing file's package (the submission
+      ``response_strategies`` root). The resulting dotted name MUST be in the
+      packaged module set, otherwise the import references a file that the
+      packager will not ship. ``from ..escape`` (level > 1) is rejected
+      outright because it leaves the submission package.
+    """
+    # Module names actually being packaged (dotted). The submission_dir IS
+    # the `response_strategies` package when the archive is extracted into
+    # the organizer tree, so every file in submission_dir is a submodule of
+    # `response_strategies`. Self-imports like
+    # `from .user_strategy import UserStrategy` resolve to a name in this set.
+    packaged_modules: set[str] = {
+        "response_strategies." + f.relative_to(submission_dir).with_suffix("").as_posix().replace("/", ".")
         for f in files
         if f.suffix == ".py"
     }
-    participant_roots = {name.split(".", 1)[0] for name in participant_module_names}
+    # Also include the bare module name for files at the submission root
+    # (no subpackage), because some Python import styles compare without the
+    # response_strategies prefix; the relative-resolver will produce the full
+    # form, so both keys must exist for comparisons to be symmetric.
+    packaged_modules |= {
+        f.relative_to(submission_dir).with_suffix("").as_posix().replace("/", ".")
+        for f in files
+        if f.suffix == ".py" and "/" not in f.relative_to(submission_dir).as_posix()
+    }
     offenders: list[str] = []
     for f in files:
         if f.suffix != ".py":
             continue
+        rel = f.relative_to(submission_dir)
+        # The dotted "package" name of the file (everything except the last
+        # component). For submission_root/user_strategy.py this is the bare
+        # 'response_strategies' package. For submission_root/sub/x.py this is
+        # 'response_strategies.sub'.
+        parent_rel = rel.parent.as_posix()
+        if parent_rel in ("", "."):
+            file_pkg = "response_strategies"
+        else:
+            file_pkg = "response_strategies." + parent_rel.replace("/", ".")
+
         try:
             tree = ast.parse(f.read_text(encoding="utf-8"), filename=str(f))
         except SyntaxError as exc:
             raise PackagerError(f"{f}: syntax error: {exc}") from exc
         for node in ast.walk(tree):
-            modules: list[str] = []
             if isinstance(node, ast.Import):
-                modules.extend(alias.name for alias in node.names)
-            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    mod = alias.name
+                    if not _is_import_allowed(mod):
+                        offenders.append(
+                            f"{f.name}: disallowed import {mod!r}"
+                        )
+                continue
+            if isinstance(node, ast.ImportFrom):
                 if node.level and node.level > 0:
-                    # Relative imports within response_strategies are allowed.
+                    # Relative import. Resolve to a dotted name relative to
+                    # this file's package, then check it against the packaged
+                    # module set.
+                    base_parts = file_pkg.split(".")
+                    # level=1: anchor = file_pkg
+                    # level=2: anchor = parent of file_pkg
+                    # level=L: anchor = file_pkg with (L-1) trailing parts dropped
+                    drop = node.level - 1
+                    if drop >= len(base_parts):
+                        offenders.append(
+                            f"{f.name}: relative import level {node.level} "
+                            f"from package {file_pkg!r} escapes the submission package"
+                        )
+                        continue
+                    anchor_parts = base_parts[: len(base_parts) - drop]
+                    anchor = ".".join(anchor_parts)
+                    suffix = node.module or ""
+                    if anchor and suffix:
+                        resolved = f"{anchor}.{suffix}"
+                    elif anchor:
+                        resolved = anchor
+                    else:
+                        # level > file_pkg depth handled above; this branch
+                        # only fires if anchor is empty AND suffix is empty,
+                        # which would be `from . import *` at top level.
+                        offenders.append(
+                            f"{f.name}: relative import has no anchor and no module"
+                        )
+                        continue
+                    if resolved and resolved not in packaged_modules:
+                        offenders.append(
+                            f"{f.name}: relative import resolves to missing "
+                            f"module {resolved!r} (not in packaged files: "
+                            f"{sorted(packaged_modules)})"
+                        )
                     continue
-                if node.module:
-                    modules.append(node.module)
-            for mod in modules:
+                # Absolute import.
+                mod = node.module or ""
+                if not mod:
+                    # from-import without module (e.g. ``from . import x``) at
+                    # level 0 is unusual but legal; check.
+                    for alias in node.names:
+                        if not _is_import_allowed(alias.name):
+                            offenders.append(
+                                f"{f.name}: disallowed import {alias.name!r}"
+                            )
+                    continue
+                if not _is_import_allowed(mod):
+                    offenders.append(
+                        f"{f.name}: disallowed import {mod!r}"
+                    )
+                    continue
+                # The root is allowed (stdlib or organizer entry point).
+                # If the root is the local 'response_strategies' package,
+                # any submodule must resolve to a packaged file.
                 root = mod.split(".", 1)[0]
-                if root in _FORBIDDEN_STDLIB_MODULES:
-                    offenders.append(f"{f.name}: forbidden import {mod!r}")
-                    continue
-                if root in participant_roots:
-                    continue
-                if root in _ALLOWED_IMPORT_MODULES:
-                    continue
-                if _is_stdlib(root):
-                    continue
-                offenders.append(f"{f.name}: disallowed third-party import {mod!r}")
+                if root == "response_strategies" and mod != "response_strategies":
+                    if mod not in packaged_modules:
+                        offenders.append(
+                            f"{f.name}: absolute import resolves to missing "
+                            f"participant module {mod!r} (not in packaged files: "
+                            f"{sorted(packaged_modules)})"
+                        )
     if offenders:
         raise PackagerError(
             "submission import validation failed: " + "; ".join(sorted(set(offenders)))
         )
+
+
+def _is_import_allowed(module_name: str) -> bool:
+    """Apply the absolute-import rules to a top-level module name."""
+    root = module_name.split(".", 1)[0]
+    if root in _FORBIDDEN_STDLIB_MODULES:
+        return False
+    if root in _ALLOWED_IMPORT_MODULES:
+        return True
+    if _is_stdlib(root):
+        return True
+    return False
 
 
 def _is_stdlib(module_name: str) -> bool:

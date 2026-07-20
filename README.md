@@ -11,6 +11,27 @@ A public-safe, reproducible participant workspace for the
 > them from a private copy of the official archive. Never commit, copy, or
 > redistribute organizer source or data.
 
+## Tracked checkout vs git history
+
+The current tracked checkout on the default branch is public-safe: every file
+under `src/`, `tests/`, `docs/`, `submission/`, `config/`, and the tracked
+top-level files are participant-owned or paraphrased documentation. The
+organizer ZIP, the extracted source tree, derived outputs, and submission
+archives are excluded by `.gitignore` and have never been added in tracked
+form on this branch.
+
+Earlier branches, forks, or force-pushed histories may have **transiently**
+contained organizer artifacts during private development. **The tracked
+checkout of this repository is the only artifact considered public-safe.**
+Before making any public release, every contributor must verify that the
+git history they intend to publish contains no organizer artifacts, no
+extracted source tree, and no input/output CSVs. If such artifacts ever
+appear in a future history, a coordinated owner-authorized history purge
+and force-push is required; rewriting history is **not** something this
+workspace will perform unilaterally.
+
+> **Public release and merge remain blocked pending owner-authorized history purge and coordinated force-push.**
+
 ## Challenge purpose
 
 Teams build response strategies for a maritime shipping disruption simulation.

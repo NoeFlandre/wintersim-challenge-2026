@@ -16,8 +16,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from wsc2026_tools.overlay import OverlayError, overlay_response_strategies
+from wsc2026_tools.packaging import PackagerError, package_submission
 from wsc2026_tools.paths import (
     RoundConfigError,
+    dist_submissions_dir,
     load_round,
     round_source_dir,
     submission_strategies_dir,
@@ -82,6 +84,22 @@ def _cmd_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_package(args: argparse.Namespace) -> int:
+    submission = submission_strategies_dir()
+    dist = dist_submissions_dir()
+    try:
+        package_submission(
+            submission,
+            team=args.team,
+            round_id=args.round,
+            dist_dir=dist,
+            report=True,
+        )
+    except PackagerError as exc:
+        return _error(str(exc))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wsc2026",
@@ -104,6 +122,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_score.add_argument("--baseline-att", required=True, help="Baseline ATT CSV path.")
     p_score.add_argument("--json", action="store_true", help="Emit full-precision JSON to stdout.")
     p_score.set_defaults(func=_cmd_score)
+
+    p_package = sub.add_parser(
+        "package",
+        help="Build a compliant submission archive under dist/submissions/.",
+    )
+    p_package.add_argument("--team", required=True, help="Team name (non-placeholder).")
+    p_package.add_argument(
+        "--round",
+        required=True,
+        choices=["1", "2", "hidden"],
+        help="Submission round (Round 0 is rejected).",
+    )
+    p_package.set_defaults(func=_cmd_package)
 
     return parser
 

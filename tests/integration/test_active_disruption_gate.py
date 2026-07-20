@@ -25,17 +25,14 @@ import pytest
 
 from wsc2026_tools.cli import run_smoke
 from wsc2026_tools.paths import (
+    round_source_dir,
     submission_strategies_dir,
 )
 
 pytestmark = pytest.mark.integration
 
-SOURCE = round_source_dir() if False else None  # placeholder; computed below
-
 
 def _round0_source() -> Path:
-    from wsc2026_tools.paths import round_source_dir
-
     return round_source_dir("round0")
 
 
@@ -93,9 +90,7 @@ def _snapshot(context) -> dict:
         "vessels": tuple(context.vessels),
         "legs": tuple(context.legs),
         "service_routes": tuple(context.service_routes),
-        "assigned_routes": {
-            vessel: vessel.assigned_service_route for vessel in context.vessels
-        },
+        "assigned_routes": {vessel: vessel.assigned_service_route for vessel in context.vessels},
         "disruption_plans": tuple(context.disruption_plans),
     }
 

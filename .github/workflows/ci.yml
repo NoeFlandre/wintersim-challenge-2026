@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-type-test:
+    name: Lint, typecheck, and test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      # Dev group only: the simulation group reproduces the organizer's runtime
+      # dependencies and is intentionally not required for CI. CI never
+      # downloads, accesses, caches, or uploads organizer software or data.
+      - name: Sync dev dependencies
+        run: uv sync --locked --group dev
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Mypy
+        run: uv run mypy src/wsc2026_tools submission
+
+      - name: Unit tests with coverage (integration excluded)
+        run: >
+          uv run pytest -m "not integration"
+          --cov=src/wsc2026_tools --cov=submission
+          --cov-report=term-missing --cov-fail-under=90

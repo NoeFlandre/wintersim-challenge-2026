@@ -1,0 +1,32 @@
+# Public challenge round metadata.
+#
+# This file contains ONLY public information: round identifiers, the publicly
+# distributed archive filename, its published SHA-256, the local extraction
+# directory name, practice/warm-up status, and structural marker paths that the
+# bootstrap step must verify.
+#
+# It MUST NOT contain organizer source code, CSV cell values, private URLs,
+# credentials, or copied prose from the organizer documents.
+#
+# Parsing is strict (fail closed): an unknown round id or a checksum mismatch
+# must abort with an error. There is intentionally no "allow unverified" escape.
+
+[[rounds]]
+round_id = "round0"
+# Publicly distributed archive filename (warm-up round).
+archive_filename = "SimulationChallenge2026_Py_Round0.zip"
+# Published SHA-256 of the Round 0 archive.
+expected_sha256 = "224e176b2c5eeee20c492f5b0cb44d02a8cb7281521f6d3a3800045bbbda256b"
+# Directory name under .challenge/ where this round is extracted.
+extract_dir_name = "round0"
+# Round 0 is a non-scored practice round; it must never be packaged or submitted.
+practice_only = true
+# Structural marker paths (relative to the archive root) that bootstrap verifies.
+marker_relpaths = [
+    "main.py",
+    "requirements.txt",
+    "response_strategies/user_strategy.py",
+    "response_strategies/default_strategy.py",
+    "response_strategies/strategy_validation.py",
+    "o2despy/pyproject.toml",
+]

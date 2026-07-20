@@ -11,24 +11,28 @@ A public-safe, reproducible participant workspace for the
 > them from a private copy of the official archive. Never commit, copy, or
 > redistribute organizer source or data.
 
-## Tracked checkout vs git history
+## Tracked checkout vs git history (public-release status)
 
-The current tracked checkout on the default branch is public-safe: every file
-under `src/`, `tests/`, `docs/`, `submission/`, `config/`, and the tracked
-top-level files are participant-owned or paraphrased documentation. The
+The current `HEAD` tree contains no organizer software or data: the
 organizer ZIP, the extracted source tree, derived outputs, and submission
 archives are excluded by `.gitignore` and have never been added in tracked
 form on this branch.
 
-Earlier branches, forks, or force-pushed histories may have **transiently**
-contained organizer artifacts during private development. **The tracked
-checkout of this repository is the only artifact considered public-safe.**
-Before making any public release, every contributor must verify that the
-git history they intend to publish contains no organizer artifacts, no
-extracted source tree, and no input/output CSVs. If such artifacts ever
-appear in a future history, a coordinated owner-authorized history purge
-and force-push is required; rewriting history is **not** something this
-workspace will perform unilaterally.
+However, reachable repository history **does contain**
+`SimulationChallenge2026_Py_Round0.zip`. In particular:
+
+* commit `f7d0c70` ("chore: add Round 0 challenge archive") added the
+  organizer ZIP, and is an ancestor of both the current `HEAD` and
+  `origin/main`.
+* Commit `df6d53d` ("chore: establish public-safe uv workspace") is the
+  point at which the ZIP was removed from the working tree and added to
+  `.gitignore`, but the file remains in the history before that point.
+
+Therefore the repository as currently published is **not** public-safe in
+its history. It must not be made public or merged as public-safe until an
+owner authorizes and coordinates a history purge and a force-push that
+removes `f7d0c70` and any later commit that re-introduced the ZIP. The
+coding agent will not perform that destructive operation autonomously.
 
 > **Public release and merge remain blocked pending owner-authorized history purge and coordinated force-push.**
 

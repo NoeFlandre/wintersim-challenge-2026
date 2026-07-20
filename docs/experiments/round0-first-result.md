@@ -75,3 +75,9 @@ run before retaining it.
 
 Public release and merge remain separately blocked pending an owner-authorized
 history purge and coordinated force-push of the restricted Round 0 ZIP.
+
+> Note: the historical fallback SHA/score above is **not reproduced in the
+> current checkout** (see `round0-fallback-reproducibility.md`). In this
+> checkout the locally reproduced fallback is `18.673577819840556`
+> (SHA `10234375...`). Treat `18.276620672293834` as historical evidence only
+> unless the discrepancy is later resolved.

@@ -103,3 +103,9 @@ Raw organizer output remains local and ignored:
   `.challenge/round0/results/transfer_aware_routing_v1_2026/`
 
 No raw organizer output or experiment result is tracked.
+
+> Note: the historical fallback SHA/score above is **not reproduced in the
+> current checkout** (see `round0-fallback-reproducibility.md`). In this
+> checkout the locally reproduced fallback is `18.673577819840556`
+> (SHA `10234375...`). Treat `18.276620672293834` as historical evidence only
+> unless the discrepancy is later resolved.

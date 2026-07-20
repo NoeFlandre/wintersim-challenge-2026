@@ -72,6 +72,7 @@ def _validate_submission_contents(submission_dir: Path) -> list[Path]:
     """Return sorted allowlisted files; skip caches; raise on unknown files."""
     allowed: list[Path] = []
     disallowed: list[str] = []
+    seen_allowlisted: set[str] = set()
     for entry in sorted(submission_dir.iterdir()):
         if entry.is_symlink():
             raise OverlayError(f"refusing symlink in submission response_strategies: {entry.name}")
@@ -87,6 +88,7 @@ def _validate_submission_contents(submission_dir: Path) -> list[Path]:
         name = entry.name
         if name in ALLOWED_OVERLAY_FILES:
             allowed.append(entry)
+            seen_allowlisted.add(name)
         else:
             disallowed.append(name)
 
@@ -95,6 +97,14 @@ def _validate_submission_contents(submission_dir: Path) -> list[Path]:
             "refusing to overlay non-allowlisted submission files: "
             + ", ".join(sorted(disallowed))
             + f". Allowed files: {sorted(ALLOWED_OVERLAY_FILES)}"
+        )
+    if "user_strategy.py" not in seen_allowlisted:
+        raise OverlayError(
+            "submission response_strategies is missing required file "
+            "'user_strategy.py'. The overlay refuses to run: running it "
+            "would leave a stale strategy at the destination while the rest "
+            "of the package is partially updated. Add user_strategy.py and "
+            "retry."
         )
     return allowed
 
@@ -105,6 +115,10 @@ def overlay_response_strategies(submission_dir: Path, dest_dir: Path) -> list[st
     Returns the sorted list of relative file names that were synchronized.
     Organizer-owned files in ``dest_dir`` are never modified or deleted.
     Idempotent: running twice yields the same result.
+
+    The submission must contain ``user_strategy.py``; without it the overlay
+    aborts before any file is copied, so the destination cannot be left in a
+    partially-updated state.
     """
     submission_dir = Path(submission_dir)
     dest_dir = Path(dest_dir)

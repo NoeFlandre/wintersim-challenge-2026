@@ -100,6 +100,34 @@ def test_member_allowlist_excludes_disallowed_files(tmp_path: Path) -> None:
         package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
 
 
+def test_package_rejects_submission_missing_user_strategy(tmp_path: Path) -> None:
+    """A submission without user_strategy.py is unpackageable.
+
+    This matches the overlay contract: without user_strategy.py there is no
+    participant strategy, so the submission is invalid by definition.
+    """
+    sub = tmp_path / "submission" / "response_strategies"
+    sub.mkdir(parents=True)
+    (sub / "README.md").write_text("# readme only\n")
+    with pytest.raises(PackagerError, match=r"(?i)user_strategy\.py"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_package_walks_submission_root_directly_missing_user_strategy_rejected(
+    tmp_path: Path,
+) -> None:
+    """Packager must inspect the *root* submission directory directly.
+
+    This guards against an accidental regression where the walk is rooted at
+    a parent that may not exist or may be the workspace itself.
+    """
+    sub = tmp_path / "response_strategies"
+    sub.mkdir(parents=True)
+    (sub / "README.md").write_text("# readme only\n")
+    with pytest.raises(PackagerError, match=r"(?i)user_strategy\.py"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
 def test_caches_and_hidden_files_skipped_not_packaged(tmp_path: Path) -> None:
     sub = _submission_dir(tmp_path)
     (sub / "__pycache__").mkdir()

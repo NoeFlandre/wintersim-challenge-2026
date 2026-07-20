@@ -172,3 +172,44 @@ def test_overlay_skips_pycache_suffix_at_top_level(tmp_path: Path) -> None:
     copied = overlay_response_strategies(submission, dest)
     assert "user_strategy.py" in copied
     assert not (dest / "user_strategy.pyc").exists()
+
+
+def test_overlay_rejects_submission_missing_user_strategy(tmp_path: Path) -> None:
+    """A submission without user_strategy.py is unusable: refuse loudly."""
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "README.md").write_text("# only readme\n")
+    dest = tmp_path / "source" / "response_strategies"
+    dest.mkdir(parents=True)
+    (dest / "__init__.py").write_text("org init\n")
+
+    with pytest.raises(OverlayError, match=r"(?i)user_strategy\.py"):
+        overlay_response_strategies(submission, dest)
+
+
+def test_overlay_refuses_to_run_when_dest_stale_strategy_would_be_retained(
+    tmp_path: Path,
+) -> None:
+    """If the submission is missing user_strategy.py the overlay must abort
+    BEFORE copying anything, so the dest never silently keeps a stale file.
+
+    This test is a guard against "we copy README.md, then fail, and now dest
+    has a fresh README plus a stale user_strategy.py".
+    """
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "README.md").write_text("# new readme\n")
+    # Deliberately no user_strategy.py.
+
+    dest = tmp_path / "source" / "response_strategies"
+    dest.mkdir(parents=True)
+    (dest / "user_strategy.py").write_text("# STALE user_strategy\n")
+    (dest / "README.md").write_text("# old readme\n")
+    (dest / "__init__.py").write_text("org init\n")
+
+    with pytest.raises(OverlayError):
+        overlay_response_strategies(submission, dest)
+
+    # The dest must not have a partially-overlaid state.
+    assert (dest / "README.md").read_text() == "# old readme\n"
+    assert (dest / "user_strategy.py").read_text() == "# STALE user_strategy\n"

@@ -220,6 +220,12 @@ def _walk_submission(submission_dir: Path) -> list[Path]:
             "no allowlisted participant files found to package "
             f"(expected {', '.join(sorted(_ALLOWED_SUBMISSION_FILES))})"
         )
+    if not any(f.name == "user_strategy.py" for f in collected):
+        raise PackagerError(
+            "submission response_strategies is missing required file "
+            "'user_strategy.py'. A submission without a user strategy is "
+            "not a valid package; add user_strategy.py and retry."
+        )
     return collected
 
 

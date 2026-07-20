@@ -104,18 +104,28 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     # eagerly; if the participant module is imported first, the package is
     # mid-init and the constructor crashes.
     import scenario_builders  # type: ignore[import-not-found]
+    from simulation_model.disruption_status import is_disruption_active  # type: ignore[import-not-found]
 
     context = scenario_builders.create_with_disruption()
     assert context.disruption_plans, "the disruption scenario must define at least one plan"
 
     UserStrategy = _load_participant_user_strategy()
 
-    # Pick a timestamp inside the FIRST disruption's active window. Each plan's
-    # start_offset_days is measured from warm-up start; mid-window is a safe
-    # representative timestamp.
+    # Pick a timestamp strictly inside the FIRST disruption's active window.
+    # The organizer's is_disruption_active anchors offsets at datetime.min,
+    # so the absolute reference clock is:
+    #   now = datetime.min + timedelta(days=start_offset_days + duration/2)
+    # The previous test added the same offset to datetime(2026, 1, 1), which
+    # sat outside every plan window -- is_disruption_active returned False.
     plan = context.disruption_plans[0]
     inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
-    now = datetime(2026, 1, 1) + timedelta(days=inside_day)
+    now = datetime.min + timedelta(days=inside_day)
+
+    # Genuine proof that the disruption is active at the chosen timestamp.
+    assert is_disruption_active(context, now) is True, (
+        "test must pick a timestamp inside an active disruption; "
+        f"plan={plan!r} now={now!r}"
+    )
 
     snapshot_before = _snapshot(context)
 
@@ -131,6 +141,37 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
         f"context. Before: {snapshot_before['service_routes']!r}, "
         f"after: {snapshot_after['service_routes']!r}"
     )
+
+
+def test_active_disruption_clock_origin_is_datetime_min() -> None:
+    """The previous test used ``datetime(2026, 1, 1)`` as the clock origin.
+
+    With that origin, is_disruption_active returns False even when the
+    relative offset clearly falls inside the disruption window: every plan
+    anchors at datetime.min, so adding 200 days to a fixed 2026 date lands
+    outside the window. This test makes the regression explicit and locks
+    the contract: ``datetime.min + offset`` is the only correct origin.
+    """
+    source = _bootstrap_or_skip()
+    _add_source_to_path(source)
+
+    import scenario_builders  # type: ignore[import-not-found]
+    from simulation_model.disruption_status import is_disruption_active  # type: ignore[import-not-found]
+
+    context = scenario_builders.create_with_disruption()
+    plan = context.disruption_plans[0]
+    inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
+
+    # The naive 2026-anchored timestamp is NOT inside the disruption window.
+    bad_now = datetime(2026, 1, 1) + timedelta(days=inside_day)
+    assert is_disruption_active(context, bad_now) is False, (
+        "with datetime(2026, 1, 1) origin the helper must return False -- "
+        "proving the previous test was off-clock"
+    )
+
+    # The correct anchor (datetime.min) lands inside the disruption.
+    good_now = datetime.min + timedelta(days=inside_day)
+    assert is_disruption_active(context, good_now) is True
 
 
 def test_round0_smoke_spawn_against_real_source() -> None:

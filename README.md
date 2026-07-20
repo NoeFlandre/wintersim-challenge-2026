@@ -13,10 +13,9 @@ A public-safe, reproducible participant workspace for the
 
 ## Tracked checkout vs git history (public-release status)
 
-The current `HEAD` tree contains no organizer software or data: the
-organizer ZIP, the extracted source tree, derived outputs, and submission
-archives are excluded by `.gitignore` and have never been added in tracked
-form on this branch.
+The current `HEAD` tree contains no organizer software or data: the organizer
+ZIP, extracted source tree, derived outputs, and submission archives are absent
+from the current tree and excluded by `.gitignore`.
 
 However, reachable repository history **does contain**
 `SimulationChallenge2026_Py_Round0.zip`. In particular:
@@ -57,7 +56,9 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
 The current `UserStrategy` delegates every decision to the organizer fallback.
-This is an intentional, known baseline; no optimization has been performed yet.
+This is the retained baseline. The first controlled Round 0 experiment was
+completed and rejected because it increased Cumulative Resilience Loss by
+22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
 
 ## Prerequisites
 

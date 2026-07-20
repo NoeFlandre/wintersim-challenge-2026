@@ -145,33 +145,25 @@ def test_cli_score_relative_paths_resolve_under_repo_root(tmp_path: Path) -> Non
     workdir = tmp_path / "elsewhere"
     workdir.mkdir()
     files_dir = repo / "tests" / "fixtures_score_root"
-    files_dir.mkdir(parents=True, exist_ok=True)
+    sp = files_dir / "scenario.csv"
+    bp = files_dir / "baseline.csv"
+    assert sp.is_file() and bp.is_file(), "tracked synthetic score fixtures must exist"
+    cwd_save = _P.cwd()
     try:
-        sp = files_dir / "scenario.csv"
-        bp = files_dir / "baseline.csv"
-        _write_att(sp, [(1, 0, 4, 100.0)])
-        _write_att(bp, [(1, 0, 4, 100.0)])
-        cwd_save = _P.cwd()
-        try:
-            os.chdir(workdir)
-            rc = cli.main(
-                [
-                    "score",
-                    "--scenario-att",
-                    "tests/fixtures_score_root/scenario.csv",
-                    "--baseline-att",
-                    "tests/fixtures_score_root/baseline.csv",
-                    "--json",
-                ]
-            )
-        finally:
-            os.chdir(cwd_save)
-        assert rc == 0, "relative paths must resolve beneath the repo root"
-        assert sp.exists() and bp.exists(), "test fixtures should remain"
+        os.chdir(workdir)
+        rc = cli.main(
+            [
+                "score",
+                "--scenario-att",
+                "tests/fixtures_score_root/scenario.csv",
+                "--baseline-att",
+                "tests/fixtures_score_root/baseline.csv",
+                "--json",
+            ]
+        )
     finally:
-        # Clean up only the fixtures directory we own in the test repo.
-        if files_dir.exists() and not any(files_dir.iterdir()):
-            files_dir.rmdir()
+        os.chdir(cwd_save)
+    assert rc == 0, "relative paths must resolve beneath the repo root"
 
 
 def test_cli_score_absolute_path_is_unchanged(tmp_path: Path, monkeypatch) -> None:

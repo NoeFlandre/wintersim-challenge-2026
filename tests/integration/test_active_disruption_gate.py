@@ -64,6 +64,25 @@ def _add_source_to_path(source: Path) -> None:
     if o2des not in sys.path:
         sys.path.insert(0, o2des)
 
+    # Unit tests import the participant-owned ``response_strategies`` package
+    # before this integration module runs. Changing sys.path cannot replace an
+    # already-cached package, so clear the organizer-facing namespaces and all
+    # their submodules before importing the real runtime tree.
+    prefixes = (
+        "response_strategies",
+        "scenario_builders",
+        "simulation_model",
+        "maritime_data_context",
+        "config",
+        "o2despy",
+        "o2des",
+    )
+    for module_name in list(sys.modules):
+        if any(
+            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
+        ):
+            sys.modules.pop(module_name, None)
+
 
 def _load_participant_user_strategy() -> type:
     """Load ``submission/response_strategies/user_strategy.py`` by file path.

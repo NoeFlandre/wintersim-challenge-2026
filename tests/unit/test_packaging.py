@@ -346,6 +346,86 @@ def test_placeholder_team_variants_rejected(tmp_path: Path) -> None:
             package_submission(sub, team=name, round_id="1", dist_dir=tmp_path / "out")
 
 
+# --- import validation: every participant import must resolve ----------------
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "import response_strategies.missing\n",
+        "from response_strategies import missing\n",
+        "from response_strategies.missing import value\n",
+        "from .missing import value\n",
+    ],
+)
+def test_packaging_rejects_imports_to_missing_participant_modules(
+    tmp_path: Path, body: str
+) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(f"{body}class UserStrategy:\n    pass\n")
+    with pytest.raises(PackagerError, match=r"(?i)disallowed|missing"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "import response_strategies.user_strategy\n",
+        "from response_strategies import user_strategy\n",
+        "from response_strategies.user_strategy import UserStrategy\n",
+        "from . import user_strategy\n",
+    ],
+)
+def test_packaging_accepts_imports_to_existing_participant_modules(
+    tmp_path: Path, body: str
+) -> None:
+    """Imports whose target IS in the packaged set must be accepted."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(f"{body}class UserStrategy:\n    pass\n")
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
+def test_relative_import_above_package_rejected(tmp_path: Path) -> None:
+    """``from ..other_pkg import foo`` from a top-level submission file escapes."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from ..other_pkg import foo\nclass UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)level|escapes"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_packaging_accepts_stdlib_and_organizer_allowlist(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "import math\n"
+        "import statistics\n"
+        "from collections import deque\n"
+        "from maritime_data_context import MaritimeDataContext\n"
+        "from simulation_model import Model\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
+def test_packaging_rejects_package_root_star_import(tmp_path: Path) -> None:
+    """``from response_strategies import *`` is not justified; reject it.
+
+    A bare star import at the package root forces every public name of the
+    submission package into the importer's namespace, defeating the explicit
+    allowlist. Reject unless the submission actually contains a sibling
+    module that justifies the star; the default baseline does not.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from response_strategies import *\nclass UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)disallowed|star"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
 # --- report (path/sha/size) -------------------------------------------------
 
 

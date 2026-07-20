@@ -292,6 +292,17 @@ def _validate_imports(files: list[Path], submission_dir: Path) -> None:
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     mod = alias.name
+                    root = mod.split(".", 1)[0]
+                    if root == "response_strategies" and mod != "response_strategies":
+                        # An absolute 'import response_strategies.<x>' must name
+                        # a real packaged module.
+                        if mod not in packaged_modules:
+                            offenders.append(
+                                f"{f.name}: absolute import resolves to missing "
+                                f"participant module {mod!r} (not in packaged "
+                                f"files: {sorted(packaged_modules)})"
+                            )
+                        continue
                     if not _is_import_allowed(mod):
                         offenders.append(f"{f.name}: disallowed import {mod!r}")
                 continue
@@ -313,32 +324,70 @@ def _validate_imports(files: list[Path], submission_dir: Path) -> None:
                         continue
                     anchor_parts = base_parts[: len(base_parts) - drop]
                     anchor = ".".join(anchor_parts)
-                    suffix = node.module or ""
-                    if anchor and suffix:
-                        resolved = f"{anchor}.{suffix}"
-                    elif anchor:
-                        resolved = anchor
-                    else:
-                        # level > file_pkg depth handled above; this branch
-                        # only fires if anchor is empty AND suffix is empty,
-                        # which would be `from . import *` at top level.
-                        offenders.append(f"{f.name}: relative import has no anchor and no module")
-                        continue
-                    if resolved and resolved not in packaged_modules:
+                    suffix = node.module
+                    aliases = list(node.names)
+                    if suffix:
+                        # ``from .module import a, b`` -- a single target module.
+                        resolved = f"{anchor}.{suffix}" if anchor else suffix
+                        if not resolved:
+                            offenders.append(
+                                f"{f.name}: relative import has empty anchor"
+                            )
+                            continue
+                        if resolved not in packaged_modules:
+                            offenders.append(
+                                f"{f.name}: relative import resolves to missing "
+                                f"module {resolved!r} (not in packaged files: "
+                                f"{sorted(packaged_modules)})"
+                            )
+                    elif not anchor:
                         offenders.append(
-                            f"{f.name}: relative import resolves to missing "
-                            f"module {resolved!r} (not in packaged files: "
-                            f"{sorted(packaged_modules)})"
+                            f"{f.name}: relative import has no anchor and no module"
                         )
+                        continue
+                    elif any(a.name == "*" for a in aliases):
+                        offenders.append(
+                            f"{f.name}: relative star import is not allowed"
+                        )
+                        continue
+                    else:
+                        # ``from . import a, b`` -- each alias resolves to a
+                        # submodule of ``anchor``.
+                        for alias in aliases:
+                            resolved = f"{anchor}.{alias.name}" if anchor else alias.name
+                            if resolved not in packaged_modules:
+                                offenders.append(
+                                    f"{f.name}: relative import resolves to "
+                                    f"missing module {resolved!r} (not in "
+                                    f"packaged files: {sorted(packaged_modules)})"
+                                )
                     continue
                 # Absolute import.
                 mod = node.module or ""
                 if not mod:
-                    # from-import without module (e.g. ``from . import x``) at
-                    # level 0 is unusual but legal; check.
+                    # ``from x import a, b`` without a module attr is unusual;
+                    # treat each alias as an absolute name and validate it.
                     for alias in node.names:
                         if not _is_import_allowed(alias.name):
                             offenders.append(f"{f.name}: disallowed import {alias.name!r}")
+                    continue
+                if any(a.name == "*" for a in node.names) and mod == "response_strategies":
+                    offenders.append(
+                        f"{f.name}: star import of the submission package is not allowed"
+                    )
+                    continue
+                if mod == "response_strategies":
+                    # ``from response_strategies import <name>`` treats each
+                    # alias as a participant submodule; require each one to be
+                    # a real packaged module.
+                    for alias in node.names:
+                        candidate = f"response_strategies.{alias.name}"
+                        if candidate not in packaged_modules:
+                            offenders.append(
+                                f"{f.name}: absolute import resolves to missing "
+                                f"participant module {candidate!r} (not in "
+                                f"packaged files: {sorted(packaged_modules)})"
+                            )
                     continue
                 if not _is_import_allowed(mod):
                     offenders.append(f"{f.name}: disallowed import {mod!r}")

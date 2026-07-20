@@ -1,4 +1,15 @@
-# Python
+# --- Challenge-organizer material (never tracked, never redistributed) ---
+# Local-only organizer software, inputs, outputs, downloads, and extracted trees.
+.challenge/
+data/
+
+# Generated submission archives and packaging scratch space.
+/dist/submissions/
+
+# Local experiment results (participant-owned, intentionally not public).
+/experiments/results/
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,7 +17,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -21,30 +31,33 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# --- Virtual environments ---
 .venv/
 venv/
 env/
 ENV/
 
-# uv
-# uv.lock is committed for reproducible builds
+# --- uv ---
+# uv.lock is committed for reproducible builds.
 
-# IDE
+# --- IDE / OS ---
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
 
-# Testing
+# --- Testing / quality artifacts ---
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
+coverage.json
 htmlcov/
 .tox/
 .mypy_cache/
 .ruff_cache/
 
-# Environment
+# --- Environment ---
 .env
 .env.local

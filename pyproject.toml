@@ -1,6 +1,92 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "wintersim-challenge-2026"
 version = "0.1.0"
-description = "Initial project setup for the WinterSim Challenge 2026."
-requires-python = ">=3.12"
+description = "Public-safe workspace for the WSC 2026 Simulation Challenge."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "NoeFlandre" }]
 dependencies = []
+
+[project.scripts]
+wsc2026 = "wsc2026_tools.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wsc2026_tools"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "submission", "config", "tests"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+simulation = [
+    "loguru>=0.7.0",
+    "numpy>=1.23.1",
+    "pandas>=1.4.3,<3.0.0",
+    "pyjson5>=1.6.0",
+    "sortedcontainers>=2.4.0,<3.0.0",
+]
+
+# --- Ruff ---
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    ".challenge",
+    "data",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "W"]
+
+[tool.ruff.format]
+docstring-code-format = false
+
+# --- Mypy ---
+[tool.mypy]
+python_version = "3.11"
+files = ["src/wsc2026_tools", "submission"]
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+exclude = [
+    "\\.challenge/",
+    "/data/",
+    "/dist/",
+]
+
+# --- Pytest ---
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+markers = [
+    "integration: end-to-end tests that require the local ignored Round 0 source tree",
+]
+addopts = "-ra"
+
+# --- Coverage ---
+# Participant-owned code only (dev CLI + submission surface).
+[tool.coverage.run]
+branch = true
+source = ["src/wsc2026_tools", "submission"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 90

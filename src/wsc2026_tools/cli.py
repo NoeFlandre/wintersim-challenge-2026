@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from wsc2026_tools.overlay import OverlayError, overlay_response_strategies
 from wsc2026_tools.paths import (
@@ -21,6 +22,7 @@ from wsc2026_tools.paths import (
     round_source_dir,
     submission_strategies_dir,
 )
+from wsc2026_tools.scoring import ScoringError, compute_resilience_loss, write_score_output
 
 __all__ = ["main"]
 
@@ -69,6 +71,17 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_score(args: argparse.Namespace) -> int:
+    scenario = Path(args.scenario_att)
+    baseline = Path(args.baseline_att)
+    try:
+        result = compute_resilience_loss(scenario, baseline)
+    except ScoringError as exc:
+        return _error(str(exc))
+    write_score_output(result, scenario, baseline, as_json=bool(args.json))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wsc2026",
@@ -82,6 +95,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_sync.add_argument("--round", required=True, help="Round id (e.g. round0).")
     p_sync.set_defaults(func=_cmd_sync)
+
+    p_score = sub.add_parser(
+        "score",
+        help="Compute cumulative resilience loss from two ATT-per-period CSVs.",
+    )
+    p_score.add_argument("--scenario-att", required=True, help="Scenario ATT CSV path.")
+    p_score.add_argument("--baseline-att", required=True, help="Baseline ATT CSV path.")
+    p_score.add_argument("--json", action="store_true", help="Emit full-precision JSON to stdout.")
+    p_score.set_defaults(func=_cmd_score)
 
     return parser
 

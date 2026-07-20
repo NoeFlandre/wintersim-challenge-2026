@@ -1,0 +1,238 @@
+"""Unit tests for the resilience loss scorer (wsc2026_tools.scoring).
+
+The scorer reproduces the dashboard formula exactly:
+
+    ATT ratio    = baseline ATT / scenario ATT
+    period loss  = (1 - ATT ratio) * inclusive number of days
+    cumulative   = sum(period loss)
+
+Zero handling matches the dashboard:
+- scenario ATT <= 0 and baseline ATT <= 0 -> ratio is 1.
+- scenario ATT <= 0 and baseline ATT > 0  -> ratio is 0.
+
+Negative loss is NOT clamped: a scenario that beats baseline yields negative
+period loss.
+
+Tests use synthetic CSVs written into tmp_path; they never reference real
+organizer output.
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+from pathlib import Path
+
+import pytest
+
+from wsc2026_tools.scoring import (
+    ScoreResult,
+    ScoringError,
+    compute_resilience_loss,
+    write_score_output,
+)
+
+
+def _write_att_csv(
+    path: Path, rows: list[dict[str, str]], *, extra_rows: list[dict[str, str]] | None = None
+) -> None:
+    """Write an ATT-per-period CSV. ``rows`` are data rows (PeriodIndex set)."""
+    fieldnames = ["PeriodIndex", "StartDay", "EndDay", "AverageTransitTime"]
+    with path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+        for row in extra_rows or []:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+
+
+def _period(idx: int, start: int, end: int, att: float) -> dict[str, str]:
+    return {
+        "PeriodIndex": str(idx),
+        "StartDay": str(start),
+        "EndDay": str(end),
+        "AverageTransitTime": str(att),
+    }
+
+
+# --- core formula -----------------------------------------------------------
+
+
+def test_basic_cumulative_loss_matches_formula(tmp_path: Path) -> None:
+    # Two 5-day periods.
+    scenario = [_period(1, 0, 4, 100.0), _period(2, 5, 9, 200.0)]
+    baseline = [_period(1, 0, 4, 120.0), _period(2, 5, 9, 200.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+
+    # period1: ratio=120/100=1.2 -> loss=(1-1.2)*5 = -1.0
+    # period2: ratio=200/200=1.0 -> loss=0.0
+    assert result.period_count == 2
+    assert result.per_period[0] == pytest.approx(-1.0)
+    assert result.per_period[1] == pytest.approx(0.0)
+    assert result.cumulative_loss == pytest.approx(-1.0)
+
+
+def test_inclusive_day_count_used(tmp_path: Path) -> None:
+    # StartDay=0, EndDay=9 inclusive => 10 days.
+    scenario = [_period(1, 0, 9, 100.0)]
+    baseline = [_period(1, 0, 9, 50.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+
+    # ratio=50/100=0.5 -> loss=(1-0.5)*10 = 5.0
+    assert result.per_period[0] == pytest.approx(5.0)
+    assert result.cumulative_loss == pytest.approx(5.0)
+
+
+def test_negative_loss_not_clamped(tmp_path: Path) -> None:
+    # Scenario outperforms baseline (lower ATT is better).
+    scenario = [_period(1, 0, 4, 80.0)]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+
+    # ratio=100/80=1.25 -> loss=(1-1.25)*5 = -1.25
+    assert result.per_period[0] == pytest.approx(-1.25)
+    assert result.cumulative_loss == pytest.approx(-1.25)
+
+
+# --- zero handling ----------------------------------------------------------
+
+
+def test_zero_handling_both_zero_ratio_is_one(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 0.0)]
+    baseline = [_period(1, 0, 4, 0.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+
+    # ratio=1 -> loss=0
+    assert result.per_period[0] == pytest.approx(0.0)
+
+
+def test_zero_handling_scenario_zero_baseline_positive_ratio_zero(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 0.0)]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+
+    # ratio=0 -> loss=(1-0)*5 = 5.0
+    assert result.per_period[0] == pytest.approx(5.0)
+
+
+# --- validation failures ----------------------------------------------------
+
+
+def test_mismatched_period_indices_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(2, 0, 4, 100.0)]  # different index
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    with pytest.raises(ScoringError, match="(?i)period"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_mismatched_day_ranges_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 9, 100.0)]  # different EndDay
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    with pytest.raises(ScoringError, match="(?i)range|day"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_duplicate_period_indices_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0), _period(1, 0, 4, 110.0)]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    with pytest.raises(ScoringError, match="(?i)duplicate|unique"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_malformed_att_value_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 4, "not-a-number")]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    with pytest.raises(ScoringError, match="(?i)malformed|invalid|non-finite|number"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_summary_rows_without_period_index_ignored(tmp_path: Path) -> None:
+    # A trailing summary line with no PeriodIndex must be ignored.
+    summary = {"PeriodIndex": "", "StartDay": "", "EndDay": "", "AverageTransitTime": "mean"}
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario, extra_rows=[summary])
+    _write_att_csv(bp, baseline, extra_rows=[summary])
+
+    result = compute_resilience_loss(sp, bp)
+
+    assert result.period_count == 1
+    assert result.cumulative_loss == pytest.approx(0.0)
+
+
+# --- output formatting ------------------------------------------------------
+
+
+def test_write_score_output_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [_period(1, 0, 4, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result = compute_resilience_loss(sp, bp)
+    write_score_output(result, sp, bp, as_json=True)
+
+    captured = capsys.readouterr().out
+    payload = json.loads(captured)
+    assert payload["scenario_att_path"] == str(sp)
+    assert payload["baseline_att_path"] == str(bp)
+    assert payload["period_count"] == 1
+    assert payload["cumulative_loss"] == pytest.approx(0.0)
+    assert payload["per_period"] == [0.0]
+
+
+def test_write_score_output_human_no_premature_round(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A loss that is not a round number must not be truncated in human output.
+    scenario = [_period(1, 0, 0, 80.0)]  # 1 inclusive day
+    baseline = [_period(1, 0, 0, 100.0)]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+
+    result: ScoreResult = compute_resilience_loss(sp, bp)
+    write_score_output(result, sp, bp, as_json=False)
+
+    captured = capsys.readouterr().out
+    # loss = (1 - 100/80) * 1 = -0.25 ; must show full precision, not "0" or "-0".
+    assert "-0.25" in captured

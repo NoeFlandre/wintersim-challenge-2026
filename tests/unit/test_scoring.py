@@ -32,12 +32,15 @@ from wsc2026_tools.scoring import (
     write_score_output,
 )
 
+# Canonical organizer ATT column name.
+ATT_COLUMN = "AverageTransportTime"
+
 
 def _write_att_csv(
     path: Path, rows: list[dict[str, str]], *, extra_rows: list[dict[str, str]] | None = None
 ) -> None:
     """Write an ATT-per-period CSV. ``rows`` are data rows (PeriodIndex set)."""
-    fieldnames = ["PeriodIndex", "StartDay", "EndDay", "AverageTransitTime"]
+    fieldnames = ["PeriodIndex", "StartDay", "EndDay", ATT_COLUMN]
     with path.open("w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
@@ -52,7 +55,7 @@ def _period(idx: int, start: int, end: int, att: float) -> dict[str, str]:
         "PeriodIndex": str(idx),
         "StartDay": str(start),
         "EndDay": str(end),
-        "AverageTransitTime": str(att),
+        ATT_COLUMN: str(att),
     }
 
 
@@ -185,7 +188,7 @@ def test_malformed_att_value_rejected(tmp_path: Path) -> None:
 
 def test_summary_rows_without_period_index_ignored(tmp_path: Path) -> None:
     # A trailing summary line with no PeriodIndex must be ignored.
-    summary = {"PeriodIndex": "", "StartDay": "", "EndDay": "", "AverageTransitTime": "mean"}
+    summary = {"PeriodIndex": "", "StartDay": "", "EndDay": "", ATT_COLUMN: "mean"}
     scenario = [_period(1, 0, 4, 100.0)]
     baseline = [_period(1, 0, 4, 100.0)]
     sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
@@ -242,7 +245,7 @@ def test_write_score_output_human_no_premature_round(
 
 
 def test_malformed_period_index_rejected(tmp_path: Path) -> None:
-    scenario = [{"PeriodIndex": "abc", "StartDay": "0", "EndDay": "4", "AverageTransitTime": "100"}]
+    scenario = [{"PeriodIndex": "abc", "StartDay": "0", "EndDay": "4", "AverageTransportTime": "100"}]
     baseline = [_period(1, 0, 4, 100.0)]
     sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
     _write_att_csv(sp, scenario)
@@ -252,7 +255,7 @@ def test_malformed_period_index_rejected(tmp_path: Path) -> None:
 
 
 def test_malformed_start_day_rejected(tmp_path: Path) -> None:
-    scenario = [{"PeriodIndex": "1", "StartDay": "x", "EndDay": "4", "AverageTransitTime": "100"}]
+    scenario = [{"PeriodIndex": "1", "StartDay": "x", "EndDay": "4", "AverageTransportTime": "100"}]
     baseline = [_period(1, 0, 4, 100.0)]
     sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
     _write_att_csv(sp, scenario)
@@ -262,7 +265,7 @@ def test_malformed_start_day_rejected(tmp_path: Path) -> None:
 
 
 def test_malformed_end_day_rejected(tmp_path: Path) -> None:
-    scenario = [{"PeriodIndex": "1", "StartDay": "0", "EndDay": "y", "AverageTransitTime": "100"}]
+    scenario = [{"PeriodIndex": "1", "StartDay": "0", "EndDay": "y", "AverageTransportTime": "100"}]
     baseline = [_period(1, 0, 4, 100.0)]
     sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
     _write_att_csv(sp, scenario)
@@ -317,7 +320,7 @@ def test_empty_headerless_csv_rejected(tmp_path: Path) -> None:
 def test_no_data_rows_rejected(tmp_path: Path) -> None:
     sp = tmp_path / "s.csv"
     bp = tmp_path / "b.csv"
-    header = "PeriodIndex,StartDay,EndDay,AverageTransitTime\n"
+    header = f"PeriodIndex,StartDay,EndDay,{ATT_COLUMN}\n"
     sp.write_text(header)
     bp.write_text(header)
     with pytest.raises(ScoringError, match="(?i)no data rows"):
@@ -334,3 +337,53 @@ def test_load_round_zero_handling_both_zero_branch(tmp_path: Path) -> None:
     result = compute_resilience_loss(sp, bp)
     # ratio for both <=0 returns 1.0; loss = (1-1)*1 = 0
     assert result.per_period[0] == 0.0
+
+
+# --- canonical column name ---------------------------------------------------
+
+
+def _header(field: str) -> str:
+    return f"PeriodIndex,StartDay,EndDay,{field}\n"
+
+
+def test_canonical_column_accepted(tmp_path: Path) -> None:
+    """CSVs with the organizer's exact ``AverageTransportTime`` header work."""
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    sp.write_text(_header("AverageTransportTime") + "1,0,4,100.0\n")
+    bp.write_text(_header("AverageTransportTime") + "1,0,4,100.0\n")
+    result = compute_resilience_loss(sp, bp)
+    assert result.period_count == 1
+
+
+def test_obsolete_column_rejected(tmp_path: Path) -> None:
+    """The obsolete ``AverageTransitTime`` header is NOT accepted."""
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    sp.write_text(_header("AverageTransitTime") + "1,0,4,100.0\n")
+    bp.write_text(_header("AverageTransitTime") + "1,0,4,100.0\n")
+    with pytest.raises(ScoringError, match=r"(?i)AverageTransportTime"):
+        compute_resilience_loss(sp, bp)
+
+
+def test_error_message_uses_canonical_name(tmp_path: Path) -> None:
+    sp = tmp_path / "s.csv"
+    bp = tmp_path / "b.csv"
+    sp.write_text("foo,bar\n1,2\n")
+    bp.write_text(_header("AverageTransportTime") + "1,0,4,100.0\n")
+    with pytest.raises(ScoringError) as exc:
+        compute_resilience_loss(sp, bp)
+    assert "AverageTransportTime" in str(exc.value)
+
+
+def test_malformed_canonical_att_rejected(tmp_path: Path) -> None:
+    scenario = [_period(1, 0, 4, 100.0)]
+    baseline = [{**_period(1, 0, 4, 100.0), ATT_COLUMN: "not-a-number"}]
+    sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
+    _write_att_csv(sp, scenario)
+    _write_att_csv(bp, baseline)
+    with pytest.raises(
+        ScoringError,
+        match=r"(?i)AverageTransportTime.*malformed|malformed.*AverageTransportTime",
+    ):
+        compute_resilience_loss(sp, bp)

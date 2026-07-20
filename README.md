@@ -15,7 +15,7 @@ A public-safe, reproducible participant workspace for the
 
 Teams build response strategies for a maritime shipping disruption simulation.
 The objective is to minimize **Cumulative Resilience Loss** (derived from
-Average Transit Time) across disrupted scenarios while preserving simulation
+Average Transport Time) across disrupted scenarios while preserving simulation
 integrity. See the tracked public documents in [`docs/`](docs/):
 [`WSC-2026-Simulation-Challenge-Brief.pdf`](docs/WSC-2026-Simulation-Challenge-Brief.pdf)
 and

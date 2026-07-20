@@ -98,7 +98,7 @@ def test_cli_sync_unknown_round(monkeypatch: pytest.MonkeyPatch) -> None:
 def _write_att(path: Path, rows: list[tuple[int, int, int, float]]) -> None:
     with path.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["PeriodIndex", "StartDay", "EndDay", "AverageTransitTime"])
+        w.writerow(["PeriodIndex", "StartDay", "EndDay", "AverageTransportTime"])
         for idx, s, e, att in rows:
             w.writerow([idx, s, e, att])
 

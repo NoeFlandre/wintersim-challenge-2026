@@ -38,7 +38,7 @@ __all__ = [
     "write_score_output",
 ]
 
-_REQUIRED_COLUMNS = ("PeriodIndex", "StartDay", "EndDay", "AverageTransitTime")
+_REQUIRED_COLUMNS = ("PeriodIndex", "StartDay", "EndDay", "AverageTransportTime")
 
 
 class ScoringError(ValueError):
@@ -78,10 +78,10 @@ def _parse_att(value: str, *, source: Path) -> float:
         att = float(value)
     except ValueError as exc:
         raise ScoringError(
-            f"{source}: malformed AverageTransitTime value {value!r} (not a number)"
+            f"{source}: malformed AverageTransportTime value {value!r} (not a number)"
         ) from exc
     if not math.isfinite(att):
-        raise ScoringError(f"{source}: non-finite AverageTransitTime value {value!r}")
+        raise ScoringError(f"{source}: non-finite AverageTransportTime value {value!r}")
     return att
 
 
@@ -104,7 +104,7 @@ def _load_periods(path: Path) -> dict[int, _PeriodRow]:
             idx = _parse_int(index_field, field_name="PeriodIndex", source=path)
             start_day = _parse_int(raw.get("StartDay", ""), field_name="StartDay", source=path)
             end_day = _parse_int(raw.get("EndDay", ""), field_name="EndDay", source=path)
-            att = _parse_att(raw.get("AverageTransitTime", ""), source=path)
+            att = _parse_att(raw.get("AverageTransportTime", ""), source=path)
             if idx in rows:
                 raise ScoringError(f"{path}: duplicate PeriodIndex {idx}")
             rows[idx] = _PeriodRow(idx, start_day, end_day, att)

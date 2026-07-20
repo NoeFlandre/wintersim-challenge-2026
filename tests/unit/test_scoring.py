@@ -245,7 +245,9 @@ def test_write_score_output_human_no_premature_round(
 
 
 def test_malformed_period_index_rejected(tmp_path: Path) -> None:
-    scenario = [{"PeriodIndex": "abc", "StartDay": "0", "EndDay": "4", "AverageTransportTime": "100"}]
+    scenario = [
+        {"PeriodIndex": "abc", "StartDay": "0", "EndDay": "4", "AverageTransportTime": "100"}
+    ]
     baseline = [_period(1, 0, 4, 100.0)]
     sp, bp = tmp_path / "s.csv", tmp_path / "b.csv"
     _write_att_csv(sp, scenario)

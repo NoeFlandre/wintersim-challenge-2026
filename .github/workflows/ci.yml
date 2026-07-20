@@ -21,13 +21,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install uv
+      # Install uv and pin the runtime Python interpreter to the matrix entry
+      # in one step. We pass python-version explicitly so 'uv run' inside later
+      # steps is forced to use exactly the matrix interpreter.
+      - name: Install uv and set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
         with:
           enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      # Diagnostic: prove that 'uv run' actually launches the matrix Python
+      # and not whatever happens to be on PATH. If this fails the matrix is
+      # being silently downgraded to a different interpreter.
+      - name: Assert uv uses matrix Python
+        run: |
+          set -euo pipefail
+          uv_python=$(uv run python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+          expected="${{ matrix.python-version }}"
+          if [ "$uv_python" != "$expected" ]; then
+            echo "::error::uv is using Python $uv_python but the matrix pinned $expected"
+            exit 1
+          fi
+          echo "uv is using Python $uv_python (matches matrix)"
 
       # Dev group only: the simulation group reproduces the organizer's runtime
       # dependencies and is intentionally not required for CI. CI never

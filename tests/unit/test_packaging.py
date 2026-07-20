@@ -231,8 +231,7 @@ def test_relative_import_escaping_package_rejected(tmp_path: Path) -> None:
     """
     sub = _submission_dir(tmp_path)
     (sub / "user_strategy.py").write_text(
-        "from ..other import foo  # parent traversal\n"
-        "class UserStrategy:\n    pass\n"
+        "from ..other import foo  # parent traversal\nclass UserStrategy:\n    pass\n"
     )
     with pytest.raises(PackagerError, match=r"(?i)relative|parent|escape"):
         package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
@@ -253,6 +252,98 @@ def test_relative_import_to_existing_participant_module_allowed(tmp_path: Path) 
     )
     archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
     assert archive.exists()
+
+
+def test_relative_import_level_above_package_depth_rejected(tmp_path: Path) -> None:
+    """`from .. import x` from a top-level submission file escapes the package."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from ..other_pkg import foo  # level=2 from response_strategies itself\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)level|escapes|relative"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_relative_import_in_subpackage_allowed_when_packaged(tmp_path: Path) -> None:
+    """A relative import whose target IS packaged is allowed.
+
+    This is the canonical positive case: a self-reference inside
+    user_strategy.py at the root resolves to a packaged module.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from .user_strategy import UserStrategy  # valid self-reference\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
+def test_absolute_import_to_existing_participant_module_allowed(tmp_path: Path) -> None:
+    """`from response_strategies.user_strategy import X` is allowed.
+
+    The root 'response_strategies' is the local package; the submodule
+    'user_strategy' IS in the packaged set. This must be accepted.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from response_strategies.user_strategy import UserStrategy  # absolute, valid\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
+def test_ast_import_forbidden_stdlib_rejected(tmp_path: Path) -> None:
+    """`import os` style AST imports must be rejected via _is_import_allowed."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "import os  # forbidden\n"
+        "import sys  # forbidden\n"
+        "import requests  # forbidden\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)disallowed|import"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_ast_import_stdlib_allowed(tmp_path: Path) -> None:
+    """Plain stdlib imports are allowed when the module is on the safe list."""
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "import math\n"
+        "import statistics\n"
+        "from collections import deque\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+    assert archive.exists()
+
+
+def test_relative_import_without_module_rejected(tmp_path: Path) -> None:
+    """`from . import *` (no module attr) at top of package is suspicious.
+
+    A from-import with level > 0 but no module attribute is `from . import x`.
+    For a top-level file in the response_strategies package, the anchor IS
+    response_strategies itself, and 'response_strategies' must be a packaged
+    module (it isn't a .py file). The validator should reject this.
+    """
+    sub = _submission_dir(tmp_path)
+    (sub / "user_strategy.py").write_text(
+        "from . import *  # suspicious; the package itself is not a .py module\n"
+        "class UserStrategy:\n    pass\n"
+    )
+    with pytest.raises(PackagerError, match=r"(?i)missing|relative|import"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_placeholder_team_variants_rejected(tmp_path: Path) -> None:
+    """Extra placeholder variants beyond the parameterized set are also rejected."""
+    sub = _submission_dir(tmp_path)
+    for name in ["placeholder2", "TODO-team", "my-placeholder"]:
+        with pytest.raises(PackagerError, match=r"(?i)team"):
+            package_submission(sub, team=name, round_id="1", dist_dir=tmp_path / "out")
 
 
 # --- report (path/sha/size) -------------------------------------------------

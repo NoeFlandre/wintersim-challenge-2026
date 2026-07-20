@@ -23,6 +23,7 @@ from wsc2026_tools.artifacts import BootstrapError, bootstrap_round
 from wsc2026_tools.overlay import OverlayError, overlay_response_strategies
 from wsc2026_tools.packaging import PackagerError, package_submission
 from wsc2026_tools.paths import (
+    RepoPathError,
     RoundConfigError,
     dist_submissions_dir,
     load_round,
@@ -263,7 +264,7 @@ def _cmd_score(args: argparse.Namespace) -> int:
     try:
         scenario = resolve_repo_path(args.scenario_att)
         baseline = resolve_repo_path(args.baseline_att)
-    except Exception as exc:
+    except RepoPathError as exc:
         return _error(str(exc))
     try:
         result = compute_resilience_loss(scenario, baseline)

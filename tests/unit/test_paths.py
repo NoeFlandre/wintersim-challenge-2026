@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import wsc2026_tools.paths as paths
-from wsc2026_tools.paths import RoundConfig, RoundConfigError
+from wsc2026_tools.paths import RepoPathError, RoundConfig, RoundConfigError
 
 
 def _use_config(monkeypatch: pytest.MonkeyPatch, content: str, tmp_path: Path) -> Path:
@@ -213,3 +213,77 @@ def test_load_round_unknown_id_raises_actionable_error(
     msg = str(exc.value)
     assert "round42" in msg
     assert "r0" in msg
+
+
+# --- resolve_repo_path containment ------------------------------------------
+
+
+def test_resolve_repo_path_relative_inside_repo_works(tmp_path: Path) -> None:
+    """A normal in-repo relative path resolves under the repo root."""
+    # tmp_path is the cwd surrogate; the repo root is unchanged.
+    repo = paths.repo_root()
+    rel = "tests/fixtures_score_root/scenario.csv"
+    assert (repo / rel).is_file()
+    resolved = paths.resolve_repo_path(rel)
+    assert resolved == (repo / rel).resolve()
+
+
+def test_resolve_repo_path_traversal_outside_repo_rejected(tmp_path: Path) -> None:
+    """``../outside.csv`` must raise RepoPathError even if the outside file exists."""
+    outside = tmp_path / "outside.csv"
+    outside.write_text("a,b\n1,2\n")
+    repo = paths.repo_root()
+    # From inside the repo, "../outside.csv" escapes.
+    rel = f"../{outside.name}"
+    # sanity: the literal path is not under the repo
+    assert not (repo / rel).resolve().is_relative_to(repo.resolve()) if hasattr(  # noqa: E501
+        Path(".").resolve(), "is_relative_to"
+    ) else True
+    with pytest.raises(RepoPathError, match=r"(?i)outside|containment|repository"):
+        paths.resolve_repo_path(rel)
+
+
+def test_resolve_repo_path_symlink_inside_repo_escaping_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A relative path that is an in-repo symlink pointing outside is rejected."""
+    # Build a synthetic layout: a directory X inside the repo with a symlink
+    # inside it pointing at an outside file.
+    repo = paths.repo_root()
+    sandbox = repo / "tests" / "_containment_sandbox"
+    sandbox.mkdir(parents=True, exist_ok=True)
+    outside = tmp_path / "outside.csv"
+    outside.write_text("a,b\n1,2\n")
+    link = sandbox / "escape.csv"
+    try:
+        if link.exists() or link.is_symlink():
+            link.unlink()
+        link.symlink_to(outside)
+    except OSError:
+        pytest.skip("symlink not supported in this environment")
+    try:
+        with pytest.raises(RepoPathError, match=r"(?i)outside|containment"):
+            paths.resolve_repo_path("tests/_containment_sandbox/escape.csv")
+    finally:
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        if sandbox.exists() and not any(sandbox.iterdir()):
+            sandbox.rmdir()
+
+
+def test_resolve_repo_path_absolute_outside_repo_accepted(tmp_path: Path) -> None:
+    """Absolute user paths are not constrained to the repo root."""
+    outside = tmp_path / "outside.csv"
+    outside.write_text("a,b\n1,2\n")
+    resolved = paths.resolve_repo_path(outside)
+    assert resolved == outside.resolve()
+
+
+def test_resolve_repo_path_empty_rejected() -> None:
+    with pytest.raises(RepoPathError, match=r"(?i)empty"):
+        paths.resolve_repo_path("")
+
+
+def test_resolve_repo_path_whitespace_rejected() -> None:
+    with pytest.raises(RepoPathError, match=r"(?i)empty"):
+        paths.resolve_repo_path("   ")

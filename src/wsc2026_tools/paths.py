@@ -42,15 +42,18 @@ def resolve_repo_path(path: str | Path, *, base: Path | None = None) -> Path:
     * Relative paths are resolved beneath ``base`` (default: the repo root).
       The caller’s current working directory is intentionally not consulted.
 
-    Resolution rules:
+    Containment contract:
 
-    * Traversal operators (``..``) are honoured, so a relative ``../outside``
-      path resolves to ``base/../outside`` and may leave the repo. The CLI
-      caller is responsible for treating such paths as user errors.
+    * A RELATIVE result must lie inside ``base`` after resolution. If the
+      resolved path escapes (via ``..`` or via a symlink that resolves
+      outside), :class:`RepoPathError` is raised. Absolute paths are not
+      checked for containment -- the user explicitly asked for an outside
+      path.
     * Empty strings raise :class:`RepoPathError`.
 
     This helper makes the documented "paths resolve relative to the repo
-    root, not the cwd" contract explicit and shared.
+    root, not the cwd; contained in the repo root" contract explicit and
+    shared.
     """
     p = Path(path)
     if p.is_absolute():
@@ -59,7 +62,26 @@ def resolve_repo_path(path: str | Path, *, base: Path | None = None) -> Path:
     if not text.strip():
         raise RepoPathError("empty path is not allowed")
     base_path = Path(base) if base is not None else repo_root()
-    return (base_path / p).resolve()
+    base_resolved = base_path.resolve()
+    resolved = (base_path / p).resolve()
+    # Containment check via Path.is_relative_to (3.9+) for clarity. Symlinks
+    # are followed by resolve(); an in-repo symlink that points outside is
+    # therefore correctly rejected.
+    try:
+        if not resolved.is_relative_to(base_resolved):
+            raise RepoPathError(
+                f"path {path!r} resolves outside the repository root "
+                f"({resolved} not under {base_resolved})"
+            )
+    except AttributeError:  # pragma: no cover - Python <3.9 fallback
+        try:
+            resolved.relative_to(base_resolved)
+        except ValueError as exc:
+            raise RepoPathError(
+                f"path {path!r} resolves outside the repository root "
+                f"({resolved} not under {base_resolved})"
+            ) from exc
+    return resolved
 
 
 def challenge_dir() -> Path:

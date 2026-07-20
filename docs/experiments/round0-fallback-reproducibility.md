@@ -2,8 +2,10 @@
 
 **Date:** 2026-07-20
 **Branch:** `codex/challenge-foundation`
-**HEAD:** `3cae539` (revert of the transfer-aware routing experiment; active
-`UserStrategy` is the no-op organizer-fallback adapter)
+**Strategy baseline commit:** `3cae539` (revert of the transfer-aware
+routing experiment; active `UserStrategy` is the no-op organizer-fallback
+adapter). Current repository HEAD is a later commit that adds documentation on
+top of this baseline.
 
 ## Purpose
 
@@ -63,7 +65,7 @@ is run end to end on Round 0. It is a reproducibility/integrity check. It is
    and the disruption scenario (`create_with_disruption`, measurement-relative
    disruption offsets) are correct and unchanged in the current tree.
 4. All required input CSVs are present
-   (`.challenge/round0/source/Input/BaselineStable/`:
+   (`.challenge/round0/source/Input/`:
    `ports.csv`, `service_routes.csv`, `route_segments.csv`, `demand_matrix.csv`,
    `vessel_classes.csv`, `route_plan.csv`).
 5. No overlapping full simulation was active during either run; only one
@@ -73,14 +75,17 @@ is run end to end on Round 0. It is a reproducibility/integrity check. It is
    matches the documented authoritative baseline hash exactly, so the input
    baseline is identical to the historical run even though the fallback
    scenario output is not.
-7. The ATT period column in the current checkout is reported in **hours**
-   (period values ~18.8–21.3 h; `OverallMean` ≈ 20.34 h). The documented
-   historical "Mean ATT = 20.276666666666667 **days**" is therefore on a
-   different absolute scale than the current checkout's `AverageTransportTime`
-   column. This unit/scale difference is the leading candidate explanation for
-   why the historical fallback SHA is not reproduced; it is noted here as the
-   next investigation point and was **not** pursued by editing organizer
-   source.
+7. ATT is measured in **days**, not hours, in both the current checkout and
+   the historical result. The simulation computes ATT internally in hours, but
+   `main.py` divides it by 24.0 before writing each period row, so the CSV's
+   approximately 18.8–21.3 values and `OverallMean` ≈ 20.34 are days. The
+   documented historical "Mean ATT = 20.276666666666667" is on the same day
+   scale. A unit/scale mismatch is therefore **ruled out** and is not an
+   explanation for the SHA/score discrepancy. The cause of the discrepancy
+   remains unresolved within this bounded audit. Plausible categories include a
+   difference in the historical organizer source, inputs not covered by the
+   baseline ATT hash, dependency/runtime state, or another unrecorded
+   environmental difference — but none of these is proven here.
 8. No stale participant helper or experiment artifact exists under the
    organizer `response_strategies/` directory (only `default_strategy.py`,
    `strategy_validation.py`, `README.md`, `user_strategy.py`).
@@ -120,15 +125,18 @@ is **not** authoritative.
 
 ## Resume point
 
-- The active strategy is the no-op organizer-fallback adapter (HEAD `3cae539`);
-  do not reintroduce either rejected candidate.
+- The active no-op organizer-fallback strategy implementation derives from
+  revert commit `3cae539`, while the current repository HEAD includes this and
+  later documentation commits. Do not reintroduce either rejected candidate.
 - In this checkout, compare new candidates against the locally reproduced
-  fallback `18.673577819840556` (SHA `10234375...`) unless the discrepancy with
-  the historical `ed4f274f...` / `18.2766...` is resolved first.
-- Open investigation (not performed here): reconcile the historical fallback
-  SHA/scale difference — the baseline SHA matches but the fallback scenario
-  SHA does not, and the current ATT column is in hours while the historical
-  Mean ATT was documented in days. Do not modify organizer source to force a
-  match.
+  fallback `18.673577819840556` (SHA `10234375...`), labeled only as the
+  current-checkout locally reproduced fallback, unless the discrepancy with the
+  historical `ed4f274f...` / `18.276620672293834` is resolved first. Keep
+  `18.276620672293834` and `ed4f274f...` as historical evidence.
+- Open investigation (not performed here): reconcile the historical and
+  current-checkout fallback outputs. Both report ATT in days, and two
+  current-checkout runs are byte-identical, so any difference must lie in the
+  historical environment/source rather than in a unit or scaling error. Do not
+  modify organizer source to force a match.
 - Public release and merge remain blocked pending an owner-authorized history
   purge and coordinated force-push of the restricted Round 0 ZIP.

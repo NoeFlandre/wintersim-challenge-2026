@@ -210,6 +210,41 @@ def test_smoke_rejects_negative_timeout() -> None:
         run_smoke(Path("/tmp"), days=1, timeout=-5.0)
 
 
+def test_smoke_rejects_nan_timeout() -> None:
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)finite|nan|inf"):
+        run_smoke(Path("/tmp"), days=1, timeout=float("nan"))
+
+
+def test_smoke_rejects_positive_inf_timeout() -> None:
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)finite|nan|inf"):
+        run_smoke(Path("/tmp"), days=1, timeout=float("inf"))
+
+
+def test_smoke_rejects_negative_inf_timeout() -> None:
+    from wsc2026_tools.cli import SmokeError
+
+    with pytest.raises(SmokeError, match=r"(?i)finite|nan|inf"):
+        run_smoke(Path("/tmp"), days=1, timeout=float("-inf"))
+
+
+def test_smoke_accepts_positive_int_timeout(tmp_path: Path) -> None:
+    source = _synthetic_tree(tmp_path / "source")
+    result = run_smoke(source, days=1, timeout=30)  # int, not float
+    assert result.returncode == 0
+    assert "SMOKE_OK" in result.stdout
+
+
+def test_smoke_accepts_positive_float_timeout(tmp_path: Path) -> None:
+    source = _synthetic_tree(tmp_path / "source")
+    result = run_smoke(source, days=1, timeout=12.5)
+    assert result.returncode == 0
+    assert "SMOKE_OK" in result.stdout
+
+
 # --- full-run construction is non-launching ---------------------------------
 
 

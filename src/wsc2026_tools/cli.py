@@ -11,6 +11,7 @@ working directory, so behaviour is identical from any cwd.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import subprocess
 import sys
@@ -98,11 +99,30 @@ def _ensure_source(source: Path) -> None:
 
 
 def _validate_smoke_args(*, days: int, timeout: float) -> None:
-    """Reject nonsensical smoke arguments up front."""
-    if not isinstance(days, int) or days < 1:
+    """Reject nonsensical smoke arguments up front.
+
+    Rejects ``days < 1`` (no progress), ``timeout <= 0`` (instant kill),
+    and non-finite timeouts (``NaN``, ``+inf``, ``-inf``). The first two
+    were already caught; the third was silently passing through to
+    subprocess.run, which would either accept ``NaN`` (and never fire) or
+    raise ``OverflowError`` for ``+inf``.
+    """
+    if not isinstance(days, int) or isinstance(days, bool) or days < 1:
         raise SmokeError(f"smoke days must be a positive integer >= 1; got {days!r}")
-    if not isinstance(timeout, (int, float)) or timeout <= 0:
-        raise SmokeError(f"smoke timeout must be a positive number > 0 (seconds); got {timeout!r}")
+    # Accept ints and floats; reject bool (bool is a subclass of int in Python,
+    # and ``True`` as a timeout would be 1s by accident).
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+        raise SmokeError(
+            f"smoke timeout must be a finite positive number > 0 (seconds); got {timeout!r}"
+        )
+    if not math.isfinite(timeout):
+        raise SmokeError(
+            f"smoke timeout must be finite (no NaN/inf); got {timeout!r}"
+        )
+    if timeout <= 0:
+        raise SmokeError(
+            f"smoke timeout must be a positive number > 0 (seconds); got {timeout!r}"
+        )
 
 
 def run_smoke(

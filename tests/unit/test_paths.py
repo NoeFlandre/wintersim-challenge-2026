@@ -236,9 +236,13 @@ def test_resolve_repo_path_traversal_outside_repo_rejected(tmp_path: Path) -> No
     # From inside the repo, "../outside.csv" escapes.
     rel = f"../{outside.name}"
     # sanity: the literal path is not under the repo
-    assert not (repo / rel).resolve().is_relative_to(repo.resolve()) if hasattr(  # noqa: E501
-        Path(".").resolve(), "is_relative_to"
-    ) else True
+    assert (
+        not (repo / rel).resolve().is_relative_to(repo.resolve())
+        if hasattr(  # noqa: E501
+            Path(".").resolve(), "is_relative_to"
+        )
+        else True
+    )
     with pytest.raises(RepoPathError, match=r"(?i)outside|containment|repository"):
         paths.resolve_repo_path(rel)
 

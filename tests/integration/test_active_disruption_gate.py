@@ -104,7 +104,6 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     # eagerly; if the participant module is imported first, the package is
     # mid-init and the constructor crashes.
     import scenario_builders  # type: ignore[import-not-found]
-    from simulation_model.disruption_status import is_disruption_active  # type: ignore[import-not-found]
 
     context = scenario_builders.create_with_disruption()
     assert context.disruption_plans, "the disruption scenario must define at least one plan"
@@ -121,10 +120,15 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
     now = datetime.min + timedelta(days=inside_day)
 
+    # Import is_disruption_active directly. The package init is independent
+    # of scenario_builders so the order does not conflict.
+    from simulation_model.disruption_status import (  # type: ignore[import-not-found]
+        is_disruption_active,
+    )
+
     # Genuine proof that the disruption is active at the chosen timestamp.
     assert is_disruption_active(context, now) is True, (
-        "test must pick a timestamp inside an active disruption; "
-        f"plan={plan!r} now={now!r}"
+        f"test must pick a timestamp inside an active disruption; plan={plan!r} now={now!r}"
     )
 
     snapshot_before = _snapshot(context)
@@ -156,11 +160,14 @@ def test_active_disruption_clock_origin_is_datetime_min() -> None:
     _add_source_to_path(source)
 
     import scenario_builders  # type: ignore[import-not-found]
-    from simulation_model.disruption_status import is_disruption_active  # type: ignore[import-not-found]
 
     context = scenario_builders.create_with_disruption()
     plan = context.disruption_plans[0]
     inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
+
+    from simulation_model.disruption_status import (  # type: ignore[import-not-found]
+        is_disruption_active,
+    )
 
     # The naive 2026-anchored timestamp is NOT inside the disruption window.
     bad_now = datetime(2026, 1, 1) + timedelta(days=inside_day)

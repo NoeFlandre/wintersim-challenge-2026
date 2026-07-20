@@ -116,13 +116,9 @@ def _validate_smoke_args(*, days: int, timeout: float) -> None:
             f"smoke timeout must be a finite positive number > 0 (seconds); got {timeout!r}"
         )
     if not math.isfinite(timeout):
-        raise SmokeError(
-            f"smoke timeout must be finite (no NaN/inf); got {timeout!r}"
-        )
+        raise SmokeError(f"smoke timeout must be finite (no NaN/inf); got {timeout!r}")
     if timeout <= 0:
-        raise SmokeError(
-            f"smoke timeout must be a positive number > 0 (seconds); got {timeout!r}"
-        )
+        raise SmokeError(f"smoke timeout must be a positive number > 0 (seconds); got {timeout!r}")
 
 
 def run_smoke(

@@ -330,9 +330,7 @@ def _validate_imports(files: list[Path], submission_dir: Path) -> None:
                         # ``from .module import a, b`` -- a single target module.
                         resolved = f"{anchor}.{suffix}" if anchor else suffix
                         if not resolved:
-                            offenders.append(
-                                f"{f.name}: relative import has empty anchor"
-                            )
+                            offenders.append(f"{f.name}: relative import has empty anchor")
                             continue
                         if resolved not in packaged_modules:
                             offenders.append(
@@ -341,14 +339,10 @@ def _validate_imports(files: list[Path], submission_dir: Path) -> None:
                                 f"{sorted(packaged_modules)})"
                             )
                     elif not anchor:
-                        offenders.append(
-                            f"{f.name}: relative import has no anchor and no module"
-                        )
+                        offenders.append(f"{f.name}: relative import has no anchor and no module")
                         continue
                     elif any(a.name == "*" for a in aliases):
-                        offenders.append(
-                            f"{f.name}: relative star import is not allowed"
-                        )
+                        offenders.append(f"{f.name}: relative star import is not allowed")
                         continue
                     else:
                         # ``from . import a, b`` -- each alias resolves to a

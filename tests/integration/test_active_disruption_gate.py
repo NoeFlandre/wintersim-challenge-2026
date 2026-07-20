@@ -56,10 +56,6 @@ def _add_source_to_path(source: Path) -> None:
     must put the organizer's source first; otherwise Python resolves
     ``response_strategies.default_strategy`` to the submission package and
     crashes. The participant strategy is loaded by absolute file path below.
-
-    Earlier in the same pytest session the participant's package was already
-    imported (e.g. by the contract tests), so we purge the cache to force a
-    fresh resolution against the just-prepended source root.
     """
     src = str(source)
     o2des = str(source / "o2despy")
@@ -67,18 +63,6 @@ def _add_source_to_path(source: Path) -> None:
         sys.path.insert(0, src)
     if o2des not in sys.path:
         sys.path.insert(0, o2des)
-    # Invalidate any cached top-level package that now has a different
-    # resolution. Most relevant: 'response_strategies'.
-    for name in (
-        "response_strategies",
-        "scenario_builders",
-        "simulation_model",
-        "maritime_data_context",
-        "config",
-        "o2despy",
-        "o2des",
-    ):
-        sys.modules.pop(name, None)
 
 
 def _load_participant_user_strategy() -> type:

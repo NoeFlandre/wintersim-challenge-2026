@@ -60,14 +60,7 @@ def test_required_static_methods_have_compatible_signature(
     )
 
 
-def test_select_vessel_for_berth_returns_one_or_none_and_does_not_mutate() -> None:
-    """Active experiment: ``select_vessel_for_berth`` now picks one vessel.
-
-    The contract test asserts the looser invariant -- exactly one of:
-    ``None`` (empty queue), or one of the elements of ``waiting_vessels``
-    (non-empty queue). The exact pick is exercised in
-    ``tests/unit/test_berth_priority_policy.py``.
-    """
+def test_select_vessel_for_berth_returns_none_and_does_not_mutate() -> None:
     waiting = ["vessel_a", "vessel_b"]
     berths = ["berth_1"]
     snapshot = list(waiting)
@@ -77,23 +70,11 @@ def test_select_vessel_for_berth_returns_one_or_none_and_does_not_mutate() -> No
         waiting_vessels=waiting,
         available_berths=berths,
         current_time=0,
-        waiting_since_by_vessel={"vessel_a": 0, "vessel_b": 0},
-    )
-    assert result in waiting
-    assert waiting == snapshot, "must not mutate waiting_vessels"
-    assert berths == ["berth_1"], "must not mutate available_berths"
-
-
-def test_select_vessel_for_berth_empty_returns_none() -> None:
-    result = UserStrategy.select_vessel_for_berth(
-        maritime_data_context=object(),
-        port=object(),
-        waiting_vessels=[],
-        available_berths=["berth_1"],
-        current_time=0,
-        waiting_since_by_vessel={},
+        waiting_since_by_vessel={"vessel_a": 0},
     )
     assert result is None
+    assert waiting == snapshot, "must not mutate waiting_vessels"
+    assert berths == ["berth_1"], "must not mutate available_berths"
 
 
 def test_create_alternative_service_routes_returns_none_and_leaves_context_unchanged() -> None:

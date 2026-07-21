@@ -174,4 +174,20 @@ underlying cause of the degradation was not established by this experiment.
 ## Final implementation commit (rejected)
 
 - Implementation commit SHA: `1c6a230`
-- Revert commit SHA: see `git log` after this `docs: record rejected in-transit rebooking result` commit.
+- Revert commit SHA: `a54480e`
+
+## Final state confirmation
+
+- Candidate score: `21.681637022046967`.
+- Candidate ATT SHA-256: `da64a36f38aae32ca93993b09e7e88f53d59069474465c10d0585c0836040fe7`.
+- The candidate ATT output is **different** from the current-checkout
+  locally reproduced fallback (different SHA, different per-period values),
+  confirming the policy had a measurable scoring effect.
+- Rejection reason: the candidate score `21.681637022046967` is well above
+  the current-checkout acceptance threshold of `18.673577819840556` (delta
+  `+3.008059202206411`).
+- Only one candidate was attempted for this experiment; no second strategy
+  was tried.
+- The active strategy is restored to the no-op organizer-fallback adapter;
+  the implementation commit was reverted via `git revert` (commit
+  `a54480e`).

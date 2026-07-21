@@ -55,10 +55,15 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
-The current `UserStrategy` delegates every decision to the organizer fallback.
-This is the retained baseline. The first controlled Round 0 experiment was
-completed and rejected because it increased Cumulative Resilience Loss by
-22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
+The current `UserStrategy` delegates `select_vessel_for_berth`,
+`assign_associated_bookings`, and `adjust_bookings_before_cargo_handling` to
+the organizer fallback (returning `None`). `create_alternative_service_routes`
+is also a no-op outside active disruptions, but during an active disruption it
+returns `False` to suppress the organizer alternative-route fallback (making
+no mutation). The three rejected Round 0 experiments are documented under
+[`docs/experiments/`](docs/experiments/): `round0-first-result.md`,
+`round0-transfer-aware-routing-v1.md`, and (after evaluation)
+`round0-alternative-route-suppression-v1.md`.
 
 ## Prerequisites
 

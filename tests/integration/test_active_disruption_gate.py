@@ -1,12 +1,18 @@
-"""Integration test: UserStrategy.create_alternative_service_routes is a no-op.
+"""Integration test: UserStrategy.create_alternative_service_routes policy.
 
-Constructs the real Round 0 organizer disruption context in memory, picks a
-timestamp inside the configured disruption window, calls the participant
-``UserStrategy.create_alternative_service_routes`` and asserts that:
+Constructs the real Round 0 organizer disruption context in memory, picks
+timestamps both inside and outside the configured disruption window, calls
+the participant ``UserStrategy.create_alternative_service_routes`` and
+asserts that:
 
-* the call returns ``None`` (delegated to the organizer fallback), and
-* the context is left untouched (vessels, legs, service_routes, vessel
-  assignments, and the disruption_plans list are all unchanged).
+* a timestamp inside the first active plan returns exactly ``False``
+  ("handled, suppress the organizer alternative-route fallback"),
+* that active call leaves the complete organizer route/vessel/leg assignment
+  snapshot unchanged,
+* a timestamp outside any active plan returns ``None`` (delegated to the
+  organizer fallback),
+* the participant module loads through the same safe file-loader procedure
+  used by existing tests.
 
 This is the "active-disruption gate": it would catch a regression where a
 strategy implementation mutates the context, returns an invalid object, or
@@ -114,7 +120,7 @@ def _snapshot(context) -> dict:
     }
 
 
-def test_user_strategy_is_no_op_inside_active_disruption() -> None:
+def test_user_strategy_returns_false_inside_active_disruption_and_preserves_state() -> None:
     source = _bootstrap_or_skip()
     _add_source_to_path(source)
 
@@ -133,8 +139,6 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     # The organizer's is_disruption_active anchors offsets at datetime.min,
     # so the absolute reference clock is:
     #   now = datetime.min + timedelta(days=start_offset_days + duration/2)
-    # The previous test added the same offset to datetime(2026, 1, 1), which
-    # sat outside every plan window -- is_disruption_active returned False.
     plan = context.disruption_plans[0]
     inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
     now = datetime.min + timedelta(days=inside_day)
@@ -155,8 +159,12 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     vessel = context.vessels[0] if context.vessels else None
     result = UserStrategy.create_alternative_service_routes(context, now, vessel)
 
-    # The baseline must return None to delegate to the organizer fallback.
-    assert result is None
+    # The active suppression policy must return exactly False, NOT None.
+    assert result is False, (
+        "UserStrategy.create_alternative_service_routes must return False "
+        "to suppress the organizer alternative-route fallback during an "
+        f"active disruption, got {result!r}"
+    )
 
     snapshot_after = _snapshot(context)
     assert snapshot_after == snapshot_before, (
@@ -164,6 +172,44 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
         f"context. Before: {snapshot_before['service_routes']!r}, "
         f"after: {snapshot_after['service_routes']!r}"
     )
+
+
+def test_user_strategy_returns_none_outside_active_disruptions() -> None:
+    """Outside any active disruption the participant delegates via ``None``.
+
+    The organizer call sites fall through to the default alternative-route
+    strategy (which performs cleanup and restoration) strictly on
+    ``is None``. Returning False outside an active window would silently
+    break that contract.
+    """
+    source = _bootstrap_or_skip()
+    _add_source_to_path(source)
+
+    import scenario_builders  # type: ignore[import-not-found]
+
+    context = scenario_builders.create_with_disruption()
+    UserStrategy = _load_participant_user_strategy()
+
+    # Pick a timestamp 1 day after the last plan ends -- guaranteed outside
+    # any active window while still being within datetime.min+offset range.
+    last_plan = max(
+        context.disruption_plans,
+        key=lambda plan: plan.start_offset_days + (plan.duration_days or 0.0),
+    )
+    after_last = datetime.min + timedelta(
+        days=last_plan.start_offset_days + last_plan.duration_days + 1
+    )
+
+    from simulation_model.disruption_status import (  # type: ignore[import-not-found]
+        is_disruption_active,
+    )
+
+    assert is_disruption_active(context, after_last) is False, (
+        "test must pick a timestamp outside any active disruption"
+    )
+
+    result = UserStrategy.create_alternative_service_routes(context, after_last, vessel=None)
+    assert result is None
 
 
 def test_active_disruption_clock_origin_is_datetime_min() -> None:

@@ -16,12 +16,21 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: organizer fallback
+## Current strategy
 
-Every method in `UserStrategy` currently returns `None`, which delegates to the
-organizer fallback strategy without mutating any input. This establishes a
-known, unmodified baseline. Optimization is deliberately deferred to later,
-separately reviewed work.
+`UserStrategy` deliberately delegates `select_vessel_for_berth`,
+`assign_associated_bookings`, and `adjust_bookings_before_cargo_handling` to
+the organizer fallback (each returns `None`).
+
+`create_alternative_service_routes` is also a no-op when no disruption is
+active (returning `None` so the fallback can clean up and restore vessels to
+their original routes). While at least one disruption is active, however, it
+returns `False` to tell the caller "handled, do not run the organizer
+alternative-route fallback". The active call makes **no mutation whatsoever**
+on the context, routes, vessels, legs, or the supplied vessel sentinel.
+
+The exact rationale, hypothesis, and acceptance rules are documented in
+`docs/experiments/round0-alternative-route-suppression-v1.md`.
 
 ## Submission boundary
 

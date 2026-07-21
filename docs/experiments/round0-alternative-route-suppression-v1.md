@@ -1,6 +1,6 @@
 # Round 0 alternative-route suppression v1
 
-**Status:** planned
+**Status:** SUCCESS_REJECTED
 
 ## Hypothesis
 
@@ -106,3 +106,64 @@ If the candidate score is equal to or above `18.673577819840556`:
 
 Do not attempt another hypothesis regardless of outcome. This is the only
 authorized candidate for this experiment.
+
+## Full result
+
+| Measure | Value |
+| --- | --- |
+| Candidate Cumulative Resilience Loss | `18.673577819840556` |
+| Candidate ATT SHA-256 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` |
+| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Delta vs baseline threshold | `0.0` (equal, not lower by more than `1e-9`) |
+| Mean ATT across numbered period rows (days) | `20.336944444444445` |
+| Period count | `72` |
+| Runtime | `28:47` |
+| Beats historical `18.276620672293834`? | No |
+| Beats current-checkout `18.673577819840556`? | No (equal, not below) |
+
+The candidate produced a byte-identical ATT CSV to the current-checkout
+locally reproduced fallback. Because acceptance requires the candidate score
+to be strictly lower than the threshold by more than `1e-9`, the candidate
+is rejected.
+
+This outcome is consistent with the hypothesis's mechanism: Round 0
+disruptions are short (14–20 days) compared with the 360 measured days, and
+the other three strategy hooks (which still delegate to the organizer
+fallback) include disruption-aware booking assignment and in-transit booking
+adjustment. Those hooks already build paths that avoid the disrupted
+ports/legs during the disruption window. Suppressing the alternative-route
+creation does not provide any additional routing benefit because the
+alternative routes were not being used during the disruption in a way that
+meaningfully changed ATT for these short disruptions within the 360-day
+measured horizon.
+
+## Decision
+
+Reject. The candidate score `18.673577819840556` is equal to the
+current-checkout locally reproduced fallback score, not strictly lower by
+more than `1e-9`.
+
+## Rejection/restoration procedure (executed)
+
+1. This document was updated to `SUCCESS_REJECTED` (this file).
+2. All metrics, hashes, and runtime recorded above.
+3. Result documentation committed separately via
+   `docs: record rejected alternative-route suppression result`.
+4. Implementation commit (`a90a4e3`) reverted via `git revert`; the no-op
+   adapter is restored automatically.
+5. The reverted no-op adapter synchronized into the organizer tree.
+6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` restored
+   from a verified current-checkout fallback snapshot (the bytes were
+   preserved in
+   `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
+   and `_run2/`).
+7. Verified restored SHA:
+   `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+8. Verified restored score: `18.673577819840556`.
+9. Final gates rerun; deterministic packaging re-verified.
+10. Branch left clean with the no-op fallback active.
+
+## Final implementation commit (rejected)
+
+- Implementation commit SHA: `a90a4e3`
+- Revert commit SHA: see `git log` after this `docs: record rejected alternative-route suppression result` commit.

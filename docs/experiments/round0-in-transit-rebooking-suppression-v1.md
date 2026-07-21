@@ -1,6 +1,6 @@
 # Round 0 in-transit rebooking suppression v1
 
-**Status:** planned
+**Status:** SUCCESS_REJECTED
 
 ## Hypothesis
 
@@ -117,3 +117,61 @@ If the candidate score is equal to or above `18.673577819840556`:
 
 Do not attempt another hypothesis regardless of outcome. This is the only
 authorized candidate for this experiment.
+
+## Full result
+
+| Measure | Value |
+| --- | --- |
+| Candidate Cumulative Resilience Loss | `21.681637022046967` |
+| Candidate ATT SHA-256 | `da64a36f38aae32ca93993b09e7e88f53d59069474465c10d0585c0836040fe7` |
+| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Delta vs baseline threshold | `+3.008059202206411` (much worse, not lower by more than `1e-9`) |
+| Mean ATT across numbered period rows (days) | `20.525694444444444` |
+| Period count | `72` |
+| Runtime | `26:21` |
+| Beats historical `18.276620672293834`? | No |
+| Beats current-checkout `18.673577819840556`? | No (worse) |
+
+The candidate produced a different ATT output than the current-checkout
+fallback (different SHA, different per-period values). Therefore suppressing
+the organizer's in-transit rebooking hook caused a measurable scoring
+degradation in this Round 0 run (cumulative loss rose by ~3.01). The
+experiment did not instrument per-port/per-cargo flow sufficiently to
+establish whether the degradation came from new shipments that could not be
+rerouted away from the disruption, or from carried shipments that became
+trapped on disrupted legs when in-transit replanning was suppressed.
+
+The candidate score `21.681637022046967` is well above the current-checkout
+acceptance threshold of `18.673577819840556`, so the candidate is rejected
+on the acceptance rule alone.
+
+## Decision
+
+Reject. The candidate score `21.681637022046967` is above the current-checkout
+acceptance threshold of `18.673577819840556` by more than `1e-9`. The
+underlying cause of the degradation was not established by this experiment.
+
+## Rejection/restoration procedure (executed)
+
+1. This document was updated to `SUCCESS_REJECTED` (this file).
+2. All metrics, hashes, and runtime recorded above.
+3. Result documentation committed separately via
+   `docs: record rejected in-transit rebooking result`.
+4. Implementation commit (`1c6a230`) reverted via `git revert`; the no-op
+   adapter is restored automatically.
+5. The reverted no-op adapter synchronized into the organizer tree.
+6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` restored
+   from a verified current-checkout fallback snapshot (the bytes were
+   preserved in
+   `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
+   and `_run2/`).
+7. Verified restored SHA:
+   `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+8. Verified restored score: `18.673577819840556`.
+9. Final gates rerun; deterministic packaging re-verified.
+10. Branch left clean with the no-op fallback active.
+
+## Final implementation commit (rejected)
+
+- Implementation commit SHA: `1c6a230`
+- Revert commit SHA: see `git log` after this `docs: record rejected in-transit rebooking result` commit.

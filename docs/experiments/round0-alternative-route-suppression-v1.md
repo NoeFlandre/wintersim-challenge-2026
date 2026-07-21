@@ -121,27 +121,24 @@ authorized candidate for this experiment.
 | Beats historical `18.276620672293834`? | No |
 | Beats current-checkout `18.673577819840556`? | No (equal, not below) |
 
-The candidate produced a byte-identical ATT CSV to the current-checkout
-locally reproduced fallback. Because acceptance requires the candidate score
-to be strictly lower than the threshold by more than `1e-9`, the candidate
-is rejected.
+The candidate produced a byte-identical ATT output to the current-checkout
+fallback. Therefore suppressing the organizer's alternative-route hook
+caused no observable scoring difference in this Round 0 run. The experiment
+did not instrument route creation or usage, so it does not establish
+whether alternative routes were never created, were created but unused, or
+had effects that canceled before ATT measurement.
 
-This outcome is consistent with the hypothesis's mechanism: Round 0
-disruptions are short (14–20 days) compared with the 360 measured days, and
-the other three strategy hooks (which still delegate to the organizer
-fallback) include disruption-aware booking assignment and in-transit booking
-adjustment. Those hooks already build paths that avoid the disrupted
-ports/legs during the disruption window. Suppressing the alternative-route
-creation does not provide any additional routing benefit because the
-alternative routes were not being used during the disruption in a way that
-meaningfully changed ATT for these short disruptions within the 360-day
-measured horizon.
+Because acceptance requires the candidate score to be strictly lower than
+the threshold by more than `1e-9`, the candidate is rejected on that ground
+alone: equal is not better.
 
 ## Decision
 
 Reject. The candidate score `18.673577819840556` is equal to the
 current-checkout locally reproduced fallback score, not strictly lower by
-more than `1e-9`.
+more than `1e-9`. The candidate was rejected because it was not strictly
+better than the locally reproduced fallback; the underlying cause of the
+byte-identical output was not established by this experiment.
 
 ## Rejection/restoration procedure (executed)
 
@@ -166,4 +163,19 @@ more than `1e-9`.
 ## Final implementation commit (rejected)
 
 - Implementation commit SHA: `a90a4e3`
-- Revert commit SHA: see `git log` after this `docs: record rejected alternative-route suppression result` commit.
+- Revert commit SHA: `7e9e0c1`
+
+## Final state confirmation
+
+- Candidate score: `18.673577819840556`.
+- Candidate ATT SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+- The candidate ATT output is byte-identical to the current-checkout locally
+  reproduced fallback ATT (same SHA-256).
+- Rejection reason: the candidate was not strictly better than the locally
+  reproduced fallback (`equal` does not satisfy the "lower by more than
+  `1e-9`" acceptance rule).
+- Only one candidate was attempted for this experiment; no second strategy
+  was tried.
+- The active strategy is restored to the no-op organizer-fallback adapter;
+  the implementation commit was reverted via `git revert` (commit
+  `7e9e0c1`).

@@ -9,15 +9,10 @@ signals "not handled; use the organizer fallback", leaving the maritime data
 context, routes, bookings, and vessel state exactly as the framework built
 them.
 
-This module deliberately delegates ``select_vessel_for_berth``,
-``assign_associated_bookings``, and ``adjust_bookings_before_cargo_handling``
-to the organizer fallback. ``create_alternative_service_routes`` is also a
-no-op when no disruption is active (returning ``None`` so the fallback can
-clean up and restore). While at least one disruption is active, however, it
-returns ``False`` to tell the caller "handled, do not run the organizer
-fallback", suppressing the alternative-route policy for the duration of the
-disruption. The active call makes no mutation whatsoever on the context,
-routes, vessels, legs, or the supplied vessel sentinel.
+This baseline intentionally delegates every decision to the organizer fallback
+so the repository starts from a known, unmodified baseline. No optimization is
+performed here; future strategy work will be added only as approved, tested
+modules.
 
 Runtime constraints (enforced by the challenge rules):
 - Standard-library imports only.
@@ -29,44 +24,14 @@ Supported Python: 3.11+ (kept compatible with the organizer framework).
 
 from __future__ import annotations
 
-import datetime as _dt
-from collections.abc import Iterable
 from typing import Any
 
 
-def _has_active_disruption(context: Any, now: Any) -> bool:
-    """Return True if any disruption plan is currently active.
-
-    A plan is usable only when ``start_offset_days`` and ``duration_days`` are
-    both not ``None``. Its active window is
-    ``datetime.min + timedelta(days=start_offset_days)`` inclusive through
-    ``start + timedelta(days=duration_days)`` exclusive. The check uses only
-    the supplied ``context`` and ``now``; it caches nothing, mutates nothing,
-    and never accesses wall-clock time. For an unsupported/non-datetime
-    sentinel used by some unit tests, it safely reports no active disruption.
-    """
-    if not isinstance(now, _dt.datetime):
-        return False
-    plans: Iterable[Any] | None = getattr(context, "disruption_plans", None)
-    if not plans:
-        return False
-    for plan in plans:
-        start_offset = getattr(plan, "start_offset_days", None)
-        duration = getattr(plan, "duration_days", None)
-        if start_offset is None or duration is None:
-            continue
-        start = _dt.datetime.min + _dt.timedelta(days=start_offset)
-        end = start + _dt.timedelta(days=duration)
-        if start <= now < end:
-            return True
-    return False
-
-
 class UserStrategy:
-    """Behavior-neutral participant adapter, except for active-disruption
-    suppression of alternative-route creation (returns ``False`` while a
-    disruption is active so the organizer fallback does not run; returns
-    ``None`` otherwise so cleanup/restoration may proceed).
+    """Behavior-neutral participant adapter.
+
+    Every method returns ``None`` to delegate to the organizer fallback without
+    mutating any argument. This preserves the baseline simulation behavior.
     """
 
     @staticmethod
@@ -88,14 +53,8 @@ class UserStrategy:
     def create_alternative_service_routes(context: Any, now: Any, vessel: Any = None) -> Any:
         """Build alternative service routes for a vessel.
 
-        Returns ``False`` ("handled, do not run the organizer alternative-route
-        fallback") while at least one disruption is active. The active call
-        makes no mutation; it simply signals suppression. Returns ``None``
-        ("not handled; use the organizer fallback") outside active
-        disruptions so the fallback may perform cleanup and restoration.
+        Returns ``None`` ("not handled") which must leave ``context`` unchanged.
         """
-        if _has_active_disruption(context, now):
-            return False
         return None
 
     @staticmethod

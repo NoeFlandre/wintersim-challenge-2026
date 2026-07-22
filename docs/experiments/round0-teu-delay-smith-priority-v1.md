@@ -14,47 +14,46 @@ rule is a Smith-style ratio:
 
   TEU whose progress depends on this vessel
   -------------------------------------------
-  predicted berth-service time
+  predicted berth handling time
 
 Choose the vessel with the greatest TEU-delay relieved per berth-service hour.
 
-## Exact Smith-ratio formula (with fixed 3-hour berthing overhead)
+## Exact Smith-ratio formula
 
-The organizer models berth occupancy as a fixed 3-hour berthing activity
-(`simulation_model/berth_berthing.py`) followed by cargo handling
-(`simulation_model/berth_handling_cargo.py`). The predicted berth-service
-time is therefore:
+For each vessel in `waiting_vessels`, predict the next berth service:
 
-  service_hours = 3.0 + handled_teu / (qc_count * 45.0)
+  carried_teu       = sum(s.teu_size for s in vessel.carried_shipments)
+  discharge_teu     = sum(s.teu_size for s in
+                          vessel.get_discharging_shipments_at_current_segment())
+  projected_load_teu = TEU selected by the read-only loading prediction
+  affected_teu      = carried_teu + projected_load_teu
+  handled_teu       = discharge_teu + projected_load_teu
+  qc_count          = max(1, int(vessel.vessel_class.loa / 55))
+  service_hours     = handled_teu / (qc_count * 45.0)
 
 The Smith ratio ("TEU-delay relieved per berth-service hour"):
 
-  priority_ratio = affected_teu / service_hours
-                  = (affected_teu * qc_count * 45) / (135 * qc_count + handled_teu)
+  affected_teu
+  ---------------  =  (affected_teu * qc_count * 45) / handled_teu
+  service_hours
 
-For exact integer comparison, the constant `45` is dropped:
+Since `45` is constant across all candidates, the constant can be dropped and
+the ranking is preserved by comparing:
 
-  numerator   = affected_teu * qc_count
-  denominator = 135 * qc_count + handled_teu
+  priority_ratio = (affected_teu * qc_count) / handled_teu
 
-Vessel A outranks vessel B iff:
+When `handled_teu == 0` the service consumes zero simulated berth time, so
+the vessel must rank ahead of every positive-service-time vessel. Among
+zero-service vessels, ordering preserves `waiting_vessels` position.
 
-  A.numerator * B.denominator > B.numerator * A.denominator
+Vessel A outranks vessel B iff one of:
 
-Exact ties preserve the input `waiting_vessels` order. There is no
-zero-service special case: a vessel with `handled_teu == 0` still
-consumes three hours of berth time and is compared via the same ratio
-path.
-
-### Worked example
-
-  Vessel A: carried=0, handled=0, qc=1
-            num=0,     den=135
-  Vessel B: carried=10, handled=10, qc=1
-            num=10,    den=145
-  A.num * B.den = 0 * 145 = 0
-  B.num * A.den = 10 * 135 = 1350
-  B wins.
+  * A.handled_teu == 0 and B.handled_teu > 0;
+  * both have positive handled_teu AND
+    (A.affected_teu * A.qc_count) * B.handled_teu
+    > (B.affected_teu * B.qc_count) * A.handled_teu
+    (exact cross multiplication, no floating-point comparison);
+  * both are zero-service AND A appears earlier in `waiting_vessels`.
 
 ## Why age is intentionally excluded
 
@@ -65,43 +64,6 @@ equally expensive in the next hour. The earlier age-weighted candidate
 (`round0-first-result`) scored worse than the fallback by ~22%; this
 candidate deliberately avoids that mistake.
 
-## Metric definitions
-
-The metrics are computed by an explicit one-pass classification of carried
-cargo:
-
-  for each carried shipment:
-      1. read and validate a positive integer teu
-      2. add it to carried_teu
-      3. require a valid non-None current booking; else delegate
-      4. if booking.service_route != vessel.assigned_service_route:
-           contribute to carried_teu only (foreign cargo)
-           do not add to occupied_teu
-           do not add to discharge_teu
-           continue
-      5. if current_segment is not None and
-         booking.arrival_segment_index == current_segment.sequence_index:
-           add to discharge_teu
-           do not add to occupied_teu
-           continue
-      6. otherwise: add to occupied_teu
-
-  projected_load_teu = greedy load using (teu_capacity - occupied_teu)
-  handled_teu        = discharge_teu + projected_load_teu
-  affected_teu       = carried_teu + projected_load_teu
-  qc_count           = max(1, int(vessel.vessel_class.loa / 55))
-
-When `current_segment is None`:
-
-  - discharge_teu must be zero;
-  - assigned-route carried cargo is occupied;
-  - foreign-route cargo is neither occupied nor discharged;
-  - all carried cargo (including foreign) contributes to affected_teu.
-
-The derived subtraction `discharge = carried - occupied` is not used
-anywhere in the implementation; foreign cargo must not appear in
-discharge_teu.
-
 ## Predicted-load calculation
 
 `port.shipments_in_storage` is iterated in its existing deterministic order.
@@ -111,6 +73,14 @@ A stored shipment is an eligible loading candidate iff:
   * `shipment.get_current_booking()` is a valid booking;
   * `booking.service_route is vessel.assigned_service_route`;
   * `booking.departure_segment_index == next_segment.sequence_index`.
+
+Occupied capacity after expected discharge is computed by iterating
+`vessel.carried_shipments`, including a shipment only if its current booking
+belongs to `vessel.assigned_service_route`, and excluding shipments whose
+booking arrival-segment-index equals the current-segment sequence-index
+(they will discharge before departure). When `vessel.current_segment is
+None`, all currently carried cargo counts as occupied (matches organizer
+behavior in `VesselBeingServed.attempt_start`).
 
 The greedy load fills remaining capacity in storage order without reordering,
 partial loading, or mutation. Reading state is purely observational: the
@@ -128,20 +98,6 @@ hooks return `None` unconditionally:
 
 The candidate never mutates any input. It never returns `False`. It returns
 `None` only when safe evaluation is impossible or `waiting_vessels` is empty.
-
-## Invalid-input delegation
-
-`_read_positive_teu` accepts positive ``int`` only (excluding ``bool``);
-fractional floats such as 1.5 are rejected, strings, ``None``,
-non-finite or fractional floats, ``bool``, zero, and negative values
-all raise a narrow `(TypeError, ValueError)`. None bookings on carried
-or stored shipments also raise `AttributeError`. `_validate_vessel_inputs`
-raises a narrow exception when `vessel.vessel_class`,
-`vessel_class.loa`, `vessel_class.teu_capacity`, or
-`vessel.assigned_service_route` is missing, non-finite, or nonpositive.
-The public selector catches only `(AttributeError, TypeError, ValueError,
-OverflowError)` and delegates with `None`. No broad `except Exception` or
-`except BaseException` is used anywhere in submission code.
 
 ## Current comparable fallback (locally reproduced)
 

@@ -1,6 +1,6 @@
 # Round 0 TEU-delay-per-berth-hour priority v1
 
-**Status:** IMPLEMENTED_AWAITING_REVIEW
+**Status:** SUCCESS_REJECTED
 
 ## Hypothesis
 
@@ -14,46 +14,36 @@ rule is a Smith-style ratio:
 
   TEU whose progress depends on this vessel
   -------------------------------------------
-  predicted berth handling time
+  predicted berth-service time
 
 Choose the vessel with the greatest TEU-delay relieved per berth-service hour.
 
-## Exact Smith-ratio formula
+## Exact Smith-ratio formula (with fixed 3-hour berthing overhead)
 
-For each vessel in `waiting_vessels`, predict the next berth service:
+The organizer models berth occupancy as a fixed 3-hour berthing activity
+(`simulation_model/berth_berthing.py`) followed by cargo handling
+(`simulation_model/berth_handling_cargo.py`). The predicted berth-service
+time is therefore:
 
-  carried_teu       = sum(s.teu_size for s in vessel.carried_shipments)
-  discharge_teu     = sum(s.teu_size for s in
-                          vessel.get_discharging_shipments_at_current_segment())
-  projected_load_teu = TEU selected by the read-only loading prediction
-  affected_teu      = carried_teu + projected_load_teu
-  handled_teu       = discharge_teu + projected_load_teu
-  qc_count          = max(1, int(vessel.vessel_class.loa / 55))
-  service_hours     = handled_teu / (qc_count * 45.0)
+  service_hours = 3.0 + handled_teu / (qc_count * 45.0)
 
 The Smith ratio ("TEU-delay relieved per berth-service hour"):
 
-  affected_teu
-  ---------------  =  (affected_teu * qc_count * 45) / handled_teu
-  service_hours
+  priority_ratio = affected_teu / service_hours
 
-Since `45` is constant across all candidates, the constant can be dropped and
-the ranking is preserved by comparing:
+For exact integer comparison, the constant `45` is dropped:
 
-  priority_ratio = (affected_teu * qc_count) / handled_teu
+  numerator   = affected_teu * qc_count
+  denominator = 135 * qc_count + handled_teu
 
-When `handled_teu == 0` the service consumes zero simulated berth time, so
-the vessel must rank ahead of every positive-service-time vessel. Among
-zero-service vessels, ordering preserves `waiting_vessels` position.
+Vessel A outranks vessel B iff:
 
-Vessel A outranks vessel B iff one of:
+  A.numerator * B.denominator > B.numerator * A.denominator
 
-  * A.handled_teu == 0 and B.handled_teu > 0;
-  * both have positive handled_teu AND
-    (A.affected_teu * A.qc_count) * B.handled_teu
-    > (B.affected_teu * B.qc_count) * A.handled_teu
-    (exact cross multiplication, no floating-point comparison);
-  * both are zero-service AND A appears earlier in `waiting_vessels`.
+Exact ties preserve the input `waiting_vessels` order. There is no
+zero-service special case: a vessel with `handled_teu == 0` still
+consumes three hours of berth time and is compared via the same ratio
+path.
 
 ## Why age is intentionally excluded
 
@@ -64,23 +54,52 @@ equally expensive in the next hour. The earlier age-weighted candidate
 (`round0-first-result`) scored worse than the fallback by ~22%; this
 candidate deliberately avoids that mistake.
 
+## Metric definitions (one-pass carried-cargo classification)
+
+The metrics are computed by an explicit one-pass classification of carried
+cargo:
+
+  for each carried shipment:
+      1. read and validate a positive integer teu; else delegate
+      2. add it to carried_teu
+      3. require a valid non-None current booking; else delegate
+      4. if booking.service_route != vessel.assigned_service_route:
+           contribute to carried_teu only (foreign cargo)
+           do not add to occupied_teu
+           do not add to discharge_teu
+           continue
+      5. if current_segment is not None and
+         booking.arrival_segment_index == current_segment.sequence_index:
+           add to discharge_teu
+           do not add to occupied_teu
+           continue
+      6. otherwise: add to occupied_teu
+
+  projected_load_teu = greedy load using (teu_capacity - occupied_teu)
+  handled_teu        = discharge_teu + projected_load_teu
+  affected_teu       = carried_teu + projected_load_teu
+  qc_count           = max(1, int(vessel.vessel_class.loa / 55))
+
+When `current_segment is None`:
+
+  - discharge_teu must be zero;
+  - assigned-route carried cargo is occupied;
+  - foreign-route cargo is neither occupied nor discharged;
+  - all carried cargo (including foreign) contributes to affected_teu.
+
+The derived subtraction `discharge = carried - occupied` is not used
+anywhere in the implementation; foreign cargo must not appear in
+discharge_teu.
+
 ## Predicted-load calculation
 
 `port.shipments_in_storage` is iterated in its existing deterministic order.
 A stored shipment is an eligible loading candidate iff:
 
   * `shipment.carrying_vessel is None`;
-  * `shipment.get_current_booking()` is a valid booking;
+  * `shipment.get_current_booking()` is a valid (non-None) booking;
   * `booking.service_route is vessel.assigned_service_route`;
   * `booking.departure_segment_index == next_segment.sequence_index`.
-
-Occupied capacity after expected discharge is computed by iterating
-`vessel.carried_shipments`, including a shipment only if its current booking
-belongs to `vessel.assigned_service_route`, and excluding shipments whose
-booking arrival-segment-index equals the current-segment sequence-index
-(they will discharge before departure). When `vessel.current_segment is
-None`, all currently carried cargo counts as occupied (matches organizer
-behavior in `VesselBeingServed.attempt_start`).
 
 The greedy load fills remaining capacity in storage order without reordering,
 partial loading, or mutation. Reading state is purely observational: the
@@ -99,12 +118,40 @@ hooks return `None` unconditionally:
 The candidate never mutates any input. It never returns `False`. It returns
 `None` only when safe evaluation is impossible or `waiting_vessels` is empty.
 
+## Invalid-input delegation
+
+`_read_positive_teu` accepts positive ``int`` only (excluding ``bool``);
+fractional floats such as 1.5 are rejected, strings, ``None``,
+non-finite or fractional floats, ``bool``, zero, and negative values
+all raise a narrow `(TypeError, ValueError)`. None bookings on carried
+or stored shipments also raise `AttributeError`. `_validate_vessel_inputs`
+raises a narrow exception when `vessel.vessel_class`,
+`vessel_class.loa`, `vessel_class.teu_capacity`, or
+`vessel.assigned_service_route` is missing, non-finite, or nonpositive.
+The public selector catches only `(AttributeError, TypeError, ValueError,
+OverflowError)` and delegates with `None`. No broad `except Exception` or
+`except BaseException` is used anywhere in submission code.
+
+## Full-run configuration
+
+- Branch: `codex/round0-teu-delay-smith-priority-v1`
+- Strategy SHA-256 (candidate): `e80c5b5bf488acae4455564511fe350c19a497dc8044f9ec6988afc590ee6c63`
+- Strategy SHA-256 (active fallback after revert): `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- Scenario: `create_with_disruption`
+- Seed: `2026`
+- Warm-up: `140 days`
+- Measured duration: `360 days`
+- Interval: `5 days`
+- Period count: `72`
+- Simulation clock runtime: `00:28:23`
+- Run command: `uv run wsc2026 run --round round0 --full`
+
 ## Current comparable fallback (locally reproduced)
 
 - Score: `18.673577819840556`
 - ATT SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
-- 72 periods
 - Mean ATT across numbered period rows: about 20.336944444444445 days
+- 72 periods
 
 ## Historical secondary reference
 
@@ -114,61 +161,71 @@ The candidate never mutates any input. It never returns `False`. It returns
 Report separately whether the candidate also beats this historical value. It
 does not affect the accept/reject decision in this checkout.
 
-## Future acceptance rule (not yet evaluated)
+## Acceptance rule
 
-After a complete 72-period run with seed `2026`, warm-up `140`, measured
-`360`, interval `5`, scenario `create_with_disruption`, retain the candidate
-only if its Cumulative Resilience Loss is strictly lower than
-`18.673577819840556` by more than `1e-9`. A smoke run, partial run, or mean
-ATT alone can never satisfy acceptance.
-
-## Reviewer gate (explicit)
-
-**No performance simulation, scoring, optimization, parameter sweep, or
-second candidate may be run before reviewer approval.** The repository
-must remain at the implemented candidate, awaiting review.
-
-Only the following gates are permitted prior to review:
-
-  * `uv lock --check`
-  * `uv sync --locked --group dev --group simulation`
-  * `uv run ruff format --check .`
-  * `uv run ruff check .`
-  * `uv run mypy src/wsc2026_tools submission`
-  * Focused new unit tests
-  * Complete non-integration test suite with coverage >= 90%
-  * Focused new integration/contract tests against real organizer domain
-    objects (without running the simulation horizon)
-  * `uv run wsc2026 sync --round round0`
-  * `cmp` of participant and organizer strategy copies
-  * `uv run wsc2026 smoke --round round0` (import/wiring gate only)
-  * Deterministic ValidationTeam packaging twice
-  * Archive member inspection
-  * Git/restricted-material integrity checks
-
-Smoke is permitted only as an import/wiring gate. It is not evidence of
-performance and must not be scored or used for acceptance.
-
-## No-second-candidate rule
-
-Do not attempt another hypothesis regardless of outcome. This is the only
-authorized candidate for this experiment.
+Retain the candidate only if the complete 72-period Cumulative Resilience
+Loss is strictly lower than `18.673577819840556` by more than `1e-9`.
+Equality is rejection. The historical `18.276620672293834` value is secondary
+reporting only. This rule was applied without alteration after seeing the
+result.
 
 ## Full result
 
-To be filled in only after reviewer approval.
-
 | Measure | Value |
 | --- | --- |
-| Candidate Cumulative Resilience Loss | TBD |
-| Candidate ATT SHA-256 | TBD |
+| Candidate Cumulative Resilience Loss | `18.673577819840556` |
+| Candidate ATT SHA-256 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` |
 | Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
-| Delta vs baseline threshold | TBD |
-| Mean ATT across numbered period rows (days) | TBD |
+| Delta vs baseline threshold | `0.0` |
+| Relative percentage change | `0.0%` |
+| Mean ATT across numbered period rows (days) | `20.336944444444445` |
 | Period count | `72` |
-| Runtime | TBD |
-| Beats historical `18.276620672293834`? | TBD |
-| Beats current-checkout `18.673577819840556`? | TBD |
+| Simulation clock runtime | `00:28:23` |
+| Periods better than pinned fallback | `0` |
+| Periods equal to pinned fallback | `72` |
+| Periods worse than pinned fallback | `0` |
+| Beats historical `18.276620672293834`? | `No` |
+| Beats current-checkout `18.673577819840556`? | `No` (equal — rejection) |
+
+The candidate Cumulative Resilience Loss is byte-identical to the pinned
+fallback reproduction. Within this seed, warm-up, horizon, and scenario, the
+candidate made no selection that diverged from the organizer fallback's
+berth assignment; the produced `ATT_By_Statistics_Interval.csv` matches the
+locally reproduced fallback snapshot exactly
+(`10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`).
+
+## Implementation / correction commits (the approved f04daad candidate)
+
+- `dde3854` — `docs: define TEU-delay Smith-priority experiment`
+- `5734c8c` — `feat: prioritize TEU delay relieved per berth hour`
+- `6c3c635` — `fix: include full berth time in Smith priority`
+- `f04daad` — `fix: classify carried cargo for Smith metrics`
+
+## Reject / restore commits
+
+- `4b8ebf6` — `revert: restore fallback after Smith-priority experiment`
+
+This revert rolls back the three implementation/correction commits
+`f04daad`, `6c3c635`, and `5734c8c` (in newest-to-oldest order) and restores
+the no-op fallback `UserStrategy` adapter with all four hooks returning
+`None` unconditionally. It also deletes the candidate-specific unit and
+integration tests and restores the pre-experiment README. The active
+`Output/ATT_By_Statistics_Interval.csv` was overwritten from the verified
+fallback snapshot
+`.challenge/round0/results/fallback_reproduction_current_checkout_run1/ATT_By_Statistics_Interval.csv`
+with SHA `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
+and re-scored to confirm `18.673577819840556` exactly.
+
+The result recorded above applies to the final approved `f04daad` candidate
+only; conclusions are evidence-limited to this single seed and scenario.
+
+## Evidence paths (ignored)
+
+- Candidate ATT snapshot: `.challenge/round0/results/teu_delay_smith_priority_v1_2026/ATT_By_Statistics_Interval.csv` (SHA `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`)
+- Aggregate metrics JSON: `experiments/results/teu_delay_smith_priority_v1_2026.json`
+- Active Output ATT after restore: `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` (SHA `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`)
+
+Both ignored locations are untracked and contain no organizer source.
 
 ## Resume point
 

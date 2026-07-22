@@ -1,6 +1,6 @@
 # Round 0 temporal lower-bound safe routing v1
 
-**Status:** PENDING_RUN
+**Status:** SUCCESS_REJECTED
 
 ## Hypothesis
 
@@ -227,30 +227,90 @@ authorized candidate for this experiment.
 
 ## Full result
 
-To be filled in after the candidate run.
-
 | Measure | Value |
 | --- | --- |
-| Candidate Cumulative Resilience Loss | TBD |
-| Candidate ATT SHA-256 | TBD |
+| Candidate Cumulative Resilience Loss | `22.732416871465396` |
+| Candidate ATT SHA-256 | `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92` |
 | Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
-| Delta vs baseline threshold | TBD |
-| Mean ATT across numbered period rows (days) | TBD |
+| Delta vs baseline threshold | `+4.05883905162484` (much worse, not lower by more than `1e-9`) |
+| Relative change vs baseline | `+21.735733%` |
+| Mean ATT across numbered period rows (days) | `20.584444444444454` |
 | Period count | `72` |
-| Runtime | TBD |
-| Beats historical `18.276620672293834`? | TBD |
-| Beats current-checkout `18.673577819840556`? | TBD |
+| Runtime | `21:17` |
+| Beats historical `18.276620672293834`? | No |
+| Beats current-checkout `18.673577819840556`? | No (much worse) |
+
+The candidate produced a different ATT output than the current-checkout
+fallback (different SHA, different per-period values). The candidate score
+`22.732416871465396` is well above the current-checkout acceptance
+threshold of `18.673577819840556` (delta `+4.058839`, `+21.74%` worse), so
+the candidate is rejected on the acceptance rule alone.
+
+The experiment did not instrument per-cargo flow or per-route usage
+sufficiently to establish whether the degradation came from extra
+overrides that produced lower-quality paths, from trips that the candidate
+attempted to override but the organizer fallback would have routed
+differently, or from the assignment-timing difference between the
+candidate's lower-bound path and the organizer's disruption-aware
+shortest path. All those categories remain possible explanations; the
+experiment only proves that the policy as a whole, with the documented
+encounter-time forecast and atomic-mutation contract, performs worse than
+the organizer fallback on this Round 0 scenario.
 
 ## Decision
 
-TBD.
+Reject. The candidate score `22.732416871465396` is above the
+current-checkout acceptance threshold of `18.673577819840556` by more than
+`1e-9`. The underlying cause of the degradation was not established by
+this experiment.
+
+## Rejection/restoration procedure (executed)
+
+1. This document was updated to `SUCCESS_REJECTED` (this file).
+2. All metrics, hashes, and runtime recorded above.
+3. Result documentation committed separately via
+   `docs: record rejected temporal safe-routing result`.
+4. Implementation commit (`3160905`) reverted via `git revert`; the
+   no-op adapter is restored automatically.
+5. The reverted no-op adapter synchronized into the organizer tree.
+6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` was
+   restored from a verified current-checkout fallback snapshot (the
+   bytes were preserved in
+   `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
+   and `_run2/`).
+7. Verified restored SHA:
+   `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+8. Verified restored score: `18.673577819840556`.
+9. Final gates rerun; deterministic packaging re-verified.
+10. Branch left clean with the no-op fallback active.
+
+## Final implementation commit (rejected)
+
+- Implementation commit SHA: `3160905`
+- Revert commit SHA: TBD (created in the rejection/restoration commit)
+
+## Final state confirmation
+
+- Candidate score: `22.732416871465396`.
+- Candidate ATT SHA-256: `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92`.
+- The candidate ATT output is **different** from the current-checkout
+  locally reproduced fallback (different SHA, different per-period
+  values), confirming the policy had a measurable scoring effect.
+- Rejection reason: the candidate score `22.732416871465396` is well
+  above the current-checkout acceptance threshold of
+  `18.673577819840556` (delta `+4.058839`).
+- Only one candidate was attempted for this experiment; no second
+  strategy was tried.
+- The active strategy is restored to the no-op organizer-fallback
+  adapter; the implementation commit was reverted via `git revert`.
 
 ## Private (ignored) evidence
 
-To be filled in after the candidate run.
-
 - Candidate ATT snapshot:
   `.challenge/round0/results/temporal_lower_bound_safe_routing_v1_2026/ATT_By_Statistics_Interval.csv`
+  — SHA `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92`
+- Candidate full run log: `/tmp/wsc2026_candidate_run.log` (private
+  shell-side log; not committed)
 - Aggregate result:
   `experiments/results/temporal_lower_bound_safe_routing_v1_2026.json`
 

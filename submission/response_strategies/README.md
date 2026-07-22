@@ -23,17 +23,28 @@ Three of the four hooks still delegate to the organizer fallback
 `adjust_bookings_before_cargo_handling`). They always return `None`.
 
 The fourth hook, `select_vessel_for_berth`, implements a Smith-style
-**TEU-delay-per-berth-hour priority**:
+**TEU-delay-per-berth-hour priority** with the fixed 3-hour berthing
+overhead:
 
 - For each waiting vessel, compute predicted `handled_teu` (discharge + greedy
   load) and `affected_teu` (carried + greedy load) using only the organizer's
   berth-handling contract (`qc_count = max(1, int(loa / 55))`,
-  `service_hours = handled_teu / (qc_count * 45)`).
-- Rank by `(affected_teu * qc_count) / handled_teu`, with exact cross
-  multiplication. Vessels with `handled_teu == 0` outrank every positive
-  candidate. Ties preserve the input `waiting_vessels` order.
+  `service_hours = 3.0 + handled_teu / (qc_count * 45)`).
+- Occupied-capacity calculation mirrors the organizer's
+  `VesselBeingServed._calc_occupied_teu` exactly: route-excluded cargo does
+  not occupy capacity.
+- Rank by exact cross multiplication of
+  `numerator = affected_teu * qc_count` vs
+  `denominator = 135 * qc_count + handled_teu`. Zero-handled vessels still
+  consume the fixed 3-hour berthing time and use the same ratio path. Ties
+  preserve the input `waiting_vessels` order.
 - Returns one of `waiting_vessels` or `None`. Never returns `False`. Never
   mutates any input.
+- Invalid inputs (missing/non-numeric/non-finite/zero/negative TEU,
+  missing vessel class, missing route, non-finite LOA, nonpositive
+  capacity) raise narrow expected exceptions that the public selector
+  catches and uses to delegate with `None`. No broad `except Exception`
+  is used.
 
 Cargo age is intentionally excluded; the metric weights ATT per TEU, so the
 marginal one-hour cost of delaying one TEU is constant. The full hypothesis,

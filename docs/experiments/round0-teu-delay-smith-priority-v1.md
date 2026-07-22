@@ -14,46 +14,47 @@ rule is a Smith-style ratio:
 
   TEU whose progress depends on this vessel
   -------------------------------------------
-  predicted berth handling time
+  predicted berth-service time
 
 Choose the vessel with the greatest TEU-delay relieved per berth-service hour.
 
-## Exact Smith-ratio formula
+## Exact Smith-ratio formula (with fixed 3-hour berthing overhead)
 
-For each vessel in `waiting_vessels`, predict the next berth service:
+The organizer models berth occupancy as a fixed 3-hour berthing activity
+(`simulation_model/berth_berthing.py`) followed by cargo handling
+(`simulation_model/berth_handling_cargo.py`). The predicted berth-service
+time is therefore:
 
-  carried_teu       = sum(s.teu_size for s in vessel.carried_shipments)
-  discharge_teu     = sum(s.teu_size for s in
-                          vessel.get_discharging_shipments_at_current_segment())
-  projected_load_teu = TEU selected by the read-only loading prediction
-  affected_teu      = carried_teu + projected_load_teu
-  handled_teu       = discharge_teu + projected_load_teu
-  qc_count          = max(1, int(vessel.vessel_class.loa / 55))
-  service_hours     = handled_teu / (qc_count * 45.0)
+  service_hours = 3.0 + handled_teu / (qc_count * 45.0)
 
 The Smith ratio ("TEU-delay relieved per berth-service hour"):
 
-  affected_teu
-  ---------------  =  (affected_teu * qc_count * 45) / handled_teu
-  service_hours
+  priority_ratio = affected_teu / service_hours
+                  = (affected_teu * qc_count * 45) / (135 * qc_count + handled_teu)
 
-Since `45` is constant across all candidates, the constant can be dropped and
-the ranking is preserved by comparing:
+For exact integer comparison, the constant `45` is dropped:
 
-  priority_ratio = (affected_teu * qc_count) / handled_teu
+  numerator   = affected_teu * qc_count
+  denominator = 135 * qc_count + handled_teu
 
-When `handled_teu == 0` the service consumes zero simulated berth time, so
-the vessel must rank ahead of every positive-service-time vessel. Among
-zero-service vessels, ordering preserves `waiting_vessels` position.
+Vessel A outranks vessel B iff:
 
-Vessel A outranks vessel B iff one of:
+  A.numerator * B.denominator > B.numerator * A.denominator
 
-  * A.handled_teu == 0 and B.handled_teu > 0;
-  * both have positive handled_teu AND
-    (A.affected_teu * A.qc_count) * B.handled_teu
-    > (B.affected_teu * B.qc_count) * A.handled_teu
-    (exact cross multiplication, no floating-point comparison);
-  * both are zero-service AND A appears earlier in `waiting_vessels`.
+Exact ties preserve the input `waiting_vessels` order. There is no
+zero-service special case: a vessel with `handled_teu == 0` still
+consumes three hours of berth time and is compared via the same ratio
+path.
+
+### Worked example
+
+  Vessel A: carried=0, handled=0, qc=1
+            num=0,     den=135
+  Vessel B: carried=10, handled=10, qc=1
+            num=10,    den=145
+  A.num * B.den = 0 * 145 = 0
+  B.num * A.den = 10 * 135 = 1350
+  B wins.
 
 ## Why age is intentionally excluded
 
@@ -64,6 +65,27 @@ equally expensive in the next hour. The earlier age-weighted candidate
 (`round0-first-result`) scored worse than the fallback by ~22%; this
 candidate deliberately avoids that mistake.
 
+## Metric definitions
+
+  carried_teu       = sum(s.teu_size for s in vessel.carried_shipments)
+  discharge_teu     = carried_teu - occupied_after_discharge
+  projected_load_teu = TEU selected by the read-only loading prediction
+  handled_teu       = discharge_teu + projected_load_teu
+  affected_teu      = carried_teu + projected_load_teu
+  qc_count          = max(1, int(vessel.vessel_class.loa / 55))
+
+`occupied_after_discharge` mirrors `VesselBeingServed._calc_occupied_teu`:
+
+  for each carried shipment:
+      booking = shipment.get_current_booking()
+      if booking.service_route != assigned_route: continue
+      if current_seg_index is not None and
+         booking.arrival_segment_index == current_seg_index: continue
+      total += teu_size
+
+When `current_segment is None`, the discharge exclusion is skipped but the
+route-exclusion still applies.
+
 ## Predicted-load calculation
 
 `port.shipments_in_storage` is iterated in its existing deterministic order.
@@ -73,14 +95,6 @@ A stored shipment is an eligible loading candidate iff:
   * `shipment.get_current_booking()` is a valid booking;
   * `booking.service_route is vessel.assigned_service_route`;
   * `booking.departure_segment_index == next_segment.sequence_index`.
-
-Occupied capacity after expected discharge is computed by iterating
-`vessel.carried_shipments`, including a shipment only if its current booking
-belongs to `vessel.assigned_service_route`, and excluding shipments whose
-booking arrival-segment-index equals the current-segment sequence-index
-(they will discharge before departure). When `vessel.current_segment is
-None`, all currently carried cargo counts as occupied (matches organizer
-behavior in `VesselBeingServed.attempt_start`).
 
 The greedy load fills remaining capacity in storage order without reordering,
 partial loading, or mutation. Reading state is purely observational: the
@@ -98,6 +112,17 @@ hooks return `None` unconditionally:
 
 The candidate never mutates any input. It never returns `False`. It returns
 `None` only when safe evaluation is impossible or `waiting_vessels` is empty.
+
+## Invalid-input delegation
+
+`_read_positive_teu` raises a narrow `(TypeError, ValueError)` when
+`shipment.teu_size` is missing, None, non-numeric, non-finite, zero, or
+negative. `_validate_vessel_inputs` raises a narrow exception when
+`vessel.vessel_class`, `vessel_class.loa`, `vessel_class.teu_capacity`, or
+`vessel.assigned_service_route` is missing, non-finite, or nonpositive.
+The public selector catches only `(AttributeError, TypeError, ValueError,
+OverflowError)` and delegates with `None`. No broad `except Exception` or
+`except BaseException` is used anywhere in submission code.
 
 ## Current comparable fallback (locally reproduced)
 

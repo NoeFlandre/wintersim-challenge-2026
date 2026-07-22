@@ -287,7 +287,7 @@ this experiment.
 ## Final implementation commit (rejected)
 
 - Implementation commit SHA: `3160905`
-- Revert commit SHA: TBD (created in the rejection/restoration commit)
+- Revert commit SHA: `33cc936`
 
 ## Final state confirmation
 

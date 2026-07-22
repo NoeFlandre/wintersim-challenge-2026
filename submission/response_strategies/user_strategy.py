@@ -34,55 +34,75 @@ from typing import Any
 
 
 def _read_positive_teu(shipment: Any) -> int:
-    """Read shipment.teu_size as a positive integer or raise.
+    """Read shipment.teu_size as a strict positive integer or raise.
 
-    A strict positive TEU value is required for scheduling decisions.
-    Missing, non-numeric, non-finite, zero, or negative values raise a
-    narrow expected exception that the public selector catches and uses
-    to delegate with ``None``.
+    Accepts positive ``int`` only (excluding ``bool``). Strings, ``None``,
+    non-finite or fractional floats, ``bool``, zero, and negative values
+    all raise a narrow expected exception that the public selector
+    catches and uses to delegate with ``None``.
     """
     value = getattr(shipment, "teu_size", None)
     if value is None:
         raise TypeError("shipment.teu_size is None")
     if isinstance(value, bool):
         raise TypeError("shipment.teu_size is a bool")
-    try:
-        numeric = int(value)
-    except (TypeError, ValueError) as exc:
-        raise TypeError(f"shipment.teu_size is non-numeric: {value!r}") from exc
-    if isinstance(value, float) and not math.isfinite(value):
-        raise ValueError(f"shipment.teu_size is non-finite: {value!r}")
-    if numeric <= 0:
-        raise ValueError(f"shipment.teu_size must be positive: {numeric}")
-    return numeric
+    if isinstance(value, int):
+        if value <= 0:
+            raise ValueError(f"shipment.teu_size must be positive: {value}")
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"shipment.teu_size is non-finite: {value!r}")
+        if not value.is_integer():
+            raise ValueError(f"shipment.teu_size must be integer: {value!r}")
+        if value <= 0:
+            raise ValueError(f"shipment.teu_size must be positive: {value}")
+        return int(value)
+    raise TypeError(f"shipment.teu_size is non-numeric: {value!r}")
 
 
-def _calc_occupied_teu(vessel: Any, route: Any, current_seg_index: int | None) -> int:
-    """Mirror the organizer ``VesselBeingServed._calc_occupied_teu`` rule.
+def _classify_carried_cargo(
+    vessel: Any, route: Any, current_seg_index: int | None
+) -> tuple[int, int, int]:
+    """One-pass classification of carried shipments.
 
-    Counts TEU of carried shipments whose current booking belongs to the
-    vessel's assigned route, excluding cargo discharging at the current
-    segment. When ``current_seg_index`` is ``None``, the discharge
-    exclusion is skipped (mirroring organizer's ``curr_seq is None``
-    branch) but the route-exclusion still applies.
+    Returns ``(carried_teu, occupied_teu, discharge_teu)``. Foreign-route
+    cargo contributes to carried_teu, contributes to neither occupied nor
+    discharge, and propagates a ``TypeError`` if TEU is malformed. A None
+    booking is treated as malformed and propagates ``AttributeError``.
+
+    Rules mirror ``VesselBeingServed._calc_occupied_teu`` for the occupied
+    count, plus an explicit discharge rule: when ``current_seg_index`` is
+    not None, assigned-route cargo whose ``arrival_segment_index`` equals
+    the current segment counts as discharge; all other assigned-route
+    cargo is occupied.
     """
-    total = 0
+    carried_teu = 0
+    occupied_teu = 0
+    discharge_teu = 0
     for shipment in vessel.carried_shipments:
+        teu = _read_positive_teu(shipment)
+        carried_teu += teu
         booking = shipment.get_current_booking()
         if booking is None:
-            continue
-        if booking.service_route != route:
+            raise AttributeError(f"shipment {getattr(shipment, 'id', '?')} has no current booking")
+        if booking.service_route is not route:
             continue
         if current_seg_index is not None and booking.arrival_segment_index == current_seg_index:
+            discharge_teu += teu
             continue
-        total += _read_positive_teu(shipment)
-    return total
+        occupied_teu += teu
+    return carried_teu, occupied_teu, discharge_teu
 
 
 def _predict_projected_load_teu(
     port: Any, vessel: Any, route: Any, next_seg_index: int, occupied: int
 ) -> int:
-    """Greedy predicted load in TEU without mutation or reordering."""
+    """Greedy predicted load in TEU without mutation or reordering.
+
+    A stored shipment with ``get_current_booking()`` returning ``None`` is
+    malformed and raises so the public selector delegates.
+    """
     remaining = vessel.vessel_class.teu_capacity - occupied
     if remaining <= 0:
         return 0
@@ -91,7 +111,11 @@ def _predict_projected_load_teu(
         if shipment.carrying_vessel is not None:
             continue
         booking = shipment.get_current_booking()
-        if booking is None or booking.service_route is not route:
+        if booking is None:
+            raise AttributeError(
+                f"stored shipment {getattr(shipment, 'id', '?')} has no current booking"
+            )
+        if booking.service_route is not route:
             continue
         if booking.departure_segment_index != next_seg_index:
             continue
@@ -103,22 +127,17 @@ def _predict_projected_load_teu(
 
 
 def _validate_vessel_inputs(vessel: Any) -> None:
-    """Raise on missing or non-finite/nonpositive vessel inputs.
-
-    Explicit checks ensure that a malformed but integer-coercible value
-    (e.g. ``loa = -1`` would otherwise pass through ``max(1, int(-1/55))``)
-    is detected and surfaced as a delegating failure.
-    """
+    """Raise on missing or non-finite/nonpositive vessel inputs."""
     vc = getattr(vessel, "vessel_class", None)
     if vc is None:
         raise AttributeError("vessel.vessel_class is None")
     loa = getattr(vc, "loa", None)
-    if not isinstance(loa, (int, float)) or isinstance(loa, bool):
+    if isinstance(loa, bool) or not isinstance(loa, (int, float)):
         raise TypeError(f"vessel_class.loa is non-numeric: {loa!r}")
     if not math.isfinite(loa) or loa <= 0:
         raise ValueError(f"vessel_class.loa must be positive finite: {loa!r}")
     capacity = getattr(vc, "teu_capacity", None)
-    if not isinstance(capacity, (int, float)) or isinstance(capacity, bool):
+    if isinstance(capacity, bool) or not isinstance(capacity, (int, float)):
         raise TypeError(f"vessel_class.teu_capacity is non-numeric: {capacity!r}")
     if not math.isfinite(capacity) or capacity <= 0:
         raise ValueError(f"vessel_class.teu_capacity must be positive finite: {capacity!r}")
@@ -127,8 +146,8 @@ def _validate_vessel_inputs(vessel: Any) -> None:
         raise AttributeError("vessel.assigned_service_route is None")
 
 
-def _candidate_metrics(port: Any, vessel: Any) -> tuple[int, int, int, int]:
-    """Return ``(handled_teu, affected_teu, qc_count, carried_teu)``."""
+def _candidate_metrics(port: Any, vessel: Any) -> tuple[int, int, int, int, int]:
+    """Return ``(handled_teu, affected_teu, qc_count, carried_teu, occupied_teu)``."""
     _validate_vessel_inputs(vessel)
     route = vessel.assigned_service_route
     current_seg = vessel.current_segment
@@ -136,15 +155,15 @@ def _candidate_metrics(port: Any, vessel: Any) -> tuple[int, int, int, int]:
     current_seg_index = current_seg.sequence_index if current_seg is not None else None
     next_seg_index = next_seg.sequence_index
 
-    carried_teu = sum(_read_positive_teu(s) for s in vessel.carried_shipments)
-    occupied = _calc_occupied_teu(vessel, route, current_seg_index)
-    projected_load = _predict_projected_load_teu(port, vessel, route, next_seg_index, occupied)
+    carried_teu, occupied_teu, discharge_teu = _classify_carried_cargo(
+        vessel, route, current_seg_index
+    )
+    projected_load = _predict_projected_load_teu(port, vessel, route, next_seg_index, occupied_teu)
 
-    discharge_teu = carried_teu - occupied
     handled_teu = discharge_teu + projected_load
     affected_teu = carried_teu + projected_load
     qc_count = max(1, int(vessel.vessel_class.loa / 55))
-    return handled_teu, affected_teu, qc_count, carried_teu
+    return handled_teu, affected_teu, qc_count, carried_teu, occupied_teu
 
 
 def _safe_metrics(port: Any, vessel: Any):
@@ -179,7 +198,7 @@ class UserStrategy:
             metrics = _safe_metrics(port, vessel)
             if metrics is None:
                 return None
-            handled, affected, qc, _ = metrics
+            handled, affected, qc, _, _ = metrics
             candidates.append((affected * qc, 135 * qc + handled, vessel))
 
         best_index = 0

@@ -67,24 +67,40 @@ candidate deliberately avoids that mistake.
 
 ## Metric definitions
 
-  carried_teu       = sum(s.teu_size for s in vessel.carried_shipments)
-  discharge_teu     = carried_teu - occupied_after_discharge
-  projected_load_teu = TEU selected by the read-only loading prediction
-  handled_teu       = discharge_teu + projected_load_teu
-  affected_teu      = carried_teu + projected_load_teu
-  qc_count          = max(1, int(vessel.vessel_class.loa / 55))
-
-`occupied_after_discharge` mirrors `VesselBeingServed._calc_occupied_teu`:
+The metrics are computed by an explicit one-pass classification of carried
+cargo:
 
   for each carried shipment:
-      booking = shipment.get_current_booking()
-      if booking.service_route != assigned_route: continue
-      if current_seg_index is not None and
-         booking.arrival_segment_index == current_seg_index: continue
-      total += teu_size
+      1. read and validate a positive integer teu
+      2. add it to carried_teu
+      3. require a valid non-None current booking; else delegate
+      4. if booking.service_route != vessel.assigned_service_route:
+           contribute to carried_teu only (foreign cargo)
+           do not add to occupied_teu
+           do not add to discharge_teu
+           continue
+      5. if current_segment is not None and
+         booking.arrival_segment_index == current_segment.sequence_index:
+           add to discharge_teu
+           do not add to occupied_teu
+           continue
+      6. otherwise: add to occupied_teu
 
-When `current_segment is None`, the discharge exclusion is skipped but the
-route-exclusion still applies.
+  projected_load_teu = greedy load using (teu_capacity - occupied_teu)
+  handled_teu        = discharge_teu + projected_load_teu
+  affected_teu       = carried_teu + projected_load_teu
+  qc_count           = max(1, int(vessel.vessel_class.loa / 55))
+
+When `current_segment is None`:
+
+  - discharge_teu must be zero;
+  - assigned-route carried cargo is occupied;
+  - foreign-route cargo is neither occupied nor discharged;
+  - all carried cargo (including foreign) contributes to affected_teu.
+
+The derived subtraction `discharge = carried - occupied` is not used
+anywhere in the implementation; foreign cargo must not appear in
+discharge_teu.
 
 ## Predicted-load calculation
 
@@ -115,10 +131,13 @@ The candidate never mutates any input. It never returns `False`. It returns
 
 ## Invalid-input delegation
 
-`_read_positive_teu` raises a narrow `(TypeError, ValueError)` when
-`shipment.teu_size` is missing, None, non-numeric, non-finite, zero, or
-negative. `_validate_vessel_inputs` raises a narrow exception when
-`vessel.vessel_class`, `vessel_class.loa`, `vessel_class.teu_capacity`, or
+`_read_positive_teu` accepts positive ``int`` only (excluding ``bool``);
+fractional floats such as 1.5 are rejected, strings, ``None``,
+non-finite or fractional floats, ``bool``, zero, and negative values
+all raise a narrow `(TypeError, ValueError)`. None bookings on carried
+or stored shipments also raise `AttributeError`. `_validate_vessel_inputs`
+raises a narrow exception when `vessel.vessel_class`,
+`vessel_class.loa`, `vessel_class.teu_capacity`, or
 `vessel.assigned_service_route` is missing, non-finite, or nonpositive.
 The public selector catches only `(AttributeError, TypeError, ValueError,
 OverflowError)` and delegates with `None`. No broad `except Exception` or

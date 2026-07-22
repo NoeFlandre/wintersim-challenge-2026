@@ -613,9 +613,11 @@ def test_continuing_cargo_counts_in_affected_not_handled() -> None:
 
 
 def test_different_route_carried_cargo_excluded_from_occupied() -> None:
-    """Mirror organizer _calc_occupied_teu: different-route carried cargo
-    does not occupy capacity; it should not artificially reduce projected
-    loading."""
+    """Sanity: a single-vessel call still returns that vessel when foreign
+    cargo is present. (A single-vessel 'returns itself' assertion does not
+    prove metric correctness; see the foreign-route selection-reversal
+    tests below for that.)
+    """
     port = _Port()
     main_route = _make_route()
     foreign_route = _make_route()
@@ -628,8 +630,6 @@ def test_different_route_carried_cargo_excluded_from_occupied() -> None:
         current_segment=seg1,
         index=1,
     )
-    # Carry cargo whose booking belongs to a different route -> must be
-    # excluded from occupied capacity (organizer rule).
     foreign_booking = _Booking(
         service_route=foreign_route,
         departure_segment_index=seg1.sequence_index,
@@ -637,7 +637,6 @@ def test_different_route_carried_cargo_excluded_from_occupied() -> None:
     )
     foreign = _Shipment(teu_size=80, carrying_vessel=v, booking=foreign_booking)
     v.carried_shipments.append(foreign)
-    # Eligible storage cargo: 100 TEU.
     for _ in range(10):
         _make_storage_shipment(
             teu_size=10,
@@ -645,11 +644,7 @@ def test_different_route_carried_cargo_excluded_from_occupied() -> None:
             departure_segment_index=seg2.sequence_index,
             port=port,
         )
-    # Occupied = 0 (foreign-route cargo is excluded).
-    # Projected load = 100.
-    # handled = 100, affected = 100.
-    result = _select(port=port, waiting_vessels=[v])
-    assert result is v
+    assert _select(port=port, waiting_vessels=[v]) is v
 
 
 def test_loading_filters_route_departure_carrying_storage() -> None:
@@ -725,8 +720,10 @@ def test_greedy_load_preserves_order_and_caps_capacity() -> None:
 
 
 def test_current_segment_none_excludes_only_assigned_route_discharge() -> None:
-    """Mirror organizer: when current_segment is None, foreign-route
-    cargo is excluded, all assigned-route cargo is occupied."""
+    """Sanity: a single-vessel call still returns that vessel when
+    current_segment is None and foreign cargo is carried. (A single-vessel
+    'returns itself' assertion does not prove metric correctness; see
+    test_foreign_cargo_with_current_segment_none for that.)"""
     port = _Port()
     main_route = _make_route()
     foreign_route = _make_route()
@@ -758,9 +755,286 @@ def test_current_segment_none_excludes_only_assigned_route_discharge() -> None:
             departure_segment_index=seg2.sequence_index,
             port=port,
         )
-    # Organizer rule (current_segment None, foreign excluded):
-    # occupied = 80 (foreign 50 excluded). remaining=20. Load 20 TEU.
     assert _select(port=port, waiting_vessels=[vessel]) is vessel
+
+
+# ---------------------------------------------------------------------------
+# Bug-detecting tests: foreign-route cargo classification
+# ---------------------------------------------------------------------------
+
+
+def test_foreign_route_cargo_selection_reversal() -> None:
+    """Foreign-route carried cargo must NOT be treated as discharge at the
+    current segment.
+
+    Vessel A (qc=3, capacity=100):
+      foreign-route carried TEU = 80 (booking on a different route)
+      assigned-route projected load = 100
+      Correct metrics:
+        carried   = 80
+        occupied  = 0          (foreign excluded from occupied)
+        discharge = 0          (foreign excluded from discharge)
+        handled   = 100        (projected load only)
+        affected  = 180
+        num = 180 * 3 = 540
+        den = 135 * 3 + 100 = 505
+      The buggy implementation computes
+        discharge = carried - occupied = 80
+        handled   = 80 + 100 = 180
+        num = 540, den = 135*3 + 180 = 585
+
+    Vessel B (qc=3, capacity=65):
+      assigned-route carried = 170
+        105 TEU discharging at current segment
+        65 TEU continuing (next segment)
+      Correct metrics:
+        carried = 170, occupied = 65, discharge = 105
+        projected = 0 (capacity 65 - occupied 65 = 0)
+        handled = 105, affected = 170
+        num = 510, den = 510
+      Buggy implementation produces the same metrics for B (no foreign
+      cargo), so the comparison flips:
+
+        Correct: 540 * 510 vs 510 * 505 -> A wins
+        Buggy:   540 * 510 vs 510 * 585 -> B wins
+    """
+    port = _Port()
+    main_route = _make_route()
+    foreign_route = _make_route()
+    seg1 = main_route.segments[0]
+    seg2 = main_route.segments[1]
+
+    # loa = 165 -> qc_count = max(1, int(165/55)) = 3
+    vc_a = _VesselClass(teu_capacity=100, loa=165.0)
+    vc_b = _VesselClass(teu_capacity=65, loa=165.0)
+    vessel_a = _Vessel(vessel_class=vc_a, route=main_route, current_segment=seg1, index=1)
+    vessel_b = _Vessel(vessel_class=vc_b, route=main_route, current_segment=seg1, index=2)
+
+    # Vessel A: 80 TEU of foreign-route carried cargo.
+    foreign_booking = _Booking(
+        service_route=foreign_route,
+        departure_segment_index=seg1.sequence_index,
+        arrival_segment_index=seg1.sequence_index,
+    )
+    vessel_a.carried_shipments.append(
+        _Shipment(teu_size=80, carrying_vessel=vessel_a, booking=foreign_booking)
+    )
+    # Vessel A: 100 TEU eligible at port for next segment -> fills all.
+    for _ in range(10):
+        _make_storage_shipment(
+            teu_size=10,
+            route=main_route,
+            departure_segment_index=seg2.sequence_index,
+            port=port,
+        )
+
+    # Vessel B: 105 discharging (seg1) + 65 continuing (seg2).
+    for _ in range(10):
+        vessel_b.carried_shipments.append(
+            _make_carrying_shipment(
+                teu_size=10,
+                route=main_route,
+                current_segment_index=seg1.sequence_index,
+                vessel=vessel_b,
+            )
+        )
+    vessel_b.carried_shipments.append(
+        _make_carrying_shipment(
+            teu_size=5,
+            route=main_route,
+            current_segment_index=seg1.sequence_index,
+            vessel=vessel_b,
+        )
+    )
+    for _ in range(6):
+        vessel_b.carried_shipments.append(
+            _make_carrying_shipment(
+                teu_size=10,
+                route=main_route,
+                current_segment_index=seg2.sequence_index,
+                vessel=vessel_b,
+            )
+        )
+    vessel_b.carried_shipments.append(
+        _make_carrying_shipment(
+            teu_size=5,
+            route=main_route,
+            current_segment_index=seg2.sequence_index,
+            vessel=vessel_b,
+        )
+    )
+
+    assert _select(port=port, waiting_vessels=[vessel_b, vessel_a]) is vessel_a
+
+
+def test_foreign_cargo_with_current_segment_none() -> None:
+    """current_segment is None: discharge_teu must be 0, foreign cargo must
+    contribute to neither occupied nor discharge, and must still contribute
+    to affected_teu.
+
+    Construct a competing vessel so an incorrect handled value changes the
+    winner.
+    """
+    port = _Port()
+    main_route = _make_route()
+    foreign_route = _make_route()
+    seg1 = main_route.segments[0]
+
+    # Vessel A: current_segment=None, foreign 400 TEU carried. qc=1.
+    vc_a = _VesselClass(teu_capacity=400, loa=55.0)  # int(55/55)=1
+    vessel_a = _Vessel(vessel_class=vc_a, route=main_route, current_segment=None, index=1)
+    foreign_booking = _Booking(
+        service_route=foreign_route,
+        departure_segment_index=seg1.sequence_index,
+        arrival_segment_index=seg1.sequence_index,
+    )
+    vessel_a.carried_shipments.append(
+        _Shipment(teu_size=400, carrying_vessel=vessel_a, booking=foreign_booking)
+    )
+
+    # Vessel B: current_segment=seg1, assigned 200 TEU (100 discharging +
+    # 100 continuing). qc=1.
+    vc_b = _VesselClass(teu_capacity=200, loa=55.0)
+    vessel_b = _Vessel(vessel_class=vc_b, route=main_route, current_segment=seg1, index=2)
+    for _ in range(10):
+        vessel_b.carried_shipments.append(
+            _make_carrying_shipment(
+                teu_size=10,
+                route=main_route,
+                current_segment_index=seg1.sequence_index,
+                vessel=vessel_b,
+            )
+        )
+    for _ in range(10):
+        vessel_b.carried_shipments.append(
+            _make_carrying_shipment(
+                teu_size=10,
+                route=main_route,
+                current_segment_index=seg1.sequence_index + 1,
+                vessel=vessel_b,
+            )
+        )
+
+    # Correct A: carried=400, occupied=0 (foreign excluded),
+    #            discharge=0 (current_segment=None -> spec rule),
+    #            projected=0, handled=0, affected=400
+    #   num=400, den=135
+    # Correct B: carried=200, occupied=100, discharge=100,
+    #            projected=0, handled=100, affected=200
+    #   num=200, den=235
+    # A wins: 400*235=94000 vs 200*135=27000
+    #
+    # Buggy A: discharge = carried - occupied = 400 - 0 = 400,
+    #          handled=400, num=400, den=135+400=535
+    # Buggy B: unchanged (no foreign cargo).
+    # B wins: 400*235=94000 vs 200*535=107000
+    assert _select(port=port, waiting_vessels=[vessel_a, vessel_b]) is vessel_a
+
+
+# ---------------------------------------------------------------------------
+# Bug-detecting tests: None booking delegation
+# ---------------------------------------------------------------------------
+
+
+def test_none_booking_carried_delegates() -> None:
+    """A carried shipment whose ``get_current_booking()`` returns ``None``
+    is malformed; the organizer normally raises. The candidate must
+    delegate, not silently skip.
+    """
+    port = _Port()
+    route = _make_route()
+    seg1 = route.segments[0]
+    vessel = _Vessel(
+        vessel_class=_VesselClass(teu_capacity=1000, loa=200.0),
+        route=route,
+        current_segment=seg1,
+        index=1,
+    )
+
+    class _NoBookingShipment:
+        def __init__(self, *, teu_size, carrying_vessel):
+            self.teu_size = teu_size
+            self.carrying_vessel = carrying_vessel
+
+        def get_current_booking(self):
+            return None
+
+    vessel.carried_shipments.append(_NoBookingShipment(teu_size=100, carrying_vessel=vessel))
+    carried_before = [id(s) for s in vessel.carried_shipments]
+    other = _make_vessel(index=2)
+    assert _select(port=port, waiting_vessels=[vessel, other]) is None
+    assert [id(s) for s in vessel.carried_shipments] == carried_before
+
+
+def test_none_booking_storage_delegates() -> None:
+    """A stored loading candidate whose ``get_current_booking()`` returns
+    ``None`` is malformed; the candidate must delegate rather than silently
+    skip.
+    """
+    port = _Port()
+    route = _make_route()
+    seg1 = route.segments[0]
+    vessel = _Vessel(
+        vessel_class=_VesselClass(teu_capacity=1000, loa=200.0),
+        route=route,
+        current_segment=seg1,
+        index=1,
+    )
+
+    class _NoBookingStored:
+        def __init__(self):
+            self.teu_size = 10
+            self.current_storage_port = port
+            self.carrying_vessel = None
+
+        def get_current_booking(self):
+            return None
+
+    bad = _NoBookingStored()
+    port.shipments_in_storage.append(bad)
+
+    storage_before = [id(s) for s in port.shipments_in_storage]
+    assert _select(port=port, waiting_vessels=[vessel]) is None
+    assert [id(s) for s in port.shipments_in_storage] == storage_before
+
+
+# ---------------------------------------------------------------------------
+# Bug-detecting tests: fractional / non-integer TEU
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bad_teu",
+    [1.5, "10", True, -3.0],
+    ids=["fractional_float", "string", "bool_true", "negative_float"],
+)
+def test_non_integer_or_fractional_teu_delegates(bad_teu) -> None:
+    """Strict positive integer TEU only.
+
+    A fractional float (1.5) must NOT silently truncate to 1. A string
+    must NOT coerce. A bool must NOT count as 1. A negative float must
+    delegate.
+    """
+    port = _Port()
+    route = _make_route()
+    seg1 = route.segments[0]
+    vessel = _Vessel(
+        vessel_class=_VesselClass(teu_capacity=1000, loa=200.0),
+        route=route,
+        current_segment=seg1,
+        index=1,
+    )
+    booking = _Booking(
+        service_route=route,
+        departure_segment_index=seg1.sequence_index,
+        arrival_segment_index=seg1.sequence_index,
+    )
+    shipment = _Shipment(teu_size=bad_teu, carrying_vessel=vessel, booking=booking)
+    vessel.carried_shipments.append(shipment)
+    carried_before = [id(s) for s in vessel.carried_shipments]
+    other = _make_vessel(index=2)
+    assert _select(port=port, waiting_vessels=[vessel, other]) is None
+    assert [id(s) for s in vessel.carried_shipments] == carried_before
 
 
 # ---------------------------------------------------------------------------

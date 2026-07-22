@@ -26,25 +26,31 @@ The fourth hook, `select_vessel_for_berth`, implements a Smith-style
 **TEU-delay-per-berth-hour priority** with the fixed 3-hour berthing
 overhead:
 
-- For each waiting vessel, compute predicted `handled_teu` (discharge + greedy
-  load) and `affected_teu` (carried + greedy load) using only the organizer's
-  berth-handling contract (`qc_count = max(1, int(loa / 55))`,
-  `service_hours = 3.0 + handled_teu / (qc_count * 45)`).
+- For each waiting vessel, classify carried cargo by a one-pass
+  walk: each shipment contributes to `carried_teu`; foreign-route
+  cargo contributes to neither `occupied_teu` nor `discharge_teu`;
+  assigned-route cargo discharging at the current segment contributes
+  to `discharge_teu`; all other assigned-route cargo contributes to
+  `occupied_teu`. When `current_segment is None`, discharge is always
+  zero and all assigned-route cargo is occupied. The derived
+  `discharge = carried - occupied` shortcut is **not** used anywhere.
 - Occupied-capacity calculation mirrors the organizer's
-  `VesselBeingServed._calc_occupied_teu` exactly: route-excluded cargo does
-  not occupy capacity.
+  `VesselBeingServed._calc_occupied_teu` exactly: foreign-route cargo
+  does not occupy capacity and is not discharged by the current route.
+- Greedy projected load uses `teu_capacity - occupied_teu`.
+- Service time: `3.0 + handled_teu / (qc_count * 45.0)`.
 - Rank by exact cross multiplication of
   `numerator = affected_teu * qc_count` vs
-  `denominator = 135 * qc_count + handled_teu`. Zero-handled vessels still
-  consume the fixed 3-hour berthing time and use the same ratio path. Ties
-  preserve the input `waiting_vessels` order.
-- Returns one of `waiting_vessels` or `None`. Never returns `False`. Never
-  mutates any input.
-- Invalid inputs (missing/non-numeric/non-finite/zero/negative TEU,
-  missing vessel class, missing route, non-finite LOA, nonpositive
-  capacity) raise narrow expected exceptions that the public selector
-  catches and uses to delegate with `None`. No broad `except Exception`
-  is used.
+  `denominator = 135 * qc_count + handled_teu`. Zero-handled vessels
+  still consume the fixed 3-hour berthing time and use the same ratio
+  path. Ties preserve the input `waiting_vessels` order.
+- Returns one of `waiting_vessels` or `None`. Never returns `False`.
+  Never mutates any input.
+- Invalid inputs (missing/non-integer/fractional/zero/negative TEU,
+  None booking on carried or stored shipments, missing vessel class,
+  missing route, non-finite LOA, nonpositive capacity) raise narrow
+  expected exceptions that the public selector catches and uses to
+  delegate with `None`. No broad `except Exception` is used.
 
 Cargo age is intentionally excluded; the metric weights ATT per TEU, so the
 marginal one-hour cost of delaying one TEU is constant. The full hypothesis,

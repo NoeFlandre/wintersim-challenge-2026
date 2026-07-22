@@ -76,6 +76,17 @@ run before retaining it.
 Public release and merge remain separately blocked pending an owner-authorized
 history purge and coordinated force-push of the restricted Round 0 ZIP.
 
+> **Update 2026-07-22.** The coordinated owner-authorized history purge
+> and force-push that removed the restricted Round 0 ZIP and the
+> restricted blob (`3f5be8fecbcc829753785c4da55c69c89c44629e`) from
+> reachable local history has been completed. `git rev-list --objects
+> --all` and `git ls-files` contain neither the archive path nor the
+> restricted blob. **Residual warning:** old local clones, pre-purge
+> forks, and any GitHub dangling, cache, or fork objects that captured
+> the prior history may still contain the restricted ZIP and blob. Treat
+> any pre-purge clone as not-public-safe until its own reachable objects
+> are re-verified.
+
 > Note: the historical fallback SHA/score above is **not reproduced in the
 > current checkout** (see `round0-fallback-reproducibility.md`). In this
 > checkout the locally reproduced fallback is `18.673577819840556`

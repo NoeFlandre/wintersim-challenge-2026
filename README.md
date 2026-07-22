@@ -17,23 +17,27 @@ The current `HEAD` tree contains no organizer software or data: the organizer
 ZIP, extracted source tree, derived outputs, and submission archives are absent
 from the current tree and excluded by `.gitignore`.
 
-However, reachable repository history **does contain**
-`SimulationChallenge2026_Py_Round0.zip`. In particular:
+Reachable local history also contains neither the archive path
+`SimulationChallenge2026_Py_Round0.zip` nor the restricted blob
+`3f5be8fecbcc829753785c4da55c69c89c44629e`. Verified by:
 
-* commit `f7d0c70` ("chore: add Round 0 challenge archive") added the
-  organizer ZIP, and is an ancestor of both the current `HEAD` and
-  `origin/main`.
-* Commit `df6d53d` ("chore: establish public-safe uv workspace") is the
-  point at which the ZIP was removed from the working tree and added to
-  `.gitignore`, but the file remains in the history before that point.
+```bash
+git rev-list --objects --all | grep -i SimulationChallenge2026_Py_Round0.zip
+git rev-list --objects --all | grep 3f5be8fecbcc829753785c4da55c69c89c44629e
+git ls-files | grep -E '\.zip|/Output/|/Input/|main\.py|default_strategy\.py'
+```
 
-Therefore the repository as currently published is **not** public-safe in
-its history. It must not be made public or merged as public-safe until an
-owner authorizes and coordinates a history purge and a force-push that
-removes `f7d0c70` and any later commit that re-introduced the ZIP. The
-coding agent will not perform that destructive operation autonomously.
+Each of these commands returns no matches.
 
-> **Public release and merge remain blocked pending owner-authorized history purge and coordinated force-push.**
+The coordinated owner-authorized history purge and force-push that removed
+those restricted objects from reachable local history has been completed.
+
+> **Residual warning.** Old local clones, pre-purge forks, and any GitHub
+> dangling, cache, or fork objects that captured the prior history may
+> still contain the restricted ZIP and blob. Treat any pre-purge clone as
+> not-public-safe until its own reachable objects are re-verified. The
+> tracked checkout and reachable local history are public-safe; clones and
+> forks are not under the maintainers' control.
 
 ## Challenge purpose
 

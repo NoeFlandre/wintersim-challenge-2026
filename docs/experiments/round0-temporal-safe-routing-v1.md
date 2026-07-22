@@ -314,12 +314,69 @@ this experiment.
 - Aggregate result:
   `experiments/results/temporal_lower_bound_safe_routing_v1_2026.json`
 
-Both locations remain ignored and untracked.
+All three locations remain ignored and untracked.
+
+## Deviations found in the rejected implementation commit (`3160905`)
+
+Post-run review of the rejected implementation found three deviations from
+the abstract policy as described above. The measured score, hashes and
+runtime recorded above apply to that exact rejected implementation, which
+is the only thing that ran on the simulation framework.
+
+1. **Mutable module-level `_Booking` cache.** The rejected module held a
+   module-level `_Booking` reference and a `_get_booking_class()` helper
+   that memoized the imported organizer `Booking` class for the lifetime
+   of the process. This is **mutable cross-run global state**, which the
+   submission contract forbids ("no mutable cross-run global state in
+   submission code"). The override path would still resolve correctly
+   per-process; however the cache violates the documented contract and
+   must not be carried into a future candidate.
+
+2. **Set-based Dijkstra `unvisited` collection.** The shortest-path helper
+   used a `set` for the unvisited frontier and selected the next node with
+   `min(unvisited, key=distances.get)`. Ties on equal distance therefore
+   resolved by **arbitrary `set` iteration order**, not by the documented
+   `context.ports` order. The intended deterministic tie-break by
+   `context.ports` order was not enforced in the implementation that ran.
+   The unit tests use very small synthetic networks where ties do not
+   occur, so this defect was not caught by the test suite. The score and
+   per-period numbers above reflect this non-deterministic tie resolution.
+
+3. **No transactional rollback on installation failure.** The
+   `_install_path` helper removes old bookings, replaces
+   `shipment.associated_bookings`, and appends new bookings to service
+   routes in place. If a step fails partway through (for example a
+   constructor that raises after the old bookings have already been
+   detached), the reachable state can be left partially mutated. The
+   abstract "Atomic-mutation rule on the override path" above requires
+   that no mutation persist on failure; the implementation that ran did
+   not implement that rollback. In practice the in-memory paths used
+   here raise predictably or not at all, so this latent defect did not
+   affect the measured score; it is recorded here so a future candidate
+   is not assumed to satisfy the atomicity contract based on this
+   experiment.
+
+**Scope of validation.** The score
+`22.732416871465396` and the SHA
+`e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92` are
+evidence that *this exact implementation*, including the three deviations
+above, scores worse than the current-checkout fallback. They do **not**
+cleanly validate every detail of the abstract policy described earlier in
+this document. Specifically: the deterministic tie-break claim, the
+"mutable cross-run global state" rule, and the atomic rollback guarantee
+were not actually exercised by the experiment.
 
 ## Resume point
 
 - The current-checkout locally reproduced fallback (`18.673577819840556`,
   SHA `10234375...`) is the authoritative comparable reference.
 - Treat `18.276620672293834` and `ed4f274f...` as historical evidence only.
-- Public release and merge remain blocked pending an owner-authorized history
-  purge and coordinated force-push of the restricted Round 0 ZIP.
+- The coordinated owner-authorized history purge and force-push that
+  removed the restricted Round 0 ZIP and the restricted blob
+  (`3f5be8fecbcc829753785c4da55c69c89c44629e`) from reachable local
+  history has been completed. `git rev-list --objects --all` and
+  `git ls-files` contain neither the archive path nor the restricted
+  blob. **Residual warning:** old local clones, pre-purge forks, and any
+  GitHub-side dangling, cache, or fork objects that captured the prior
+  history may still hold those bytes. Treat any pre-purge clone as
+  not-public-safe until its own reachable objects are re-verified.

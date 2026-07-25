@@ -13,18 +13,12 @@ from __future__ import annotations
 
 import datetime as dt
 import math
-from collections.abc import Iterable
 from types import SimpleNamespace
+from typing import Iterable
 
 
 class _Port:
-    __slots__ = (
-        "name",
-        "outgoing_legs",
-        "incoming_legs",
-        "outgoing_demands",
-        "shipments_in_storage",
-    )
+    __slots__ = ("name", "outgoing_legs", "incoming_legs", "outgoing_demands", "shipments_in_storage")
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -53,7 +47,7 @@ class _Leg:
 class _Segment:
     __slots__ = ("sequence_index", "associated_leg", "associated_service_route", "current_vessels")
 
-    def __init__(self, sequence_index: int, leg: _Leg, route: _ServiceRoute) -> None:
+    def __init__(self, sequence_index: int, leg: _Leg, route: "_ServiceRoute") -> None:
         self.sequence_index = sequence_index
         self.associated_leg = leg
         self.associated_service_route = route
@@ -81,7 +75,7 @@ class _Vessel:
         "carried_shipments",
     )
 
-    def __init__(self, index: int, vessel_class: _VesselClass, route: _ServiceRoute) -> None:
+    def __init__(self, index: int, vessel_class: _VesselClass, route: "_ServiceRoute") -> None:
         self.index = index
         self.vessel_class = vessel_class
         self.assigned_service_route = route
@@ -195,9 +189,7 @@ def make_segment(sequence_index: int, leg: _Leg, route: _ServiceRoute) -> _Segme
     return seg
 
 
-def make_vessel_class(
-    name: str, teu_capacity: int, sailing_speed: float, loa: float = 300.0
-) -> _VesselClass:
+def make_vessel_class(name: str, teu_capacity: int, sailing_speed: float, loa: float = 300.0) -> _VesselClass:
     return _VesselClass(name, teu_capacity, sailing_speed, loa)
 
 
@@ -213,6 +205,8 @@ def make_route(route_id: str, name: str = "", start_day_of_week: float = 0.0) ->
 
 def make_berth(index: int, port: _Port) -> _Berth:
     berth = _Berth(index, port)
+    port.outgoing_legs  # keep attribute access alive
+    port.incoming_legs  # keep attribute access alive
     return berth
 
 

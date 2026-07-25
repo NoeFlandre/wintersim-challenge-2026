@@ -11,11 +11,14 @@ Compliance enforced here:
 * Default archive names follow the current website convention:
   ``Round1_TEAM.zip``, ``Round2_TEAM.zip``, ``HiddenRound_TEAM.zip``.
   (The PDF uses ``TEAM_Round1.zip``; this must be reconfirmed with organizers.)
-* The archive contains only ``response_strategies/user_strategy.py``,
-  ``response_strategies/README.md``, and any future explicitly allowlisted
-  participant-owned response modules/data. Organizer code, default_strategy.py,
+* The archive contains only allowlisted participant-owned response
+  modules/data. Organizer code, default_strategy.py,
   strategy_validation.py, inputs, outputs, tests, caches, ``.git`` files,
   ``.DS_Store``, pyc, secrets, and dev tooling are never included.
+* The required runtime candidate files are ``user_strategy.py`` and
+  ``transshipment_readiness.py``; ``README.md`` is optional documentation
+  and is included only if present. The packager refuses to ship a candidate
+  that is missing either required runtime file.
 * Symlinks are rejected.
 * Submission imports are inspected with ``ast``: code may import only the
   Python standard library, participant modules within ``response_strategies``,
@@ -34,7 +37,13 @@ import sys
 import zipfile
 from pathlib import Path
 
-__all__ = ["PackagerError", "package_submission", "team_to_slug"]
+__all__ = [
+    "PackagerError",
+    "package_submission",
+    "team_to_slug",
+    "ALLOWED_SUBMISSION_FILES",
+    "REQUIRED_RUNTIME_FILES",
+]
 
 
 class PackagerError(ValueError):
@@ -48,13 +57,25 @@ _ROUND_AFFIXES: dict[str, tuple[str, str]] = {
     "hidden": ("HiddenRound", "HiddenRound"),
 }
 
-# Participant-owned files that may appear in the archive's response_strategies.
-# Adding to this set is a reviewed decision that expands the submission surface.
-_ALLOWED_SUBMISSION_FILES: frozenset[str] = frozenset(
+# Public alias used by tests and external callers.
+ALLOWED_SUBMISSION_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
         "transshipment_readiness.py",
         "README.md",
+    }
+)
+
+# Internal copy used by the packager. Kept as a separate constant so the
+# historic type-slotted name used by tests stays private.
+_ALLOWED_SUBMISSION_FILES: frozenset[str] = ALLOWED_SUBMISSION_FILES
+
+# Required runtime candidate files. ``README.md`` is optional; these two
+# files must both be present for the candidate to ship.
+REQUIRED_RUNTIME_FILES: frozenset[str] = frozenset(
+    {
+        "user_strategy.py",
+        "transshipment_readiness.py",
     }
 )
 
@@ -225,20 +246,14 @@ def _walk_submission(submission_dir: Path) -> list[Path]:
             "no allowlisted participant files found to package "
             f"(expected {', '.join(sorted(_ALLOWED_SUBMISSION_FILES))})"
         )
-    if not any(f.name == "user_strategy.py" for f in collected):
-        raise PackagerError(
-            "submission response_strategies is missing required file "
-            "'user_strategy.py'. A submission without a user strategy is "
-            "not a valid package; add user_strategy.py and retry."
-        )
-    missing_required = sorted(set(_ALLOWED_SUBMISSION_FILES) - {f.name for f in collected})
+    missing_required = sorted(REQUIRED_RUNTIME_FILES - {f.name for f in collected})
     if missing_required:
         raise PackagerError(
-            "submission response_strategies is missing required candidate files: "
+            "submission response_strategies is missing required runtime file(s): "
             + ", ".join(missing_required)
-            + ". The packager refuses to ship a partial candidate set because "
-            "user_strategy.py's relative import would resolve to a packaged "
-            "module that is not present. Add the missing file(s) and retry."
+            + ". The packager refuses to ship a candidate without the required "
+            "runtime pair (user_strategy.py and transshipment_readiness.py). "
+            "Add the missing file(s) and retry."
         )
     return collected
 

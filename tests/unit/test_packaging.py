@@ -52,6 +52,18 @@ def test_transshipment_readiness_helper_is_allowlisted() -> None:
     assert "transshipment_readiness.py" in packaging_module._ALLOWED_SUBMISSION_FILES
 
 
+def test_readme_is_allowlisted_but_not_a_required_runtime_file() -> None:
+    """README.md is documentation, not a runtime dependency.
+
+    The packager must ship only the runtime helper pair by default; missing
+    README must not be a packaging failure.
+    """
+    assert "README.md" in packaging_module.ALLOWED_SUBMISSION_FILES
+    assert "README.md" not in packaging_module.REQUIRED_RUNTIME_FILES
+    assert "user_strategy.py" in packaging_module.REQUIRED_RUNTIME_FILES
+    assert "transshipment_readiness.py" in packaging_module.REQUIRED_RUNTIME_FILES
+
+
 # --- round / team validation -------------------------------------------------
 
 
@@ -162,15 +174,97 @@ def test_member_allowlist_excludes_disallowed_files(tmp_path: Path) -> None:
         package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
 
 
-@pytest.mark.parametrize("missing", ["README.md", "transshipment_readiness.py"])
+@pytest.mark.parametrize("missing", ["transshipment_readiness.py"])
 def test_packaging_requires_complete_candidate_without_partial_archive(
     tmp_path: Path, missing: str
 ) -> None:
+    """Only the runtime helper is mandatory. ``README.md`` is optional.
+
+    The packager must abort on a submission missing the runtime helper, with
+    no archive produced.
+    """
     sub = _submission_dir(tmp_path)
     (sub / missing).unlink()
+    dist = tmp_path / "out"
 
     with pytest.raises(PackagerError, match=missing.replace(".", r"\.")):
-        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=dist)
+
+    # No archive should have been produced.
+    assert not dist.exists() or not any(dist.glob("*.zip"))
+
+
+def test_packaging_succeeds_without_readme_and_relative_import_resolves(
+    tmp_path: Path,
+) -> None:
+    """README.md is optional. The packager must ship the two runtime files,
+    and the relative import in user_strategy.py must resolve after the
+    archive is extracted into a fresh package root.
+    """
+    sub = tmp_path / "submission" / "response_strategies"
+    sub.mkdir(parents=True)
+    (sub / "user_strategy.py").write_text(
+        "from __future__ import annotations\n"
+        "from typing import Any\n"
+        "from .transshipment_readiness import choose_buffer_vessel\n"
+        "class UserStrategy:\n"
+        "    @staticmethod\n"
+        "    def select_vessel_for_berth(a, b, c, d, e, f=None) -> Any:\n"
+        "        return choose_buffer_vessel(a, b, c, d, e, f)\n"
+    )
+    (sub / "transshipment_readiness.py").write_text(
+        "def choose_buffer_vessel(*args, **kwargs):\n    return None\n"
+    )
+    # No README.md on the submission side.
+
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+    expected = [
+        "Round1_ValidTeam/response_strategies/transshipment_readiness.py",
+        "Round1_ValidTeam/response_strategies/user_strategy.py",
+    ]
+    assert _read_members(archive) == expected
+
+    # The relative import must resolve after extraction.
+    extracted = tmp_path / "extracted"
+    with zipfile.ZipFile(archive) as zf:
+        zf.extractall(extracted)
+    response_dir = extracted / "Round1_ValidTeam" / "response_strategies"
+    package_name = "_packaged_no_readme"
+    package = types.ModuleType(package_name)
+    package.__path__ = [str(response_dir)]
+    package.__package__ = package_name
+    sys.modules[package_name] = package
+    module_name = f"{package_name}.user_strategy"
+    spec = importlib.util.spec_from_file_location(module_name, response_dir / "user_strategy.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+        assert callable(module.UserStrategy.select_vessel_for_berth)
+        assert f"{package_name}.transshipment_readiness" in sys.modules
+    finally:
+        for name in list(sys.modules):
+            if name == package_name or name.startswith(f"{package_name}."):
+                sys.modules.pop(name, None)
+
+
+def test_packaging_atomically_rejects_missing_runtime_helper(tmp_path: Path) -> None:
+    """transshipment_readiness.py is a required runtime file. If it is
+    missing the packager must abort BEFORE producing any archive.
+    """
+    sub = tmp_path / "submission" / "response_strategies"
+    sub.mkdir(parents=True)
+    (sub / "user_strategy.py").write_text("class UserStrategy:\n    pass\n")
+    (sub / "README.md").write_text("# readme\n")
+    # No transshipment_readiness.py.
+    dist = tmp_path / "out"
+
+    with pytest.raises(PackagerError, match="transshipment_readiness\\.py"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=dist)
+
+    assert not dist.exists() or not any(dist.glob("*.zip"))
 
 
 def test_package_rejects_submission_missing_user_strategy(tmp_path: Path) -> None:

@@ -16,6 +16,7 @@ import pytest
 
 from wsc2026_tools.overlay import (
     ALLOWED_OVERLAY_FILES,
+    REQUIRED_RUNTIME_FILES,
     OverlayError,
     overlay_response_strategies,
 )
@@ -46,6 +47,18 @@ ORGANIZER_FILES: dict[str, str] = {
 
 def test_transshipment_readiness_helper_is_allowlisted() -> None:
     assert "transshipment_readiness.py" in ALLOWED_OVERLAY_FILES
+
+
+def test_readme_is_allowlisted_but_not_a_required_runtime_file() -> None:
+    """README.md is documentation, not a runtime dependency.
+
+    Missing README must not be a required-file failure; only the runtime
+    helper pair must be present.
+    """
+    assert "README.md" in ALLOWED_OVERLAY_FILES
+    assert "README.md" not in REQUIRED_RUNTIME_FILES
+    assert "user_strategy.py" in REQUIRED_RUNTIME_FILES
+    assert "transshipment_readiness.py" in REQUIRED_RUNTIME_FILES
 
 
 def _setup(tmp_path: Path) -> tuple[Path, Path]:
@@ -91,11 +104,16 @@ def test_overlay_is_idempotent(tmp_path: Path) -> None:
     assert (dest / "user_strategy.py").read_text() == "# participant user_strategy\n"
 
 
-@pytest.mark.parametrize("missing", ["README.md", "transshipment_readiness.py"])
+@pytest.mark.parametrize("missing", ["transshipment_readiness.py"])
 def test_overlay_requires_complete_candidate_without_partial_copy(
     tmp_path: Path,
     missing: str,
 ) -> None:
+    """Only the runtime helper is mandatory. ``README.md`` is optional.
+
+    The overlay must abort on a submission missing the runtime helper, with
+    the destination left byte-identical.
+    """
     submission, dest = _setup(tmp_path)
     (submission / missing).unlink()
     before = {path.name: path.read_bytes() for path in dest.iterdir() if path.is_file()}
@@ -243,3 +261,79 @@ def test_overlay_refuses_to_run_when_dest_stale_strategy_would_be_retained(
     # The dest must not have a partially-overlaid state.
     assert (dest / "README.md").read_text() == "# old readme\n"
     assert (dest / "user_strategy.py").read_text() == "# STALE user_strategy\n"
+
+
+def test_overlay_succeeds_when_readme_missing_and_preserves_dest_readme(
+    tmp_path: Path,
+) -> None:
+    """README.md is optional. The overlay must copy the two runtime files,
+    leave the destination README byte-identical if one exists, and never
+    delete or rewrite unchanged files at the destination.
+    """
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "user_strategy.py").write_text("# new user_strategy\n")
+    (submission / "transshipment_readiness.py").write_text("# new helper\n")
+    # No README.md on submission side.
+
+    dest = tmp_path / "source" / "response_strategies"
+    dest.mkdir(parents=True)
+    (dest / "README.md").write_text("# EXISTING destination README\n")
+    (dest / "__init__.py").write_text("# organizer\n")
+
+    copied = overlay_response_strategies(submission, dest)
+
+    assert copied == ["transshipment_readiness.py", "user_strategy.py"]
+    assert (dest / "user_strategy.py").read_text() == "# new user_strategy\n"
+    assert (dest / "transshipment_readiness.py").read_text() == "# new helper\n"
+    # The destination README is preserved byte-identical.
+    assert (dest / "README.md").read_text() == "# EXISTING destination README\n"
+    assert (dest / "__init__.py").read_text() == "# organizer\n"
+
+
+def test_overlay_succeeds_when_readme_missing_and_dest_has_no_readme(
+    tmp_path: Path,
+) -> None:
+    """README.md is optional. With no README on either side the overlay
+    copies only the two runtime files and reports them.
+    """
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "user_strategy.py").write_text("# user_strategy\n")
+    (submission / "transshipment_readiness.py").write_text("# helper\n")
+
+    dest = tmp_path / "source" / "response_strategies"
+    dest.mkdir(parents=True)
+    (dest / "__init__.py").write_text("# organizer\n")
+
+    copied = overlay_response_strategies(submission, dest)
+
+    assert copied == ["transshipment_readiness.py", "user_strategy.py"]
+    assert not (dest / "README.md").exists()
+
+
+def test_overlay_atomically_rejects_missing_runtime_helper(tmp_path: Path) -> None:
+    """transshipment_readiness.py is a required runtime file. If it is
+    missing the overlay must abort BEFORE touching the destination, leaving
+    any stale helper in place.
+    """
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "user_strategy.py").write_text("# new user_strategy\n")
+    (submission / "README.md").write_text("# new readme\n")
+    # No transshipment_readiness.py.
+
+    dest = tmp_path / "source" / "response_strategies"
+    dest.mkdir(parents=True)
+    (dest / "user_strategy.py").write_text("# STALE user_strategy\n")
+    (dest / "transshipment_readiness.py").write_text("# STALE helper\n")
+    (dest / "README.md").write_text("# old readme\n")
+    (dest / "__init__.py").write_text("# organizer\n")
+
+    with pytest.raises(OverlayError, match=r"transshipment_readiness\.py"):
+        overlay_response_strategies(submission, dest)
+
+    # Destination was not touched.
+    assert (dest / "user_strategy.py").read_text() == "# STALE user_strategy\n"
+    assert (dest / "transshipment_readiness.py").read_text() == "# STALE helper\n"
+    assert (dest / "README.md").read_text() == "# old readme\n"

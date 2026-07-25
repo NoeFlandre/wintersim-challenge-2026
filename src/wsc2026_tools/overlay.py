@@ -8,6 +8,9 @@ sees the participant ``UserStrategy``.
 Hard rules for the overlay:
 
 * Only an explicit allowlist of participant-owned files is copied.
+* The required runtime candidate files (``user_strategy.py`` and
+  ``transshipment_readiness.py``) must be present; ``README.md`` is
+  documentation and is optional.
 * Organizer-owned files (``__init__.py``, ``default_strategy.py``,
   ``strategy_validation.py``, anything not in the allowlist) are never deleted
   or overwritten by the overlay. (If a future participant file legitimately
@@ -19,6 +22,8 @@ Hard rules for the overlay:
   unreviewed code.
 * Symlinks are rejected.
 * The overlay is idempotent and reports exactly which files were copied.
+* Missing required runtime files abort the overlay BEFORE any file is copied,
+  so the destination cannot be left in a partially-updated state.
 """
 
 from __future__ import annotations
@@ -26,7 +31,12 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-__all__ = ["OverlayError", "overlay_response_strategies", "ALLOWED_OVERLAY_FILES"]
+__all__ = [
+    "OverlayError",
+    "overlay_response_strategies",
+    "ALLOWED_OVERLAY_FILES",
+    "REQUIRED_RUNTIME_FILES",
+]
 
 
 class OverlayError(Exception):
@@ -40,6 +50,15 @@ ALLOWED_OVERLAY_FILES: frozenset[str] = frozenset(
         "user_strategy.py",
         "transshipment_readiness.py",
         "README.md",
+    }
+)
+
+# Required runtime candidate files. Every candidate must ship these two;
+# ``README.md`` is optional documentation and is not in this set.
+REQUIRED_RUNTIME_FILES: frozenset[str] = frozenset(
+    {
+        "user_strategy.py",
+        "transshipment_readiness.py",
     }
 )
 
@@ -70,7 +89,11 @@ def _check_tree(submission_dir: Path, dest_dir: Path) -> None:
 
 
 def _validate_submission_contents(submission_dir: Path) -> list[Path]:
-    """Return sorted allowlisted files; skip caches; raise on unknown files."""
+    """Return sorted allowlisted files; skip caches; raise on unknown files.
+
+    ``REQUIRED_RUNTIME_FILES`` must all be present; otherwise the overlay
+    aborts before copying anything. ``README.md`` is optional.
+    """
     allowed: list[Path] = []
     disallowed: list[str] = []
     seen_allowlisted: set[str] = set()
@@ -99,23 +122,16 @@ def _validate_submission_contents(submission_dir: Path) -> list[Path]:
             + ", ".join(sorted(disallowed))
             + f". Allowed files: {sorted(ALLOWED_OVERLAY_FILES)}"
         )
-    if "user_strategy.py" not in seen_allowlisted:
-        raise OverlayError(
-            "submission response_strategies is missing required file "
-            "'user_strategy.py'. The overlay refuses to run: running it "
-            "would leave a stale strategy at the destination while the rest "
-            "of the package is partially updated. Add user_strategy.py and "
-            "retry."
-        )
-    missing_required = sorted(set(ALLOWED_OVERLAY_FILES) - seen_allowlisted)
+    missing_required = sorted(REQUIRED_RUNTIME_FILES - seen_allowlisted)
     if missing_required:
         raise OverlayError(
-            "submission response_strategies is missing required candidate files: "
+            "submission response_strategies is missing required runtime file(s): "
             + ", ".join(missing_required)
-            + ". The overlay refuses to run a partial copy: every approved "
-            "participant file must be present so the destination is never "
-            "left with a stale helper next to a fresh strategy. Add the "
-            "missing file(s) and retry."
+            + ". The overlay refuses to run a partial copy: the runtime "
+            "candidate pair (user_strategy.py and transshipment_readiness.py) "
+            "must both be present so the destination is never left with a "
+            "stale helper next to a fresh strategy. Add the missing file(s) "
+            "and retry."
         )
     return allowed
 
@@ -127,9 +143,11 @@ def overlay_response_strategies(submission_dir: Path, dest_dir: Path) -> list[st
     Organizer-owned files in ``dest_dir`` are never modified or deleted.
     Idempotent: running twice yields the same result.
 
-    The submission must contain ``user_strategy.py``; without it the overlay
-    aborts before any file is copied, so the destination cannot be left in a
-    partially-updated state.
+    The submission must contain the required runtime files
+    (``user_strategy.py`` and ``transshipment_readiness.py``); without them
+    the overlay aborts before any file is copied, so the destination cannot
+    be left in a partially-updated state. ``README.md`` is optional and a
+    missing README is silently skipped.
     """
     submission_dir = Path(submission_dir)
     dest_dir = Path(dest_dir)

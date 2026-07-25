@@ -37,8 +37,17 @@ def _setup_source_and_submission(tmp_path: Path) -> tuple[Path, Path]:
     (source / "response_strategies" / "__init__.py").write_text("# organizer\n")
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
-    (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
-    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
+    (submission / "user_strategy.py").write_text(
+        "from __future__ import annotations\n"
+        "from .transshipment_readiness import choose_buffer_vessel\n"
+        "class UserStrategy:\n"
+        "    @staticmethod\n"
+        "    def select_vessel_for_berth(a, b, c, d, e, f=None):\n"
+        "        return choose_buffer_vessel(a, b, c, d, e, f)\n"
+    )
+    (submission / "transshipment_readiness.py").write_text(
+        "def choose_buffer_vessel(*args, **kwargs):\n    return None\n"
+    )
     (submission / "README.md").write_text("# participant\n")
     return source, submission
 
@@ -212,8 +221,17 @@ def test_cli_score_relative_path_outside_repo_rejected(tmp_path: Path) -> None:
 def test_cli_package_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
-    (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
-    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
+    (submission / "user_strategy.py").write_text(
+        "from __future__ import annotations\n"
+        "from .transshipment_readiness import choose_buffer_vessel\n"
+        "class UserStrategy:\n"
+        "    @staticmethod\n"
+        "    def select_vessel_for_berth(a, b, c, d, e, f=None):\n"
+        "        return choose_buffer_vessel(a, b, c, d, e, f)\n"
+    )
+    (submission / "transshipment_readiness.py").write_text(
+        "def choose_buffer_vessel(*args, **kwargs):\n    return None\n"
+    )
     (submission / "README.md").write_text("# x\n")
     dist = tmp_path / "dist"
     monkeypatch.setattr(cli, "submission_strategies_dir", lambda: submission)
@@ -227,8 +245,17 @@ def test_cli_package_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 def test_cli_package_round0_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
-    (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
-    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
+    (submission / "user_strategy.py").write_text(
+        "from __future__ import annotations\n"
+        "from .transshipment_readiness import choose_buffer_vessel\n"
+        "class UserStrategy:\n"
+        "    @staticmethod\n"
+        "    def select_vessel_for_berth(a, b, c, d, e, f=None):\n"
+        "        return choose_buffer_vessel(a, b, c, d, e, f)\n"
+    )
+    (submission / "transshipment_readiness.py").write_text(
+        "def choose_buffer_vessel(*args, **kwargs):\n    return None\n"
+    )
     (submission / "README.md").write_text("# x\n")
     monkeypatch.setattr(cli, "submission_strategies_dir", lambda: submission)
     monkeypatch.setattr(cli, "dist_submissions_dir", lambda: tmp_path / "dist")

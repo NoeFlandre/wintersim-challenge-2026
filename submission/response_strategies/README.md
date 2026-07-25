@@ -8,6 +8,8 @@ directory are considered for evaluation.
 
 - `user_strategy.py` - the participant `UserStrategy` adapter that the
   organizer framework imports and calls during simulation events.
+- `transshipment_readiness.py` - the standard-library-only implementation of
+  the reviewed Round 0 transshipment-readiness barrier candidate.
 
 ## What is intentionally absent
 
@@ -16,12 +18,17 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: organizer fallback
+## Current strategy: Transshipment Readiness Barrier v1
 
-Every method in `UserStrategy` currently returns `None`, which delegates to the
-organizer fallback strategy without mutating any input. This establishes a
-known, unmodified baseline. Optimization is deliberately deferred to later,
-separately reviewed work.
+Only `select_vessel_for_berth` may override the organizer fallback. It delegates
+to `transshipment_readiness.py`, which may select one original waiting vessel
+as a temporary buffer when conservative route, capacity, event-readiness, and
+TEU-hour checks all pass. Every invalid, ambiguous, disrupted, non-finite, or
+non-positive case returns `None`. The other three hooks remain unconditional
+fallback delegations.
+
+This candidate has not been performance-simulated or accepted. Its status is
+`PRE_RUN_REVIEW`, and operational execution requires separate reviewer approval.
 
 ## Submission boundary
 

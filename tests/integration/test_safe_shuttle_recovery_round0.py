@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import importlib
 import importlib.util
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -20,6 +20,7 @@ def load_participant_strategy():
     spec = importlib.util.spec_from_file_location("wsc_safe_shuttle_candidate", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module.UserStrategy
 
@@ -44,13 +45,15 @@ def test_real_round0_builds_valid_idempotent_recovery_shuttle() -> None:
         if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes):
             sys.modules.pop(name, None)
 
-    import scenario_builders  # type: ignore[import-not-found]
-    from simulation_model.disruption_status import (  # type: ignore[import-not-found]
-        is_disruption_active,
+    scenario_builders = importlib.import_module("scenario_builders")
+    disruption_status = importlib.import_module("simulation_model.disruption_status")
+    strategy_validation = importlib.import_module("response_strategies.strategy_validation")
+    is_disruption_active = disruption_status.is_disruption_active
+    capture_alternative_route_strategy_state = (
+        strategy_validation.capture_alternative_route_strategy_state
     )
-    from response_strategies.strategy_validation import (  # type: ignore[import-not-found]
-        capture_alternative_route_strategy_state,
-        validate_alternative_route_strategy_result,
+    validate_alternative_route_strategy_result = (
+        strategy_validation.validate_alternative_route_strategy_result
     )
 
     context = scenario_builders.create_with_disruption()

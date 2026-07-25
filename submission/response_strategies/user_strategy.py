@@ -134,6 +134,22 @@ def _is_finite_nonnegative(value: object) -> bool:
     return math.isfinite(as_float) and as_float >= 0.0
 
 
+def _as_finite_positive(value: object) -> float | None:
+    """Return value as float when it is a finite positive number, else None."""
+    if not _is_finite_positive(value):
+        return None
+    # _is_finite_positive already verified ``isinstance(value, (int, float))``,
+    # so the ``cast`` here is a no-op at runtime; it just satisfies mypy.
+    return float(value if isinstance(value, (int, float)) else 0.0)
+
+
+def _as_finite_nonnegative(value: object) -> float | None:
+    """Return value as float when it is a finite non-negative number, else None."""
+    if not _is_finite_nonnegative(value):
+        return None
+    return float(value if isinstance(value, (int, float)) else 0.0)
+
+
 def _route_cycle_distance(route: Any) -> float:
     """Sum the sailing distances of a route's segments.
 
@@ -146,10 +162,10 @@ def _route_cycle_distance(route: Any) -> float:
         return math.inf
     for segment in segments:
         leg = getattr(segment, "associated_leg", None)
-        distance = getattr(leg, "sailing_distance", None)
-        if not _is_finite_positive(distance):
+        distance = _as_finite_positive(getattr(leg, "sailing_distance", None))
+        if distance is None:
             return math.inf
-        total += float(distance)
+        total += distance
     return total
 
 
@@ -171,9 +187,9 @@ def _route_eligible_speeds(route: Any) -> list[float]:
             continue
         seen.add(vid)
         vessel_class = getattr(vessel, "vessel_class", None)
-        speed = getattr(vessel_class, "sailing_speed", None)
-        if _is_finite_positive(speed):
-            speeds.append(float(speed))
+        speed = _as_finite_positive(getattr(vessel_class, "sailing_speed", None))
+        if speed is not None:
+            speeds.append(speed)
     if not speeds:
         segments = getattr(route, "segments", None) or []
         for segment in segments:
@@ -184,9 +200,9 @@ def _route_eligible_speeds(route: Any) -> list[float]:
                     continue
                 seen.add(vid)
                 vessel_class = getattr(vessel, "vessel_class", None)
-                speed = getattr(vessel_class, "sailing_speed", None)
-                if _is_finite_positive(speed):
-                    speeds.append(float(speed))
+                speed = _as_finite_positive(getattr(vessel_class, "sailing_speed", None))
+                if speed is not None:
+                    speeds.append(speed)
     return speeds
 
 
@@ -241,7 +257,7 @@ def _route_edges_for_nominal(route: Any) -> list[Any]:
     if getattr(route, "source_service_route", None) is not None:
         return []
     segments = sorted(
-        list(getattr(route, "segments", []) or []),
+        getattr(route, "segments", []) or [],
         key=lambda segment: int(getattr(segment, "sequence_index", 0) or 0),
     )
     segment_count = len(segments)
@@ -262,8 +278,7 @@ def _route_edges_for_nominal(route: Any) -> list[Any]:
             if departure_port is arrival_port:
                 continue
             candidate_segments = [
-                segments[(start_index + offset) % segment_count]
-                for offset in range(step)
+                segments[(start_index + offset) % segment_count] for offset in range(step)
             ]
             edges.append(
                 _NominalBookingEdge(
@@ -298,7 +313,7 @@ def _route_edges_for_safe(
     if not _route_is_available_for_booking(route, disruption_key):
         return []
     segments = sorted(
-        list(getattr(route, "segments", []) or []),
+        getattr(route, "segments", []) or [],
         key=lambda segment: int(getattr(segment, "sequence_index", 0) or 0),
     )
     segment_count = len(segments)
@@ -319,8 +334,7 @@ def _route_edges_for_safe(
             if departure_port is arrival_port:
                 continue
             candidate_segments = [
-                segments[(start_index + offset) % segment_count]
-                for offset in range(step)
+                segments[(start_index + offset) % segment_count] for offset in range(step)
             ]
             if any(
                 id(getattr(segment, "associated_leg", None)) in congested_legs
@@ -406,8 +420,8 @@ def _pathfind(
             next_port = edge.arrival_port
             if id(next_port) not in port_by_id:
                 continue
-            edge_distance = getattr(edge, "total_distance", None)
-            if not _is_finite_positive(edge_distance):
+            edge_distance = _as_finite_positive(getattr(edge, "total_distance", None))
+            if edge_distance is None:
                 continue
             alternative = distances[id(best_port)] + edge_distance
             if alternative < distances[id(next_port)]:
@@ -432,9 +446,7 @@ def _pathfind(
     return path
 
 
-def _plan_active_window(
-    plan: Any, now: dt.datetime
-) -> tuple[dt.datetime, dt.datetime] | None:
+def _plan_active_window(plan: Any, now: dt.datetime) -> tuple[dt.datetime, dt.datetime] | None:
     """Return (start, end) of an active disruption plan, or None if inactive."""
     start_offset = getattr(plan, "start_offset_days", None)
     duration = getattr(plan, "duration_days", None)
@@ -458,9 +470,7 @@ def _plan_intersects_path(plan: Any, path: list[Any]) -> bool:
     """Whether a disruption plan intersects the nominal booking path."""
     if getattr(plan, "close_berth", False):
         target_berth = getattr(plan, "target_berth", None)
-        target_port = (
-            getattr(target_berth, "port", None) if target_berth is not None else None
-        )
+        target_port = getattr(target_berth, "port", None) if target_berth is not None else None
         if target_port is None:
             return False
         for edge in path:
@@ -509,9 +519,7 @@ def _latest_intersecting_recovery(
 
 def _collect_active_disruption_keys(
     context: Any, now: dt.datetime
-) -> tuple[
-    set[str], set[int], tuple[tuple[str, ...], tuple[tuple[str, str], ...]]
-]:
+) -> tuple[set[str], set[int], tuple[tuple[str, ...], tuple[tuple[str, str], ...]]]:
     """Avoid port names, congested-leg object ids, and matching disruption_key.
 
     The disruption_key mirrors the organizer's fallback format:
@@ -528,9 +536,7 @@ def _collect_active_disruption_keys(
             continue
         if getattr(plan, "close_berth", False):
             target_berth = getattr(plan, "target_berth", None)
-            target_port = (
-                getattr(target_berth, "port", None) if target_berth is not None else None
-            )
+            target_port = getattr(target_berth, "port", None) if target_berth is not None else None
             target_name = getattr(target_port, "name", None)
             if isinstance(target_name, str):
                 avoid_port_names.add(target_name.casefold())
@@ -631,9 +637,7 @@ def _assign_associated_bookings_impl(context: Any, now: Any, shipment: Any) -> A
         return None
 
     # Condition 3: nominal path intersects at least one active disruption.
-    avoid_port_names, congested_legs, disruption_key = _collect_active_disruption_keys(
-        context, now
-    )
+    avoid_port_names, congested_legs, disruption_key = _collect_active_disruption_keys(context, now)
     intersects = False
     for plan in disruption_plans:
         if _plan_active_window(plan, now) is None:

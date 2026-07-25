@@ -47,7 +47,9 @@ USER_STRATEGY_FILE = REPO_ROOT / "submission" / "response_strategies" / "user_st
 
 
 def _load_user_strategy() -> type:
-    spec = importlib.util.spec_from_file_location("wsc_participant_user_strategy", str(USER_STRATEGY_FILE))
+    spec = importlib.util.spec_from_file_location(
+        "wsc_participant_user_strategy", str(USER_STRATEGY_FILE)
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -128,14 +130,18 @@ def test_assign_associated_bookings_signature(user_strategy_cls: type) -> None:
 
 def test_select_vessel_for_berth_returns_none(user_strategy_cls: type) -> None:
     sentinel = object()
-    result = user_strategy_cls.select_vessel_for_berth(sentinel, sentinel, [sentinel], [sentinel], 0.0)
+    result = user_strategy_cls.select_vessel_for_berth(
+        sentinel, sentinel, [sentinel], [sentinel], 0.0
+    )
     assert result is None
 
 
 def test_create_alternative_service_routes_returns_none(user_strategy_cls: type) -> None:
     sentinel = object()
     assert user_strategy_cls.create_alternative_service_routes(sentinel, 0.0) is None
-    assert user_strategy_cls.create_alternative_service_routes(sentinel, 0.0, vessel=sentinel) is None
+    assert (
+        user_strategy_cls.create_alternative_service_routes(sentinel, 0.0, vessel=sentinel) is None
+    )
 
 
 def test_adjust_bookings_before_cargo_handling_returns_none(user_strategy_cls: type) -> None:
@@ -1060,8 +1066,11 @@ def test_strategy_file_sha256_is_deterministic(user_strategy_cls: type) -> None:
 
 
 def test_no_forbidden_global_state(user_strategy_cls: type) -> None:
-    """Re-loading the strategy file twice must not introduce module-level cache that mutates behavior."""
-    spec = importlib.util.spec_from_file_location("wsc_participant_user_strategy_v2", str(USER_STRATEGY_FILE))
+    """Re-loading the strategy file twice must introduce no module-level cache
+    that mutates behavior."""
+    spec = importlib.util.spec_from_file_location(
+        "wsc_participant_user_strategy_v2", str(USER_STRATEGY_FILE)
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

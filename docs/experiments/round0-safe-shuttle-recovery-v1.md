@@ -40,12 +40,14 @@ Round 0 fixture, not constants in the participant implementation.
 ## Candidate identity
 
 - Branch: `codex/round0-safe-shuttle-recovery-v1`
-- Reviewed candidate HEAD: `e96322a821be0989953db2cd0a22e47c1744b3d0`
-- Implementation commit: `1d3a770`
+- Reviewed candidate HEAD: `1f7e70c4397b85b047ff5b1535346c3c8099faa6`
+- Initial implementation commit: `1d3a770`
+- Package-compliance RED test commit: `34ece05`
+- Self-contained lifecycle correction: `1f7e70c`
 - RED test commit: `4c423bd`
 - Real-contract test commit: `e96322a`
 - Candidate `user_strategy.py` SHA-256:
-  `88f10f990a2b5e5deba53482be122b6501b3bdeb285420968ea456ff7f868286`
+  `f59d79b9029206b022223752ccaab155fd7d9c68944c11ba23396012409262da`
 
 ## Fixed full-run configuration
 

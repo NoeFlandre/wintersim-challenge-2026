@@ -321,10 +321,6 @@ def test_fallback_conformance_real_context() -> None:
         "no shipment yielded None across the full conformance sweep; "
         "the candidate never delegates, which contradicts the policy"
     )
-    print(
-        f"FALLBACK_CONFORMANCE_STATS: total_pairs={total_pairs} "
-        f"mismatches={total_mismatches} saw_false={saw_false} saw_none={saw_none}"
-    )
 
 
 def _compare_paths(

@@ -247,13 +247,13 @@ def test_fallback_conformance_real_context() -> None:
     # imported BEFORE ``response_strategies.default_strategy`` to avoid the
     # circular import through ``simulation_model.__init__`` ->
     # ``shipment_waiting_for_loading_at_origin_port``.
-    from maritime_data_context import Shipment  # type: ignore[import-not-found]
-    from response_strategies.default_strategy import (  # type: ignore[import-not-found]
-        DefaultStrategy,
-    )
     from simulation_model.disruption_status import (  # type: ignore[import-not-found]
         is_disruption_active,
     )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]
+        DefaultStrategy,
+    )
+    from maritime_data_context import Shipment  # type: ignore[import-not-found]
 
     total_mismatches = 0
     total_pairs = 0

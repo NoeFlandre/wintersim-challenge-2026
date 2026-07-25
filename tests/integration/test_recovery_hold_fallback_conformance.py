@@ -105,10 +105,10 @@ def _fresh_context(source: Path) -> object:
     return scenario_builders.create_with_disruption()
 
 
-def _load_participant_user_strategy() -> type:
-    """Load the participant user_strategy.py and return the UserStrategy class.
+def _load_participant_user_strategy() -> tuple:
+    """Load the participant user_strategy.py and return ``(UserStrategy class, module)``.
 
-    Returns the module object so the test can reach private helpers
+    The module is returned so the test can reach private helpers
     (``_collect_active_disruption_keys``, ``_route_edges_for_safe``,
     ``_pathfind``) without importing them through the package.
     """
@@ -122,7 +122,17 @@ def _load_participant_user_strategy() -> type:
         pytest.fail(f"could not build import spec for {participant_file}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.UserStrategy
+    return module.UserStrategy, module
+
+
+def _load_participant_module() -> object:
+    """Backwards-compatible alias returning the module half of the user_strategy.
+
+    The current implementation only exposes the module via
+    ``_load_participant_user_strategy``. This helper is retained for tests
+    that imported the old symbol.
+    """
+    return _load_participant_user_strategy()[1]
 
 
 def _signature_from_edges(edges: list) -> list:
@@ -240,8 +250,7 @@ def test_fallback_conformance_real_context() -> None:
     # Load the participant strategy AFTER the organizer modules are loaded,
     # to avoid clashing with the simulation_model -> response_strategies ->
     # default_strategy -> simulation_model circular import.
-    UserStrategy = _load_participant_user_strategy()
-    part_module = _load_participant_module()
+    UserStrategy, part_module = _load_participant_user_strategy()
 
     timestamps = _timestamps_for_plans(context)
     assert timestamps, "Round 0 context must declare at least one disruption plan"
@@ -250,13 +259,13 @@ def test_fallback_conformance_real_context() -> None:
     # imported BEFORE ``response_strategies.default_strategy`` to avoid the
     # circular import through ``simulation_model.__init__`` ->
     # ``shipment_waiting_for_loading_at_origin_port``.
-    from maritime_data_context import Shipment  # type: ignore[import-not-found]
-    from response_strategies.default_strategy import (  # type: ignore[import-not-found]
-        DefaultStrategy,
-    )
     from simulation_model.disruption_status import (  # type: ignore[import-not-found]
         is_disruption_active,
     )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]
+        DefaultStrategy,
+    )
+    from maritime_data_context import Shipment  # type: ignore[import-not-found]
 
     total_mismatches = 0
     total_pairs = 0

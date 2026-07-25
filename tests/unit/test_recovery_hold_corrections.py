@@ -67,7 +67,9 @@ def user_strategy_cls(strategy_module: object) -> type:
     return strategy_module.UserStrategy
 
 
-def _safe_close_plan(berth_port: object, start: float = 60.0, duration_days: float = 1.0 / 24.0) -> object:
+def _safe_close_plan(
+    berth_port: object, start: float = 60.0, duration_days: float = 1.0 / 24.0
+) -> object:
     from tests.unit._helpers_recovery_hold import make_berth  # type: ignore[import-not-found]
 
     return make_disruption_plan(
@@ -326,7 +328,7 @@ def test_path_intersects_when_only_berth_intersects_user_strategy(
     # Combined plan: close B AND congest C->D. Nominal A->B->C intersects B
     # (closed berth), demonstrating the OR semantics.
     plan = make_disruption_plan(
-        target_berth=(lambda port: (port, 0)) and None,  # placeholder
+        target_berth=None,
         target_leg=leg_cd,
         start_offset_days=60.0,
         duration_days=1.0,
@@ -372,17 +374,13 @@ def test_no_mutable_module_level_state(strategy_module: object) -> None:
             name = getattr(target, "id", None)
             if name == "_NARROW_EXCEPTIONS":
                 continue
-            pytest.fail(
-                f"unexpected module-level mutable assignment to {name!r}"
-            )
+            pytest.fail(f"unexpected module-level mutable assignment to {name!r}")
         if isinstance(node, ast.AnnAssign) and node.value is not None:
             target = node.target
             name = getattr(target, "id", None)
             if name == "_NARROW_EXCEPTIONS":
                 continue
-            pytest.fail(
-                f"unexpected module-level mutable annotated assignment to {name!r}"
-            )
+            pytest.fail(f"unexpected module-level mutable annotated assignment to {name!r}")
 
 
 # --- Packaged README describes the candidate, not the no-op fallback -----

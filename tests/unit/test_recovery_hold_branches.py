@@ -83,7 +83,7 @@ def test_as_finite_nonnegative_returns_none_on_invalid(strategy_module: object) 
 
 
 def test_route_speed_falls_back_to_current_vessels(strategy_module: object) -> None:
-    """If no deployed vessels, current_vessels on segments are used."""
+    """A vessel on a segment whose ``assigned_service_route is route`` is included."""
     a = make_port("A")
     b = make_port("B")
     leg_ab = make_leg(a, b, 100.0)
@@ -91,9 +91,9 @@ def test_route_speed_falls_back_to_current_vessels(strategy_module: object) -> N
     route = make_route("R1")
     seg1 = make_segment(1, leg_ab, route)
     make_segment(2, leg_ba, route)
-    # Vessel not in deployed_vessels but in segment current_vessels.
+    # Vessel assigned to the same route, sitting on a segment but not deployed.
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=12.5)
-    vessel = make_vessel(99, vc, make_route("OTHER"))
+    vessel = make_vessel(99, vc, route)
     seg1.current_vessels.append(vessel)
     speeds = strategy_module._route_eligible_speeds(route)
     assert speeds == [12.5]
@@ -116,6 +116,91 @@ def test_cycle_distance_invalid_segment(strategy_module: object) -> None:
 def test_cycle_distance_no_segments(strategy_module: object) -> None:
     route = make_route("R1")
     assert strategy_module._route_cycle_distance(route) == 0.0
+
+
+def test_cycle_distance_no_segments_attribute(strategy_module: object) -> None:
+    """A route without a ``segments`` attribute returns math.inf."""
+    route = make_route("R1")
+    route.segments = None
+    assert strategy_module._route_cycle_distance(route) == math.inf
+
+
+def test_path_duration_invalid_mean_speed(strategy_module: object) -> None:
+    """Edge whose route has no eligible speeds -> math.inf."""
+    a = make_port("A")
+    b = make_port("B")
+    leg_ab = make_leg(a, b, 100.0)
+    leg_ba = make_leg(b, a, 100.0)
+    route = make_route("R1")
+    make_segment(1, leg_ab, route)
+    make_segment(2, leg_ba, route)
+    # No vessel at all -> mean_speed is math.inf.
+    edge = strategy_module._BookingEdge(
+        service_route=route,
+        departure_port=a,
+        arrival_port=b,
+        departure_segment_index=1,
+        arrival_segment_index=2,
+        candidate_segments=[],
+    )
+    edge.total_distance = 100.0
+    assert strategy_module._path_duration_hours([edge]) == math.inf
+
+
+def test_pathfind_self_loop_prevention(strategy_module: object) -> None:
+    """A predecessor edge whose departure is the cursor cannot loop infinitely."""
+    a = make_port("A")
+    context = FakeContext(ports=[a], service_routes=[], legs=[], vessels=[])
+    edge = strategy_module._BookingEdge(
+        service_route=make_route("R1"),
+        departure_port=a,
+        arrival_port=a,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+        candidate_segments=[],
+    )
+    edge.total_distance = 0.0
+    # Should not crash even if the only edge is a self-loop.
+    assert strategy_module._pathfind(context, [edge], a, a) == []
+
+
+def test_latest_intersecting_recovery_picks_latest_end(strategy_module: object) -> None:
+    """The latest end among active intersecting plans is returned."""
+    a = make_port("A")
+    b = make_port("B")
+    leg_ab = make_leg(a, b, 100.0)
+    routing = make_route("R1")
+    seg = make_segment(1, leg_ab, routing)
+    long_plan = make_disruption_plan(
+        target_leg=leg_ab,
+        start_offset_days=60.0,
+        duration_days=20.0,
+        multiplier=5.0,
+    )
+    short_plan = make_disruption_plan(
+        target_leg=leg_ab,
+        start_offset_days=60.0,
+        duration_days=5.0,
+        multiplier=5.0,
+    )
+    context = FakeContext(
+        ports=[a, b],
+        service_routes=[],
+        legs=[leg_ab],
+        vessels=[],
+        disruption_plans=[short_plan, long_plan],
+    )
+    inside = dt.datetime.min + dt.timedelta(days=60.0, seconds=1)
+    edge = strategy_module._BookingEdge(
+        service_route=routing,
+        departure_port=a,
+        arrival_port=b,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+        candidate_segments=[seg],
+    )
+    latest = strategy_module._latest_intersecting_recovery(context, inside, [edge])
+    assert latest == dt.datetime.min + dt.timedelta(days=80.0)
 
 
 def test_headway_invalid_cycle_distance(strategy_module: object) -> None:
@@ -289,7 +374,7 @@ def test_path_duration_invalid_distance(strategy_module: object) -> None:
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=10.0)
     make_vessel(1, vc, route)
     # Use the edge class directly with invalid distance.
-    edge = strategy_module._NominalBookingEdge(
+    edge = strategy_module._BookingEdge(
         service_route=route,
         departure_port=a,
         arrival_port=b,
@@ -303,7 +388,7 @@ def test_path_duration_invalid_distance(strategy_module: object) -> None:
 
 def test_path_duration_no_route(strategy_module: object) -> None:
     a = make_port("A")
-    edge = strategy_module._NominalBookingEdge(
+    edge = strategy_module._BookingEdge(
         service_route=None,
         departure_port=a,
         arrival_port=a,

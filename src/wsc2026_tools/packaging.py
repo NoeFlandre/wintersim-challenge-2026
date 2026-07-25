@@ -53,6 +53,7 @@ _ROUND_AFFIXES: dict[str, tuple[str, str]] = {
 _ALLOWED_SUBMISSION_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
+        "transshipment_readiness.py",
         "README.md",
     }
 )
@@ -229,6 +230,15 @@ def _walk_submission(submission_dir: Path) -> list[Path]:
             "submission response_strategies is missing required file "
             "'user_strategy.py'. A submission without a user strategy is "
             "not a valid package; add user_strategy.py and retry."
+        )
+    missing_required = sorted(set(_ALLOWED_SUBMISSION_FILES) - {f.name for f in collected})
+    if missing_required:
+        raise PackagerError(
+            "submission response_strategies is missing required candidate files: "
+            + ", ".join(missing_required)
+            + ". The packager refuses to ship a partial candidate set because "
+            "user_strategy.py's relative import would resolve to a packaged "
+            "module that is not present. Add the missing file(s) and retry."
         )
     return collected
 

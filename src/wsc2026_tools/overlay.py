@@ -38,6 +38,7 @@ class OverlayError(Exception):
 ALLOWED_OVERLAY_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
+        "transshipment_readiness.py",
         "README.md",
     }
 )
@@ -105,6 +106,16 @@ def _validate_submission_contents(submission_dir: Path) -> list[Path]:
             "would leave a stale strategy at the destination while the rest "
             "of the package is partially updated. Add user_strategy.py and "
             "retry."
+        )
+    missing_required = sorted(set(ALLOWED_OVERLAY_FILES) - seen_allowlisted)
+    if missing_required:
+        raise OverlayError(
+            "submission response_strategies is missing required candidate files: "
+            + ", ".join(missing_required)
+            + ". The overlay refuses to run a partial copy: every approved "
+            "participant file must be present so the destination is never "
+            "left with a stale helper next to a fresh strategy. Add the "
+            "missing file(s) and retry."
         )
     return allowed
 

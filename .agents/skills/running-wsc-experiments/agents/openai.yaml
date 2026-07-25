@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run WSC Experiments"
+  short_description: "Controlled WSC strategy experiments"
+  default_prompt: "Use $running-wsc-experiments to design and execute one WSC strategy experiment end to end."

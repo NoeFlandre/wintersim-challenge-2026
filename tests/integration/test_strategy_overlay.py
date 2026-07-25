@@ -68,11 +68,14 @@ def test_sync_overlays_participant_files_onto_real_round0(
     assert before, "expected organizer response_strategies files to be present"
 
     copied = overlay_response_strategies(submission, preserved_organizer_dir)
-    assert "user_strategy.py" in copied
+    assert set(copied) == {
+        "README.md",
+        "transshipment_readiness.py",
+        "user_strategy.py",
+    }
 
-    # Participant file overlaid.
-    participant_src = (submission / "user_strategy.py").read_bytes()
-    assert (preserved_organizer_dir / "user_strategy.py").read_bytes() == participant_src
+    for name in copied:
+        assert (preserved_organizer_dir / name).read_bytes() == (submission / name).read_bytes()
 
     # Organizer files byte-identical.
     for name, blob in before.items():

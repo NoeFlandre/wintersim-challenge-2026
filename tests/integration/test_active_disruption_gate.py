@@ -18,6 +18,9 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import types
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -84,23 +87,32 @@ def _add_source_to_path(source: Path) -> None:
             sys.modules.pop(module_name, None)
 
 
-def _load_participant_user_strategy() -> type:
-    """Load ``submission/response_strategies/user_strategy.py`` by file path.
-
-    Bypasses the ``response_strategies`` namespace collision between the
-    organizer's package and the participant's package.
-    """
-    participant_file = submission_strategies_dir() / "user_strategy.py"
+@contextmanager
+def _load_participant_user_strategy() -> Iterator[type]:
+    """Load the participant strategy inside a temporary private package."""
+    strategies_dir = submission_strategies_dir()
+    participant_file = strategies_dir / "user_strategy.py"
     if not participant_file.is_file():
         pytest.fail(f"participant user_strategy.py missing at {participant_file}")
-    spec = importlib.util.spec_from_file_location(
-        "wsc_participant_user_strategy", str(participant_file)
-    )
+
+    package_name = "_wsc_participant_active_disruption_gate"
+    package = types.ModuleType(package_name)
+    package.__path__ = [str(strategies_dir)]
+    package.__package__ = package_name
+    sys.modules[package_name] = package
+    module_name = f"{package_name}.user_strategy"
+    spec = importlib.util.spec_from_file_location(module_name, participant_file)
     if spec is None or spec.loader is None:
         pytest.fail(f"could not build import spec for {participant_file}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.UserStrategy
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+        yield module.UserStrategy
+    finally:
+        for name in list(sys.modules):
+            if name == package_name or name.startswith(f"{package_name}."):
+                sys.modules.pop(name, None)
 
 
 def _snapshot(context) -> dict:
@@ -127,8 +139,6 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     context = scenario_builders.create_with_disruption()
     assert context.disruption_plans, "the disruption scenario must define at least one plan"
 
-    UserStrategy = _load_participant_user_strategy()
-
     # Pick a timestamp strictly inside the FIRST disruption's active window.
     # The organizer's is_disruption_active anchors offsets at datetime.min,
     # so the absolute reference clock is:
@@ -153,9 +163,9 @@ def test_user_strategy_is_no_op_inside_active_disruption() -> None:
     snapshot_before = _snapshot(context)
 
     vessel = context.vessels[0] if context.vessels else None
-    result = UserStrategy.create_alternative_service_routes(context, now, vessel)
+    with _load_participant_user_strategy() as UserStrategy:
+        result = UserStrategy.create_alternative_service_routes(context, now, vessel)
 
-    # The baseline must return None to delegate to the organizer fallback.
     assert result is None
 
     snapshot_after = _snapshot(context)

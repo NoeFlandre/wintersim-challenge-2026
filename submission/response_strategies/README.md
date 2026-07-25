@@ -16,30 +16,12 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: safe recovery shuttle experiment
+## Current strategy: organizer fallback
 
-Three methods delegate to the organizer fallback without mutation:
-
-- `select_vessel_for_berth`
-- `assign_associated_bookings`
-- `adjust_bookings_before_cargo_handling`
-
-`create_alternative_service_routes` implements the standard alternative-route
-creation, reservation, switching, and post-disruption restoration lifecycle
-inside the participant file. If an active disruption leaves an affected
-original service route without a complete safe alternative, it adds a
-temporary recovery shuttle over the largest safely connected subset of that
-route's ports. The shuttle uses only existing, non-disrupted legs and may take
-one empty vessel when it reaches the shuttle start port.
-
-This self-contained implementation is required by the submission packager:
-participant code may import documented maritime entity classes, but it may not
-depend on organizer-owned `response_strategies` implementation files that are
-absent from the archive.
-
-The policy is deterministic and derives every decision from the runtime
-context. It contains no port names, route IDs, dates, tuned thresholds,
-randomness, I/O, or mutable cross-run state.
+Every method in `UserStrategy` currently returns `None`, which delegates to the
+organizer fallback strategy without mutating any input. This establishes a
+known, unmodified baseline. Optimization is deliberately deferred to later,
+separately reviewed work.
 
 ## Submission boundary
 

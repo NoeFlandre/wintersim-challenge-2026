@@ -1,14 +1,22 @@
-"""Integration checks for the real Round 0 clock and smoke driver.
+"""Integration test: UserStrategy.create_alternative_service_routes is a no-op.
 
-The candidate route-mutation contract is covered separately by
-``test_safe_shuttle_recovery_round0.py`` using the organizer's own strategy
-validator. These checks retain the independent clock-origin regression and
-out-of-process smoke coverage. They skip when the private Round 0 source is
-not bootstrapped.
+Constructs the real Round 0 organizer disruption context in memory, picks a
+timestamp inside the configured disruption window, calls the participant
+``UserStrategy.create_alternative_service_routes`` and asserts that:
+
+* the call returns ``None`` (delegated to the organizer fallback), and
+* the context is left untouched (vessels, legs, service_routes, vessel
+  assignments, and the disruption_plans list are all unchanged).
+
+This is the "active-disruption gate": it would catch a regression where a
+strategy implementation mutates the context, returns an invalid object, or
+silently swallows an exception. Skipped when the local Round 0 source is
+not bootstrapped (CI does not include the organizer ZIP).
 """
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,7 +24,10 @@ from pathlib import Path
 import pytest
 
 from wsc2026_tools.cli import run_smoke
-from wsc2026_tools.paths import round_source_dir
+from wsc2026_tools.paths import (
+    round_source_dir,
+    submission_strategies_dir,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -71,6 +82,88 @@ def _add_source_to_path(source: Path) -> None:
             module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
         ):
             sys.modules.pop(module_name, None)
+
+
+def _load_participant_user_strategy() -> type:
+    """Load ``submission/response_strategies/user_strategy.py`` by file path.
+
+    Bypasses the ``response_strategies`` namespace collision between the
+    organizer's package and the participant's package.
+    """
+    participant_file = submission_strategies_dir() / "user_strategy.py"
+    if not participant_file.is_file():
+        pytest.fail(f"participant user_strategy.py missing at {participant_file}")
+    spec = importlib.util.spec_from_file_location(
+        "wsc_participant_user_strategy", str(participant_file)
+    )
+    if spec is None or spec.loader is None:
+        pytest.fail(f"could not build import spec for {participant_file}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.UserStrategy
+
+
+def _snapshot(context) -> dict:
+    """Capture the identity-bearing state we expect the strategy to preserve."""
+    return {
+        "vessels": tuple(context.vessels),
+        "legs": tuple(context.legs),
+        "service_routes": tuple(context.service_routes),
+        "assigned_routes": {vessel: vessel.assigned_service_route for vessel in context.vessels},
+        "disruption_plans": tuple(context.disruption_plans),
+    }
+
+
+def test_user_strategy_is_no_op_inside_active_disruption() -> None:
+    source = _bootstrap_or_skip()
+    _add_source_to_path(source)
+
+    # Import the organizer-side scenario_builders BEFORE the participant
+    # strategy. simulation_model imports ``response_strategies.default_strategy``
+    # eagerly; if the participant module is imported first, the package is
+    # mid-init and the constructor crashes.
+    import scenario_builders  # type: ignore[import-not-found]
+
+    context = scenario_builders.create_with_disruption()
+    assert context.disruption_plans, "the disruption scenario must define at least one plan"
+
+    UserStrategy = _load_participant_user_strategy()
+
+    # Pick a timestamp strictly inside the FIRST disruption's active window.
+    # The organizer's is_disruption_active anchors offsets at datetime.min,
+    # so the absolute reference clock is:
+    #   now = datetime.min + timedelta(days=start_offset_days + duration/2)
+    # The previous test added the same offset to datetime(2026, 1, 1), which
+    # sat outside every plan window -- is_disruption_active returned False.
+    plan = context.disruption_plans[0]
+    inside_day = plan.start_offset_days + (plan.duration_days / 2.0)
+    now = datetime.min + timedelta(days=inside_day)
+
+    # Import is_disruption_active directly. The package init is independent
+    # of scenario_builders so the order does not conflict.
+    from simulation_model.disruption_status import (  # type: ignore[import-not-found]
+        is_disruption_active,
+    )
+
+    # Genuine proof that the disruption is active at the chosen timestamp.
+    assert is_disruption_active(context, now) is True, (
+        f"test must pick a timestamp inside an active disruption; plan={plan!r} now={now!r}"
+    )
+
+    snapshot_before = _snapshot(context)
+
+    vessel = context.vessels[0] if context.vessels else None
+    result = UserStrategy.create_alternative_service_routes(context, now, vessel)
+
+    # The baseline must return None to delegate to the organizer fallback.
+    assert result is None
+
+    snapshot_after = _snapshot(context)
+    assert snapshot_after == snapshot_before, (
+        "UserStrategy.create_alternative_service_routes must not mutate the "
+        f"context. Before: {snapshot_before['service_routes']!r}, "
+        f"after: {snapshot_after['service_routes']!r}"
+    )
 
 
 def test_active_disruption_clock_origin_is_datetime_min() -> None:

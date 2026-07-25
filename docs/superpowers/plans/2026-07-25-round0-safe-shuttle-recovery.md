@@ -10,11 +10,11 @@
 > organizer-owned `response_strategies.default_strategy`, but the mandatory
 > packaging gate correctly rejected that unshipped module. RED tests were
 > updated in commit `34ece05` to require a self-contained lifecycle. The final
-> candidate imports only documented `maritime_data_context` entities and
-> independently covers ordinary alternative creation, reservation, switching,
-> restoration, and the recovery-shuttle extension. The historical task steps
-> below preserve the original plan for auditability; this note governs the
-> reviewed implementation.
+> candidate imported only documented `maritime_data_context` entities and
+> independently covered ordinary alternative creation, reservation, switching,
+> restoration, and the recovery-shuttle extension. The candidate was later
+> rejected on score and reverted; the historical task steps below preserve the
+> original plan for auditability.
 
 **Tech Stack:** Python 3.11-compatible standard library, organizer-provided maritime entities and fallback strategy, pytest, Ruff, mypy, uv, and the local Round 0 integration environment.
 

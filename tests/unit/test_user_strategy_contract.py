@@ -77,6 +77,14 @@ def test_select_vessel_for_berth_returns_none_and_does_not_mutate() -> None:
     assert berths == ["berth_1"], "must not mutate available_berths"
 
 
+def test_create_alternative_service_routes_returns_none_and_leaves_context_unchanged() -> None:
+    context = {"routes": [1, 2, 3], "vessels": ["x"]}
+    snapshot = {"routes": list(context["routes"]), "vessels": list(context["vessels"])}
+    result = UserStrategy.create_alternative_service_routes(context, now=5, vessel="x")
+    assert result is None
+    assert context == snapshot, "None result must leave context unchanged"
+
+
 def test_assign_associated_bookings_returns_none() -> None:
     result = UserStrategy.assign_associated_bookings(context={"k": 1}, now=10, shipment=object())
     assert result is None

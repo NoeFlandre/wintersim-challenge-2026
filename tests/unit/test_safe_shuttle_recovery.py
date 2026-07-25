@@ -144,21 +144,11 @@ def now(day: float) -> dt.datetime:
     return dt.datetime.min + dt.timedelta(days=day)
 
 
-def install_fake_organizer_modules(monkeypatch, calls: list) -> None:
+def install_fake_maritime_module(monkeypatch) -> None:
     maritime = ModuleType("maritime_data_context")
     maritime.Segment = Segment
     maritime.ServiceRoute = ServiceRoute
     monkeypatch.setitem(sys.modules, "maritime_data_context", maritime)
-
-    default_module = ModuleType("response_strategies.default_strategy")
-
-    class DefaultStrategy:
-        @staticmethod
-        def create_alternative_service_routes(context, current_time, vessel=None):
-            calls.append((context, current_time, vessel))
-
-    default_module.DefaultStrategy = DefaultStrategy
-    monkeypatch.setitem(sys.modules, "response_strategies.default_strategy", default_module)
 
 
 def test_active_interval_is_start_inclusive_end_exclusive(network) -> None:
@@ -213,15 +203,11 @@ def test_plan_returns_none_without_two_mutually_reachable_anchors(network) -> No
     assert _build_recovery_plan(context, source, state.closed_ports, state.congested_legs) is None
 
 
-def test_hook_invokes_default_once_creates_idempotently_and_does_not_reserve(
-    network, monkeypatch
-) -> None:
+def test_hook_creates_recovery_idempotently_and_does_not_reserve(network, monkeypatch) -> None:
     context, source, _, original_legs = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
 
     assert UserStrategy.create_alternative_service_routes(context, now(12)) is True
-    assert len(calls) == 1
     shuttles = [
         route
         for route in context.service_routes
@@ -236,7 +222,6 @@ def test_hook_invokes_default_once_creates_idempotently_and_does_not_reserve(
     assert not context.vessels
 
     assert UserStrategy.create_alternative_service_routes(context, now(12)) is True
-    assert len(calls) == 2
     assert [
         route
         for route in context.service_routes
@@ -244,13 +229,11 @@ def test_hook_invokes_default_once_creates_idempotently_and_does_not_reserve(
     ] == [shuttle]
 
 
-def test_hook_handles_inactive_state_after_running_default(network, monkeypatch) -> None:
+def test_hook_handles_inactive_state(network, monkeypatch) -> None:
     context, _, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
 
     assert UserStrategy.create_alternative_service_routes(context, now(15)) is True
-    assert len(calls) == 1
     assert not [
         route
         for route in context.service_routes
@@ -260,8 +243,7 @@ def test_hook_handles_inactive_state_after_running_default(network, monkeypatch)
 
 def test_hook_preserves_existing_organizer_alternative(network, monkeypatch) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     state = _active_disruption_state(context, now(12))
     assert state is not None
     alternative = ServiceRoute("SOURCE-ALT-1", "organizer alternative", 0.0)
@@ -273,10 +255,75 @@ def test_hook_preserves_existing_organizer_alternative(network, monkeypatch) -> 
     assert context.service_routes == [source, alternative]
 
 
+def test_hook_recreates_standard_alternative_reservation_and_switch(monkeypatch) -> None:
+    a, b, blocked = [Port(name) for name in ("A", "B", "X")]
+    ax, xb, ba, ab = Leg(a, blocked), Leg(blocked, b), Leg(b, a), Leg(a, b)
+    source = make_route("SOURCE", [ax, xb, ba])
+    context = Context(
+        [a, b, blocked],
+        [ax, xb, ba, ab],
+        [source],
+        [Plan(start=10, duration=5, berth=blocked.berths[0])],
+    )
+    later = Vessel(2, source)
+    reserved = Vessel(1, source)
+    source.deployed_vessels.extend([later, reserved])
+    context.vessels.extend([later, reserved])
+    install_fake_maritime_module(monkeypatch)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(12)) is True
+    alternative = context.service_routes[-1]
+    assert alternative.source_service_route is source
+    assert not getattr(alternative, "is_participant_recovery_shuttle", False)
+    assert [
+        (segment.associated_leg.departure_port, segment.associated_leg.arrival_port)
+        for segment in alternative.segments
+    ] == [(a, b), (b, a)]
+    assert reserved.pending_assigned_service_route is alternative
+    assert later.pending_assigned_service_route is None
+
+    reserved.current_segment = source.segments[-1]  # B -> A, the alternative start.
+    reserved.current_segment.current_vessels.append(reserved)
+    assert UserStrategy.create_alternative_service_routes(context, now(12), reserved) is True
+    assert reserved.assigned_service_route is alternative
+    assert reserved.pending_assigned_service_route is None
+    assert reserved in alternative.deployed_vessels
+    assert reserved not in source.deployed_vessels
+
+
+def test_hook_restores_empty_alternative_vessel_after_recovery(monkeypatch) -> None:
+    a, b, blocked = [Port(name) for name in ("A", "B", "X")]
+    ax, xb, ba, ab = Leg(a, blocked), Leg(blocked, b), Leg(b, a), Leg(a, b)
+    source = make_route("SOURCE", [ax, xb, ba])
+    context = Context(
+        [a, b, blocked],
+        [ax, xb, ba, ab],
+        [source],
+        [Plan(start=10, duration=5, berth=blocked.berths[0])],
+    )
+    vessel = Vessel(1, source)
+    source.deployed_vessels.append(vessel)
+    context.vessels.append(vessel)
+    install_fake_maritime_module(monkeypatch)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    alternative = context.service_routes[-1]
+    vessel.current_segment = source.segments[-1]
+    vessel.current_segment.current_vessels.append(vessel)
+    UserStrategy.create_alternative_service_routes(context, now(12), vessel)
+    vessel.current_segment = alternative.segments[-1]  # B -> A, a source re-entry.
+    vessel.current_segment.current_vessels.append(vessel)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(15), vessel) is True
+    assert vessel.assigned_service_route is source
+    assert vessel.pending_assigned_service_route is None
+    assert vessel.current_segment is source.segments[-1]
+    assert vessel in source.deployed_vessels
+    assert vessel not in alternative.deployed_vessels
+
+
 def test_hook_skips_route_without_viable_recovery_cycle(network, monkeypatch) -> None:
     context, source, _, (_, _, _, _, bc, ca) = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     context.legs.remove(bc)
     context.legs.remove(ca)
 
@@ -286,8 +333,7 @@ def test_hook_skips_route_without_viable_recovery_cycle(network, monkeypatch) ->
 
 def test_hook_clears_default_pending_assignment_to_custom_shuttle(network, monkeypatch) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     shuttle = context.service_routes[-1]
     vessel = Vessel(1, source)
@@ -302,8 +348,7 @@ def test_hook_clears_default_pending_assignment_to_custom_shuttle(network, monke
 
 def test_hook_switches_exactly_one_empty_source_vessel_at_start(network, monkeypatch) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     shuttle = context.service_routes[-1]
 
@@ -322,8 +367,7 @@ def test_hook_switches_exactly_one_empty_source_vessel_at_start(network, monkeyp
 
 def test_hook_switches_empty_source_vessel_from_start_port_berth(network, monkeypatch) -> None:
     context, source, (_, start, _, _, _), _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     shuttle = context.service_routes[-1]
     vessel = Vessel(1, source)
@@ -339,8 +383,7 @@ def test_hook_switches_empty_source_vessel_from_start_port_berth(network, monkey
 
 def test_hook_refuses_vessel_with_other_pending_route(network, monkeypatch) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     vessel = Vessel(1, source)
     vessel.current_segment = source.segments[0]
@@ -355,8 +398,7 @@ def test_hook_refuses_vessel_with_other_pending_route(network, monkeypatch) -> N
 
 def test_hook_refuses_second_vessel_when_shuttle_is_already_deployed(network, monkeypatch) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     shuttle = context.service_routes[-1]
     deployed = Vessel(1, shuttle)
@@ -379,8 +421,7 @@ def test_hook_refuses_ineligible_vessel(
     network, monkeypatch, loaded: bool, at_start: bool, foreign: bool
 ) -> None:
     context, source, _, _ = network
-    calls: list = []
-    install_fake_organizer_modules(monkeypatch, calls)
+    install_fake_maritime_module(monkeypatch)
     UserStrategy.create_alternative_service_routes(context, now(12))
     foreign_route = make_route("FOREIGN", [context.legs[0]])
     vessel = Vessel(2, foreign_route if foreign else source)
@@ -405,6 +446,12 @@ def test_module_has_no_mutable_globals_or_forbidden_runtime_access() -> None:
     tree = ast.parse(USER_STRATEGY_PATH.read_text(encoding="utf-8"))
     assert not [
         node for node in tree.body if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign))
+    ]
+    assert not [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "response_strategies.default_strategy"
     ]
     source = inspect.getsource(sys.modules[UserStrategy.__module__])
     for forbidden in ("subprocess", "socket", "requests", "open(", "os.environ", "Path("):

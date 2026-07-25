@@ -313,3 +313,27 @@ condition is enforced: no `wsc2026 sync`, no `wsc2026 smoke`, no
 `wsc2026 run`, no organizer `main.py`, no partial or full simulation, no
 performance experiment, no candidate comparison, and no submission archive
 may be produced before explicit approval.
+
+## Result: SUCCESS_REJECTED
+
+Single full run with the fixed configuration above completed at
+Day 360 / Period 72 in 23 minutes 38 seconds.
+
+- Candidate Cumulative Resilience Loss: `22.19667865314415`
+- Pinned current-checkout fallback Cumulative Resilience Loss:
+  `18.673577819840556`
+- Period count: `72`
+- Absolute delta vs fallback: `+3.5231008333035945`
+- Relative change vs fallback: `+18.8668%`
+- Better/equal/worse period counts vs fallback: `19 / 19 / 34`
+- Historical reference (separate, non-decisive): `18.276620672293834`
+- Candidate does not beat the historical reference.
+
+Acceptance rule: `candidate_score < 18.673577819840556 - 1e-9`. Equality is
+rejection. The candidate score is strictly greater than the pinned
+fallback score, so the rule rejects the candidate.
+
+The candidate strategy is reverted, the no-op fallback adapter is
+restored, the verified current-checkout fallback ATT snapshot is
+restored under `.challenge/round0/source/Output/`, and the rejected-candidate
+evidence is preserved under the ignored evidence paths above.

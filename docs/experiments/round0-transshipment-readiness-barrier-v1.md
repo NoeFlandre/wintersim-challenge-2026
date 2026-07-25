@@ -321,7 +321,7 @@ The eligible buffer with maximum `N_B` is selected. An exact tie preserves origi
 
 ## Validation and delegation summary
 
-All quantities used by arithmetic must have the required sign and be finite. Identity-sensitive organizer relationships are validated by object identity. Sequence indexes must resolve uniquely. Route connectivity, cyclic closure, fleet deployment, booking direction, storage ownership, carrying ownership, berth ownership, and next-selection behavior must be unambiguous. Any violation delegates. The strategy does not mutate lists, mappings, context, routes, bookings, cargo, vessels, or berths. It returns only an original waiting-vessel object.
+All quantities used by arithmetic must have the required sign and be finite. Identity-sensitive organizer relationships are validated by object identity. Sequence indexes must resolve uniquely. Route connectivity, cyclic closure, fleet deployment, booking direction (no full-cycle bookings, no identical departure/arrival endpoints), storage ownership, carrying ownership, berth ownership, and next-selection behavior must be unambiguous. Any violation delegates. The strategy does not mutate lists, mappings, context, routes, bookings, cargo, vessels, or berths. It returns only an original waiting-vessel object.
 
 ## TDD and proof controls
 
@@ -336,7 +336,43 @@ Focused tests cover the fallback formula and parity, identity and hook contracts
 
 ### RED/GREEN evidence ledger
 
-Commands, assertion causes, and passing counts are appended here as they are observed. Operational trajectory commands are never used for this ledger.
+Operational trajectory commands are never used for this ledger.
+
+#### Initial RED
+
+- Command:
+
+  ```text
+  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object" -q
+  ```
+
+  Result: `1 failed`. The final public hook returned `None`, so the identity assertion `selected is state["buffer"]` failed against the no-op baseline.
+
+- Command:
+
+  ```text
+  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier" -q
+  ```
+
+  Result: `1 failed`. Before the feature assertion, the actual organizer activity test proved that immediate receiver assignment started service before booking advancement, left the exact shipment stored and absent from receiver cargo, advanced the booking only afterward, and left the shipment pending for loading. The feature assertion then failed because the no-op participant hook returned `None` instead of the original buffer object.
+
+#### Initial GREEN
+
+- Command:
+
+  ```text
+  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object" -q
+  ```
+
+  Result: `1 passed`. The public hook returned the exact original buffer object.
+
+- Command:
+
+  ```text
+  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier" -q
+  ```
+
+  Result: `1 passed`. The actual organizer activity proof confirmed immediate receiver miss, buffer selection, booking readiness during buffer service, receiver-next selection, and loading/carrying of the exact guaranteed shipment object.
 
 ## Overlay and packaging control
 
@@ -346,15 +382,19 @@ Exactly these participant files are approved:
 - `transshipment_readiness.py`
 - `user_strategy.py`
 
-The overlay must copy all three, leave organizer files byte-identical, reject unknown helpers, and remain idempotent.
+The overlay must copy all three, leave organizer files byte-identical, reject unknown helpers, refuse a partial copy, and remain idempotent. Both control surfaces reject submissions missing any approved file: the overlay aborts before touching the destination and the packager refuses to ship a partial candidate set.
 
-The package must contain only those three participant files below its `response_strategies` directory. The relative import must resolve to the packaged helper. Unknown participant modules and organizer-owned modules remain rejected. Two archives from identical candidate inputs must be byte-identical. The old fallback package hash is not reused because the approved member set changes.
+The package must contain only those three participant files below its `response_strategies` directory. The relative import must resolve to the packaged helper. Unknown participant modules and organizer-owned modules remain rejected. Two archives from identical candidate inputs must be byte-identical. The current measured archive SHA-256 is `a61c06166fb829234407fbc14c9fe44eeb19a53412996345363f6c110f257cbb` and the archive contains exactly:
+
+- `Round1_DetTeam/response_strategies/README.md`
+- `Round1_DetTeam/response_strategies/transshipment_readiness.py`
+- `Round1_DetTeam/response_strategies/user_strategy.py`
 
 ## Private probe control
 
 `experiments/probes/transshipment_readiness_barrier_v1.py` is development-only and must never be packaged. It is implemented and statically tested in this phase but must not execute a trajectory.
 
-A later approved observation mode will replay the real fallback trajectory, monkeypatch the organizer berth hook in-process, evaluate the shared immutable decision, compare the independent fallback receiver with actual `DefaultStrategy`, always return `None`, stop at the first strict candidate divergence, and write only derived evidence to ignored `experiments/results/transshipment_readiness_barrier_v1_probe.json`:
+A later approved observation mode will replay the real fallback trajectory up to an event-count cap, monkeypatch the organizer berth hook in-process, evaluate the shared immutable decision, compare the independent fallback receiver with actual `DefaultStrategy`, always return `None`, refuse any candidate whose independent ranking disagrees with the real hook or whose evaluation mutates organizer state, stop at the first strict candidate divergence, and write only derived evidence to ignored `experiments/results/transshipment_readiness_barrier_v1_probe.json`:
 
 - simulation timestamp;
 - anonymized stable participant-side vessel indexes;
@@ -368,11 +408,18 @@ A later approved observation mode will replay the real fallback trajectory, monk
 
 It must not serialize organizer source, input rows, complete objects, or private data.
 
-A later approved bounded replay mode may replay seed `2026`, locate the same event, allow the candidate only there, and verify `B` is served, guaranteed shipments become ready, `R` is selected next, and all guaranteed transitional shipments load. This is mechanism evidence, not score evidence.
+A later approved bounded replay mode may replay seed `2026`, locate the same event, allow the candidate only there, and verify all of:
+
+- `B` is served at the berth,
+- the exact guaranteed shipments become ready,
+- the first vessel to occupy the berth after `B` departs is exactly `R` (no other vessel in between),
+- every guaranteed transitional shipment is loaded on `R`.
+
+This is mechanism evidence, not score evidence. The replay refuses to honor any stored evidence whose parity or no-mutation flag is not `True`, and it cleans up the participant and organizer modules from `sys.modules` on exit.
 
 ## Pre-review boundary
 
-Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90%, bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status.
+Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.27%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status.
 
 Before reviewer approval, do not run:
 

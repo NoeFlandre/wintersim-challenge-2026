@@ -244,6 +244,62 @@ def test_hook_invokes_default_once_creates_idempotently_and_does_not_reserve(
     ] == [shuttle]
 
 
+def test_hook_handles_inactive_state_after_running_default(network, monkeypatch) -> None:
+    context, _, _, _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(15)) is True
+    assert len(calls) == 1
+    assert not [
+        route
+        for route in context.service_routes
+        if getattr(route, "is_participant_recovery_shuttle", False)
+    ]
+
+
+def test_hook_preserves_existing_organizer_alternative(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    state = _active_disruption_state(context, now(12))
+    assert state is not None
+    alternative = ServiceRoute("SOURCE-ALT-1", "organizer alternative", 0.0)
+    alternative.source_service_route = source
+    alternative.disruption_key = state.key
+    context.service_routes.append(alternative)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(12)) is True
+    assert context.service_routes == [source, alternative]
+
+
+def test_hook_skips_route_without_viable_recovery_cycle(network, monkeypatch) -> None:
+    context, source, _, (_, _, _, _, bc, ca) = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    context.legs.remove(bc)
+    context.legs.remove(ca)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(12)) is True
+    assert context.service_routes == [source]
+
+
+def test_hook_clears_default_pending_assignment_to_custom_shuttle(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    shuttle = context.service_routes[-1]
+    vessel = Vessel(1, source)
+    vessel.pending_assigned_service_route = shuttle
+    context.vessels.append(vessel)
+
+    UserStrategy.create_alternative_service_routes(context, now(12))
+
+    assert vessel.pending_assigned_service_route is None
+    assert vessel.assigned_service_route is source
+
+
 def test_hook_switches_exactly_one_empty_source_vessel_at_start(network, monkeypatch) -> None:
     context, source, _, _ = network
     calls: list = []
@@ -262,6 +318,58 @@ def test_hook_switches_exactly_one_empty_source_vessel_at_start(network, monkeyp
     assert vessel.current_segment is None
     assert vessel in shuttle.deployed_vessels
     assert vessel not in source.deployed_vessels
+
+
+def test_hook_switches_empty_source_vessel_from_start_port_berth(network, monkeypatch) -> None:
+    context, source, (_, start, _, _, _), _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    shuttle = context.service_routes[-1]
+    vessel = Vessel(1, source)
+    vessel.current_berth = start.berths[0]
+    source.deployed_vessels.append(vessel)
+    context.vessels.append(vessel)
+
+    UserStrategy.create_alternative_service_routes(context, now(12), vessel)
+
+    assert vessel.assigned_service_route is shuttle
+    assert vessel in shuttle.deployed_vessels
+
+
+def test_hook_refuses_vessel_with_other_pending_route(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    vessel = Vessel(1, source)
+    vessel.current_segment = source.segments[0]
+    vessel.pending_assigned_service_route = object()
+    source.deployed_vessels.append(vessel)
+    context.vessels.append(vessel)
+
+    UserStrategy.create_alternative_service_routes(context, now(12), vessel)
+
+    assert vessel.assigned_service_route is source
+
+
+def test_hook_refuses_second_vessel_when_shuttle_is_already_deployed(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    calls: list = []
+    install_fake_organizer_modules(monkeypatch, calls)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    shuttle = context.service_routes[-1]
+    deployed = Vessel(1, shuttle)
+    shuttle.deployed_vessels.append(deployed)
+    candidate = Vessel(2, source)
+    candidate.current_segment = source.segments[0]
+    source.deployed_vessels.append(candidate)
+    context.vessels.extend([deployed, candidate])
+
+    UserStrategy.create_alternative_service_routes(context, now(12), candidate)
+
+    assert candidate.assigned_service_route is source
+    assert shuttle.deployed_vessels == [deployed]
 
 
 @pytest.mark.parametrize(

@@ -115,8 +115,10 @@ pinning a vessel that cannot reach the safe switch point during the disruption.
 
 ## Determinism and runtime constraints
 
-- Standard library plus organizer-provided
-  `response_strategies.default_strategy` and `maritime_data_context` classes.
+- Standard-library-only top-level imports. Organizer-provided
+  `response_strategies.default_strategy` and `maritime_data_context` classes
+  are resolved locally inside the route hook without caching, so the module
+  remains importable in public CI without the private organizer tree.
 - No filesystem, environment, network, subprocess, current-working-directory,
   wall-clock, or random access.
 - No mutable module-level or cross-run state.

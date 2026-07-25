@@ -148,8 +148,8 @@ All other cases (including invalid or missing inputs) return exactly `None`.
 - Fully validate needed numeric values as finite and positive.
 - Catch only narrow expected exceptions (`AttributeError`, `TypeError`,
   `ValueError`, `ZeroDivisionError`, `FloatingPointError`,
-  `OverflowError`); on these listed types the candidate delegates with
-  `None`. Unexpected exception types propagate without being caught.
+  `OverflowError`); any other exception type propagates and the candidate
+  delegates with `None`.
 - Invalid, missing, or ambiguous data causes `None`, never a guessed
   decision.
 - No mutation is permitted on either the `False` or `None` path; the
@@ -185,21 +185,7 @@ All other cases (including invalid or missing inputs) return exactly `None`.
 - Reformat commit: `cda389c`
 - Review-correction commits (this pass):
   - RED correction tests: `e692b9e`
-  - Implementation/cleanup: `bfee640`
-- Cleanup commits (between review pass and pre-run):
-  - `4bee052` style: organize imports in fallback-conformance test
-  - `a0e5955` test: fix import order in fallback-conformance integration test
-  - `fc3261d` test: load participant strategy after organizer modules are initialized
-  - `6a347d9` test: use single user_strategy module load for accessibility
-  - `89062e8` style: organize imports in fallback-conformance test
-  - `e7ec310` test: keep simulation_model.disruption_status import before default_strategy
-  - `7c7f29c` style: organize imports in fallback-conformance test
-  - `4bd5cde` test: pin import order with noqa to avoid circular re-introduction
-  - `1d59984` test: print conformance and real-context decision statistics
-  - `c389a51` style: reformat real-context test
-- Reviewed pre-run HEAD: `c389a51` (style: reformat real-context test)
-- Reviewed participant SHA-256:
-  `93d5adcc7830b85fd8e2459e44c280826ebd6b09af019885ad5bd7e4730a0fe4`
+  - Implementation/cleanup: pending atomic commit to be added in this pass.
 
 ## Review-correction history (this pass)
 

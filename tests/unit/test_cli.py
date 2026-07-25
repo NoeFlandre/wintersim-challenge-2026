@@ -38,6 +38,7 @@ def _setup_source_and_submission(tmp_path: Path) -> tuple[Path, Path]:
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
     (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
+    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
     (submission / "README.md").write_text("# participant\n")
     return source, submission
 
@@ -212,6 +213,7 @@ def test_cli_package_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
     (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
+    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
     (submission / "README.md").write_text("# x\n")
     dist = tmp_path / "dist"
     monkeypatch.setattr(cli, "submission_strategies_dir", lambda: submission)
@@ -226,6 +228,8 @@ def test_cli_package_round0_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyP
     submission = tmp_path / "submission" / "response_strategies"
     submission.mkdir(parents=True)
     (submission / "user_strategy.py").write_text("class UserStrategy: ...\n")
+    (submission / "transshipment_readiness.py").write_text("HELPER = 1\n")
+    (submission / "README.md").write_text("# x\n")
     monkeypatch.setattr(cli, "submission_strategies_dir", lambda: submission)
     monkeypatch.setattr(cli, "dist_submissions_dir", lambda: tmp_path / "dist")
     rc = cli.main(["package", "--team", "ValidTeam", "--round", "1"])  # sanity passes

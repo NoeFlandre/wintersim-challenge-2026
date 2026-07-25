@@ -14,7 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from wsc2026_tools.overlay import OverlayError, overlay_response_strategies
+from wsc2026_tools.overlay import (
+    ALLOWED_OVERLAY_FILES,
+    OverlayError,
+    overlay_response_strategies,
+)
 
 
 def _make_tree(root: Path, files: dict[str, str]) -> None:
@@ -27,6 +31,7 @@ def _make_tree(root: Path, files: dict[str, str]) -> None:
 # Files the participant owns and that may be overlaid.
 SUBMISSION_FILES: dict[str, str] = {
     "user_strategy.py": "# participant user_strategy\n",
+    "transshipment_readiness.py": "# participant readiness helper\n",
     "README.md": "# participant readme\n",
 }
 
@@ -37,6 +42,10 @@ ORGANIZER_FILES: dict[str, str] = {
     "default_strategy.py": "# organizer default strategy\n",
     "strategy_validation.py": "# organizer validation\n",
 }
+
+
+def test_transshipment_readiness_helper_is_allowlisted() -> None:
+    assert "transshipment_readiness.py" in ALLOWED_OVERLAY_FILES
 
 
 def _setup(tmp_path: Path) -> tuple[Path, Path]:
@@ -57,9 +66,14 @@ def test_overlay_copies_participant_files_and_preserves_organizer(tmp_path: Path
 
     copied = overlay_response_strategies(submission, dest)
 
-    assert set(copied) == {"user_strategy.py", "README.md"}
+    assert set(copied) == {
+        "user_strategy.py",
+        "transshipment_readiness.py",
+        "README.md",
+    }
     # Participant files updated.
     assert (dest / "user_strategy.py").read_text() == "# participant user_strategy\n"
+    assert (dest / "transshipment_readiness.py").read_text() == "# participant readiness helper\n"
     assert (dest / "README.md").read_text() == "# participant readme\n"
     # Organizer files untouched.
     assert (dest / "__init__.py").read_text() == "# organizer package init\n"
@@ -77,20 +91,32 @@ def test_overlay_is_idempotent(tmp_path: Path) -> None:
     assert (dest / "user_strategy.py").read_text() == "# participant user_strategy\n"
 
 
-def test_overlay_does_not_delete_organizer_files_when_submission_is_small(
+@pytest.mark.parametrize("missing", ["README.md", "transshipment_readiness.py"])
+def test_overlay_requires_complete_candidate_without_partial_copy(
     tmp_path: Path,
+    missing: str,
 ) -> None:
     submission, dest = _setup(tmp_path)
-    # Remove README from submission side; overlay must not delete dest files.
-    (submission / "README.md").unlink()
+    (submission / missing).unlink()
+    before = {path.name: path.read_bytes() for path in dest.iterdir() if path.is_file()}
 
-    overlay_response_strategies(submission, dest)
+    with pytest.raises(OverlayError, match=missing.replace(".", r"\.")):
+        overlay_response_strategies(submission, dest)
 
-    # Organizer files still present.
-    for name in ORGANIZER_FILES:
-        assert (dest / name).exists(), f"overlay must not delete organizer file {name}"
-    # Stale participant file still updated (not deleted just because README left).
-    assert (dest / "user_strategy.py").read_text() == "# participant user_strategy\n"
+    after = {path.name: path.read_bytes() for path in dest.iterdir() if path.is_file()}
+    assert after == before
+
+
+def test_overlay_requires_destination_directory(tmp_path: Path) -> None:
+    submission = tmp_path / "submission" / "response_strategies"
+    submission.mkdir(parents=True)
+    (submission / "user_strategy.py").write_text("# user\n")
+    (submission / "transshipment_readiness.py").write_text("# helper\n")
+    (submission / "README.md").write_text("# readme\n")
+    missing_dest = tmp_path / "missing-destination"
+
+    with pytest.raises(OverlayError, match="not a directory|missing"):
+        overlay_response_strategies(submission, missing_dest)
 
 
 def test_overlay_skips_caches_and_hidden_files_without_failing(tmp_path: Path) -> None:
@@ -104,7 +130,11 @@ def test_overlay_skips_caches_and_hidden_files_without_failing(tmp_path: Path) -
     copied = overlay_response_strategies(submission, dest)
 
     # Only allowlisted participant files synchronized.
-    assert set(copied) == {"user_strategy.py", "README.md"}
+    assert set(copied) == {
+        "user_strategy.py",
+        "transshipment_readiness.py",
+        "README.md",
+    }
     # Cruft never landed in dest.
     assert not (dest / "__pycache__").exists()
     assert not (dest / "user_strategy.pyc").exists()

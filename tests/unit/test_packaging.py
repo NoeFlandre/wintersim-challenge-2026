@@ -8,11 +8,15 @@ disallowed imports.
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+import types
 import zipfile
 from pathlib import Path
 
 import pytest
 
+import wsc2026_tools.packaging as packaging_module
 from wsc2026_tools.packaging import (
     PackagerError,
     package_submission,
@@ -26,9 +30,14 @@ def _submission_dir(tmp_path: Path) -> Path:
     (sub / "user_strategy.py").write_text(
         "from __future__ import annotations\n"
         "from typing import Any\n"
+        "from .transshipment_readiness import choose_buffer_vessel\n"
         "class UserStrategy:\n"
         "    @staticmethod\n"
-        "    def select_vessel_for_berth(a, b, c, d, e, f=None) -> Any: return None\n"
+        "    def select_vessel_for_berth(a, b, c, d, e, f=None) -> Any:\n"
+        "        return choose_buffer_vessel(a, b, c, d, e, f)\n"
+    )
+    (sub / "transshipment_readiness.py").write_text(
+        "def choose_buffer_vessel(*args, **kwargs):\n    return None\n"
     )
     (sub / "README.md").write_text("# participant\n")
     return sub
@@ -37,6 +46,10 @@ def _submission_dir(tmp_path: Path) -> Path:
 def _read_members(zip_path: Path) -> list[str]:
     with zipfile.ZipFile(zip_path) as zf:
         return zf.namelist()
+
+
+def test_transshipment_readiness_helper_is_allowlisted() -> None:
+    assert "transshipment_readiness.py" in packaging_module._ALLOWED_SUBMISSION_FILES
 
 
 # --- round / team validation -------------------------------------------------
@@ -90,6 +103,55 @@ def test_archive_naming_and_top_level_dir(
     assert all(m.startswith(top + "/") for m in members)
 
 
+def test_archive_contains_exact_approved_files_and_relative_import_resolves(
+    tmp_path: Path,
+) -> None:
+    sub = _submission_dir(tmp_path)
+    archive = package_submission(
+        sub,
+        team="ValidTeam",
+        round_id="1",
+        dist_dir=tmp_path / "out",
+    )
+    expected = [
+        "Round1_ValidTeam/response_strategies/README.md",
+        "Round1_ValidTeam/response_strategies/transshipment_readiness.py",
+        "Round1_ValidTeam/response_strategies/user_strategy.py",
+    ]
+    assert _read_members(archive) == expected
+
+    extracted = tmp_path / "extracted"
+    with zipfile.ZipFile(archive) as zf:
+        zf.extractall(extracted)
+    response_dir = extracted / "Round1_ValidTeam" / "response_strategies"
+    package_name = "_packaged_transshipment_response"
+    package = types.ModuleType(package_name)
+    package.__path__ = [str(response_dir)]
+    package.__package__ = package_name
+    sys.modules[package_name] = package
+    module_name = f"{package_name}.user_strategy"
+    spec = importlib.util.spec_from_file_location(module_name, response_dir / "user_strategy.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+        assert callable(module.UserStrategy.select_vessel_for_berth)
+        assert f"{package_name}.transshipment_readiness" in sys.modules
+    finally:
+        for name in list(sys.modules):
+            if name == package_name or name.startswith(f"{package_name}."):
+                sys.modules.pop(name, None)
+
+
+def test_unknown_participant_helper_remains_rejected(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / "helpers.py").write_text("VALUE = 1\n")
+
+    with pytest.raises(PackagerError, match=r"(?i)helpers\.py|disallowed"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
 def test_member_allowlist_excludes_disallowed_files(tmp_path: Path) -> None:
     sub = _submission_dir(tmp_path)
     # Drop organizer-style and dev files into the participant dir; they must be
@@ -97,6 +159,17 @@ def test_member_allowlist_excludes_disallowed_files(tmp_path: Path) -> None:
     (sub / "default_strategy.py").write_text("# organizer\n")
     (sub / "strategy_validation.py").write_text("# organizer\n")
     with pytest.raises(PackagerError, match="(?i)not allowlisted|disallowed|refus|organizer"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+@pytest.mark.parametrize("missing", ["README.md", "transshipment_readiness.py"])
+def test_packaging_requires_complete_candidate_without_partial_archive(
+    tmp_path: Path, missing: str
+) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / missing).unlink()
+
+    with pytest.raises(PackagerError, match=missing.replace(".", r"\.")):
         package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
 
 
@@ -110,6 +183,27 @@ def test_package_rejects_submission_missing_user_strategy(tmp_path: Path) -> Non
     sub.mkdir(parents=True)
     (sub / "README.md").write_text("# readme only\n")
     with pytest.raises(PackagerError, match=r"(?i)user_strategy\.py"):
+        package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_team_name_non_string_rejected(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    with pytest.raises(PackagerError, match=r"(?i)team|str"):
+        package_submission(sub, team=42, round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_team_name_special_chars_only_raises(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    with pytest.raises(PackagerError, match=r"(?i)team|no usable"):
+        package_submission(sub, team="!!!", round_id="1", dist_dir=tmp_path / "out")
+
+
+def test_packaging_rejects_submission_with_forbidden_subdir(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / "subpkg").mkdir()
+    (sub / "subpkg" / "x.py").write_text("x")
+
+    with pytest.raises(PackagerError, match=r"(?i)disallowed|refus|not allowlist"):
         package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
 
 

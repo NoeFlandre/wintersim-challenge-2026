@@ -343,7 +343,7 @@ Operational trajectory commands are never used for this ledger.
 - Command:
 
   ```text
-  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object" -q
+  uv run pytest tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object -q
   ```
 
   Result: `1 failed`. The final public hook returned `None`, so the identity assertion `selected is state["buffer"]` failed against the no-op baseline.
@@ -351,7 +351,7 @@ Operational trajectory commands are never used for this ledger.
 - Command:
 
   ```text
-  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier" -q
+  uv run pytest tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier -q
   ```
 
   Result: `1 failed`. Before the feature assertion, the actual organizer activity test proved that immediate receiver assignment started service before booking advancement, left the exact shipment stored and absent from receiver cargo, advanced the booking only afterward, and left the shipment pending for loading. The feature assertion then failed because the no-op participant hook returned `None` instead of the original buffer object.
@@ -361,7 +361,7 @@ Operational trajectory commands are never used for this ledger.
 - Command:
 
   ```text
-  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object" -q
+  uv run pytest tests/unit/test_transshipment_readiness.py::test_positive_transition_margin_selects_original_buffer_object -q
   ```
 
   Result: `1 passed`. The public hook returned the exact original buffer object.
@@ -369,30 +369,100 @@ Operational trajectory commands are never used for this ledger.
 - Command:
 
   ```text
-  uv run --project "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1" pytest "/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier" -q
+  uv run pytest tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier -q
   ```
 
   Result: `1 passed`. The actual organizer activity proof confirmed immediate receiver miss, buffer selection, booking readiness during buffer service, receiver-next selection, and loading/carrying of the exact guaranteed shipment object.
 
+#### Probe fail-closed RED → GREEN (corrections phase)
+
+- RED command:
+
+  ```text
+  uv run pytest tests/unit/test_transshipment_readiness_probe.py -q
+  ```
+
+  RED result (15 failures, 1 pass):
+  - `install_observer`, `remove_observer`, `_validate_decision_safety`,
+    `_record_evidence_atomic`, and `NoDivergenceLifecycle` were
+    missing from the probe module.
+  - `MAX_OBSERVATION_EVENTS`, `MAX_REPLAY_SEARCH_EVENTS`,
+    `EXPECTED_CUMULATIVE_RESILIENCE_LOSS`, and
+    `EXPECTED_OBSERVATION_HASH` were not exported.
+  - `_validate_decision_safety` did not raise on parity, mutation,
+    strictness, or receiver-identity mismatches (the legacy observer
+    silently skipped those cases).
+  - `_record_evidence_atomic` did not exist; the legacy code wrote
+    evidence non-atomically and could overwrite existing files.
+
+- GREEN command:
+
+  ```text
+  uv run pytest tests/unit/test_transshipment_readiness_probe.py tests/unit/test_transshipment_readiness.py tests/unit/test_overlay.py tests/unit/test_packaging.py tests/unit/test_cli.py -q
+  ```
+
+  GREEN result: all assertions pass; the probe is implemented but not
+  executed against a real simulation in this phase.
+
 ## Overlay and packaging control
 
-Exactly these participant files are approved:
+The submission surface is:
 
-- `README.md`
-- `transshipment_readiness.py`
-- `user_strategy.py`
+- **Required runtime files** (must be present): `transshipment_readiness.py`, `user_strategy.py`.
+- **Allowlisted optional files** (copied if present): `README.md`.
 
-The overlay must copy all three, leave organizer files byte-identical, reject unknown helpers, refuse a partial copy, and remain idempotent. Both control surfaces reject submissions missing any approved file: the overlay aborts before touching the destination and the packager refuses to ship a partial candidate set.
+A submission missing either required runtime file is atomic-failed by both the overlay and the packager BEFORE any file is copied or any archive is written. A submission missing `README.md` is silently accepted; the overlay copies only the runtime pair and the packager ships the archive without a README. The default candidate still includes `README.md`, so the documented archive contents below assume all three files are present.
 
-The package must contain only those three participant files below its `response_strategies` directory. The relative import must resolve to the packaged helper. Unknown participant modules and organizer-owned modules remain rejected. Two archives from identical candidate inputs must be byte-identical. The current measured archive SHA-256 is `a61c06166fb829234407fbc14c9fe44eeb19a53412996345363f6c110f257cbb` and the archive contains exactly:
+The overlay must copy the runtime pair, leave organizer files byte-identical, reject unknown helpers, refuse a partial copy (atomic on missing-helper), and remain idempotent.
+
+The package must contain only participant-owned allowlisted files below its `response_strategies` directory. The relative import in `user_strategy.py` must resolve to the packaged helper. Unknown participant modules and organizer-owned modules remain rejected. Two archives from identical candidate inputs must be byte-identical.
+
+Run packaging locally with:
+
+```bash
+uv run wsc2026 package --team DetTeam --round 1
+```
+
+The archive contains exactly (when all three files are present):
 
 - `Round1_DetTeam/response_strategies/README.md`
 - `Round1_DetTeam/response_strategies/transshipment_readiness.py`
 - `Round1_DetTeam/response_strategies/user_strategy.py`
 
+When `README.md` is intentionally omitted, the archive contains only the runtime pair (in sorted order):
+
+- `Round1_DetTeam/response_strategies/transshipment_readiness.py`
+- `Round1_DetTeam/response_strategies/user_strategy.py`
+
+The current measured archive SHA-256 (when all three files are present) is `a61c06166fb829234407fbc14c9fe44eeb19a53412996345363f6c110f257cbb`. The archive is recomputed deterministically on every run.
+
 ## Private probe control
 
-`experiments/probes/transshipment_readiness_barrier_v1.py` is development-only and must never be packaged. It is implemented and statically tested in this phase but must not execute a trajectory.
+`experiments/probes/transshipment_readiness_barrier_v1.py` is development-only and must never be packaged. **The probe is implemented but not executed against a real simulation in this phase.** The probe's bounded no-divergence lifecycle is verified with fakes (see `tests/unit/test_transshipment_readiness_probe.py`).
+
+The probe is **FAIL-CLOSED** at every layer:
+
+- the observation observer aborts with `ProbeError` on any parity, mutation, strictness, or receiver-identity mismatch;
+- no valid-looking evidence is written after a safety violation;
+- the original hook is restored on every code path (success and failure);
+- evidence is written atomically (temp file + rename) and never overwrites existing evidence;
+- the observation event cap (`MAX_OBSERVATION_EVENTS = 1_000_000`) aborts on exhaustion with a clear `ProbeError`;
+- the replay event caps (`MAX_REPLAY_SEARCH_EVENTS = 100_000`,
+  `MAX_REPLAY_EVENTS_AFTER_DECISION = 100_000`) abort on exhaustion with a
+  clear `ProbeError`;
+- malformed, stale, incomplete, or safety-flag-false evidence is refused
+  before any model is loaded;
+- `_load_runtime` restores `sys.path` and removes every inserted package
+  from `sys.modules` on every entry and exit path.
+
+The lifecycle constants and documented invariants:
+
+- `WARMUP_DAYS = 140`
+- `MEASURED_DAYS = 360`
+- `ATT_PERIOD_DAYS = 5`
+- `EXPECTED_PERIODS = 72`
+- `EXPECTED_CUMULATIVE_RESILIENCE_LOSS = 18.673577819840556`
+- `EXPECTED_OBSERVATION_HASH = 10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
 
 A later approved observation mode will replay the real fallback trajectory up to an event-count cap, monkeypatch the organizer berth hook in-process, evaluate the shared immutable decision, compare the independent fallback receiver with actual `DefaultStrategy`, always return `None`, refuse any candidate whose independent ranking disagrees with the real hook or whose evaluation mutates organizer state, stop at the first strict candidate divergence, and write only derived evidence to ignored `experiments/results/transshipment_readiness_barrier_v1_probe.json`:
 
@@ -408,7 +478,7 @@ A later approved observation mode will replay the real fallback trajectory up to
 
 It must not serialize organizer source, input rows, complete objects, or private data.
 
-A later approved bounded replay mode may replay seed `2026`, locate the same event, allow the candidate only there, and verify all of:
+A later approved bounded replay mode may replay seed `2026`, locate the same event under the bounded search cap, allow the candidate only there, and verify all of:
 
 - `B` is served at the berth,
 - the exact guaranteed shipments become ready,
@@ -417,16 +487,18 @@ A later approved bounded replay mode may replay seed `2026`, locate the same eve
 
 This is mechanism evidence, not score evidence. The replay refuses to honor any stored evidence whose parity or no-mutation flag is not `True`, and it cleans up the participant and organizer modules from `sys.modules` on exit.
 
+The static actual-next gate in the bounded lifecycle assumes the queue is unchanged for the duration of the measured horizon (no vessel arrivals or departures during ATT sampling). This is a documented hypothesis; it is not verified until a real run is approved.
+
 ## Pre-review boundary
 
-Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.27%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status.
+Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.27%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status. Run each check via `uv run <command>` from the repo root; never embed absolute paths.
 
 Before reviewer approval, do not run:
 
 - `uv run wsc2026 sync --round round0`
 - `uv run wsc2026 smoke --round round0`
-- the real-context trajectory probe
-- bounded replay from the real seed
+- the real-context trajectory probe (probe is implemented but not executed)
+- bounded replay from the real seed (replay is implemented but not executed)
 - `uv run wsc2026 run --round round0 --full`
 - any complete fallback or candidate simulation
 

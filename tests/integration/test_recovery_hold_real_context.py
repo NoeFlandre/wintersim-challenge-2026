@@ -240,6 +240,5 @@ def test_recovery_hold_real_context_contract() -> None:
         "the candidate never delegates, which contradicts the policy"
     )
     print(
-        f"REAL_CONTEXT_STATS: shipments={len(shipments)} "
-        f"saw_false={saw_false} saw_none={saw_none}"
+        f"REAL_CONTEXT_STATS: shipments={len(shipments)} saw_false={saw_false} saw_none={saw_none}"
     )

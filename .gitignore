@@ -1,6 +1,6 @@
 # --- Challenge-organizer material (never tracked, never redistributed) ---
 # Local-only organizer software, inputs, outputs, downloads, and extracted trees.
-.challenge/
+/.challenge
 data/
 
 # Generated submission archives and packaging scratch space.

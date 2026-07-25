@@ -232,13 +232,16 @@ def test_fallback_conformance_real_context() -> None:
     source = _bootstrap_or_skip()
     _add_source_to_path(source)
 
-    UserStrategy = _load_participant_user_strategy()
-    part_module = _load_participant_module()
-
     import scenario_builders  # type: ignore[import-not-found]
 
     context = scenario_builders.create_with_disruption()
     assert context.disruption_plans, "the disruption scenario must define plans"
+
+    # Load the participant strategy AFTER the organizer modules are loaded,
+    # to avoid clashing with the simulation_model -> response_strategies ->
+    # default_strategy -> simulation_model circular import.
+    UserStrategy = _load_participant_user_strategy()
+    part_module = _load_participant_module()
 
     timestamps = _timestamps_for_plans(context)
     assert timestamps, "Round 0 context must declare at least one disruption plan"

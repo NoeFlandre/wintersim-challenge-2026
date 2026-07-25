@@ -39,14 +39,16 @@ sequencing or another global cargo-routing rewrite.
 Only `UserStrategy.create_alternative_service_routes` changes behavior. The
 other three hooks return `None` unconditionally.
 
-The hook first invokes the organizer's `DefaultStrategy` for the same call.
-This preserves its restoration, cleanup, ordinary alternative-route creation,
-and pending-vessel behavior. The participant hook then adds a recovery shuttle
-only for an affected original service route that still has no usable
-alternative route for the active disruption key.
+The hook implements the ordinary alternative-route lifecycle directly within
+participant-owned code: restore vessels from inactive alternatives, create a
+complete safe alternative when possible, reserve one source-route vessel, and
+switch that vessel at the alternative start port. It then adds a recovery
+shuttle only for an affected original service route for which the complete
+safe-anchor cycle cannot be built.
 
-The hook returns `True` after invoking the organizer default itself, preventing
-the call site from invoking it a second time.
+The hook returns `True`, preventing the call site from invoking the organizer
+fallback a second time. It does not import organizer-owned
+`response_strategies` modules, which are absent from the submission archive.
 
 ### Active disruption model
 
@@ -115,10 +117,10 @@ pinning a vessel that cannot reach the safe switch point during the disruption.
 
 ## Determinism and runtime constraints
 
-- Standard-library-only top-level imports. Organizer-provided
-  `response_strategies.default_strategy` and `maritime_data_context` classes
-  are resolved locally inside the route hook without caching, so the module
-  remains importable in public CI without the private organizer tree.
+- Standard-library-only top-level imports. Documented
+  `maritime_data_context` classes are resolved locally inside the route hook
+  without caching, so the module remains importable in public CI without the
+  private organizer tree.
 - No filesystem, environment, network, subprocess, current-working-directory,
   wall-clock, or random access.
 - No mutable module-level or cross-run state.
@@ -131,8 +133,8 @@ pinning a vessel that cannot reach the safe switch point during the disruption.
 ## Failure behavior
 
 Expected malformed or incomplete organizer-shaped inputs cause the extension
-to skip that source route after the organizer default has already handled the
-call. No broad `except Exception` or `except BaseException` is permitted.
+to skip that source route. No broad `except Exception` or
+`except BaseException` is permitted.
 
 The custom route is fully planned before context mutation. Entity constructors
 run before any append. Appending the already-constructed route and segments is

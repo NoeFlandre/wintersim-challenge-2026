@@ -1,14 +1,14 @@
 """Participant-owned response strategy for the WSC 2026 Simulation Challenge.
 
-Only ``create_alternative_service_routes`` extends the organizer behavior. It
-first runs the organizer fallback, then creates a deterministic recovery
-shuttle when an affected original route has no usable disruption alternative.
-The shuttle uses only existing safe legs and can take one empty vessel at its
-start port. The other three hooks delegate unconditionally.
+Only ``create_alternative_service_routes`` extends behavior. It implements the
+standard alternative-route reservation, switching, and recovery lifecycle,
+then creates a deterministic recovery shuttle when an affected original route
+has no complete safe alternative. The shuttle uses only existing safe legs and
+can take one empty vessel at its start port. The other three hooks delegate.
 
 Top-level imports are standard-library-only so public CI can import this module
-without the private organizer tree. Organizer classes are resolved locally
-inside the route hook and are never cached.
+without the private organizer tree. Documented maritime entity classes are
+resolved locally inside the route hook and are never cached.
 """
 
 from __future__ import annotations
@@ -204,6 +204,55 @@ def _largest_mutually_reachable_component(
     return best
 
 
+def _build_cycle_plan(
+    context: Any,
+    anchors: list[Any],
+    start_port: Any,
+    safe_legs: tuple[Any, ...],
+) -> _RecoveryPlan | None:
+    if len(anchors) < 2 or not any(start_port is port for port in anchors):
+        return None
+
+    start_index = next(index for index, port in enumerate(anchors) if port is start_port)
+    ordered_anchors = anchors[start_index:] + anchors[:start_index]
+    route_legs: list[Any] = []
+    for index, departure in enumerate(ordered_anchors):
+        arrival = ordered_anchors[(index + 1) % len(ordered_anchors)]
+        path = _find_shortest_leg_path(
+            context,
+            departure,
+            arrival,
+            safe_legs,
+        )
+        if not path:
+            return None
+        route_legs.extend(path)
+
+    if not route_legs or route_legs[0].departure_port is not start_port:
+        return None
+    for left, right in zip(route_legs, route_legs[1:], strict=False):
+        if left.arrival_port is not right.departure_port:
+            return None
+    if route_legs[-1].arrival_port is not start_port:
+        return None
+    return _RecoveryPlan(start_port, tuple(route_legs))
+
+
+def _build_complete_alternative_plan(
+    context: Any,
+    source_route: Any,
+    closed_ports: tuple[Any, ...],
+    congested_legs: tuple[Any, ...],
+) -> _RecoveryPlan | None:
+    safe_legs = tuple(
+        leg for leg in context.legs if _is_safe_leg(leg, closed_ports, congested_legs)
+    )
+    anchors = _unique_source_anchors(source_route, closed_ports)
+    if not anchors:
+        return None
+    return _build_cycle_plan(context, anchors, anchors[0], safe_legs)
+
+
 def _build_recovery_plan(
     context: Any,
     source_route: Any,
@@ -228,31 +277,7 @@ def _build_recovery_plan(
             start_port = departure
             break
 
-    start_index = next(index for index, port in enumerate(component) if port is start_port)
-    ordered_anchors = component[start_index:] + component[:start_index]
-    route_legs: list[Any] = []
-    for index, departure in enumerate(ordered_anchors):
-        arrival = ordered_anchors[(index + 1) % len(ordered_anchors)]
-        path = _find_shortest_leg_path(
-            context,
-            departure,
-            arrival,
-            safe_legs,
-        )
-        if not path:
-            return None
-        route_legs.extend(path)
-
-    if not route_legs:
-        return None
-    if route_legs[0].departure_port is not start_port:
-        return None
-    for left, right in zip(route_legs, route_legs[1:], strict=False):
-        if left.arrival_port is not right.departure_port:
-            return None
-    if route_legs[-1].arrival_port is not start_port:
-        return None
-    return _RecoveryPlan(start_port, tuple(route_legs))
+    return _build_cycle_plan(context, component, start_port, safe_legs)
 
 
 def _source_route_is_affected(source_route: Any, state: _DisruptionState) -> bool:
@@ -279,33 +304,37 @@ def _matching_alternatives(
     ]
 
 
-def _next_recovery_route_id(context: Any, source_route: Any) -> str:
+def _next_route_id(context: Any, source_route: Any, suffix: str) -> str:
     existing = {str(route.id).casefold() for route in context.service_routes}
     index = 1
     while True:
-        route_id = f"{source_route.id}-RECOVERY-{index}"
+        route_id = f"{source_route.id}-{suffix}-{index}"
         if route_id.casefold() not in existing:
             return route_id
         index += 1
 
 
-def _install_recovery_route(
+def _install_alternative_route(
     context: Any,
     source_route: Any,
     disruption_key: Any,
     plan: _RecoveryPlan,
     service_route_type: Any,
     segment_type: Any,
+    *,
+    recovery_shuttle: bool,
 ) -> Any:
-    route_id = _next_recovery_route_id(context, source_route)
+    suffix = "RECOVERY" if recovery_shuttle else "ALT"
+    label = "Recovery Shuttle" if recovery_shuttle else "Disruption Alternative"
+    route_id = _next_route_id(context, source_route, suffix)
     route = service_route_type(
         route_id,
-        f"{source_route.name} Recovery Shuttle",
+        f"{source_route.name} {label}",
         source_route.start_day_of_week,
     )
     route.source_service_route = source_route
     route.disruption_key = disruption_key
-    route.is_participant_recovery_shuttle = True
+    route.is_participant_recovery_shuttle = recovery_shuttle
     segments = [segment_type(index, leg, route) for index, leg in enumerate(plan.legs, start=1)]
     route.segments.extend(segments)
 
@@ -370,6 +399,113 @@ def _try_switch_empty_vessel(
     return True
 
 
+def _reserve_one_source_vessel(context: Any, source_route: Any, alternative: Any) -> None:
+    if any(
+        getattr(vessel, "assigned_service_route", None) is alternative
+        or getattr(vessel, "pending_assigned_service_route", None) is alternative
+        for vessel in context.vessels
+    ):
+        return
+    for vessel in sorted(source_route.deployed_vessels, key=lambda item: item.index):
+        if getattr(vessel, "assigned_service_route", None) is not source_route:
+            continue
+        if getattr(vessel, "pending_assigned_service_route", None) is not None:
+            continue
+        vessel.pending_assigned_service_route = alternative
+        return
+
+
+def _try_switch_pending_vessel(vessel: Any) -> bool:
+    if vessel is None or getattr(vessel, "carried_shipments", None):
+        return False
+    alternative = getattr(vessel, "pending_assigned_service_route", None)
+    if alternative is None or not getattr(alternative, "segments", None):
+        return False
+    first_segment = min(alternative.segments, key=lambda item: item.sequence_index)
+    if _vessel_current_port(vessel) is not first_segment.associated_leg.departure_port:
+        return False
+
+    current_segment = getattr(vessel, "current_segment", None)
+    if current_segment is not None:
+        while vessel in current_segment.current_vessels:
+            current_segment.current_vessels.remove(vessel)
+    source_route = getattr(vessel, "assigned_service_route", None)
+    if source_route is not None:
+        while vessel in source_route.deployed_vessels:
+            source_route.deployed_vessels.remove(vessel)
+    if vessel not in alternative.deployed_vessels:
+        alternative.deployed_vessels.append(vessel)
+    vessel.assigned_service_route = alternative
+    vessel.pending_assigned_service_route = None
+    vessel.current_segment = None
+    return True
+
+
+def _find_reentry_segment(source_route: Any, port: Any) -> Any:
+    segments = sorted(source_route.segments, key=lambda item: item.sequence_index)
+    for segment in segments:
+        if segment.associated_leg.arrival_port is port:
+            return segment
+    return None
+
+
+def _try_restore_empty_vessel(vessel: Any) -> bool:
+    if vessel is None or getattr(vessel, "carried_shipments", None):
+        return False
+    alternative = getattr(vessel, "assigned_service_route", None)
+    if alternative is None:
+        return False
+    source_route = getattr(alternative, "source_service_route", None)
+    if source_route is None:
+        return False
+    port = _vessel_current_port(vessel)
+    if port is None:
+        return False
+    reentry_segment = _find_reentry_segment(source_route, port)
+    if reentry_segment is None:
+        return False
+
+    current_segment = getattr(vessel, "current_segment", None)
+    if current_segment is not None:
+        while vessel in current_segment.current_vessels:
+            current_segment.current_vessels.remove(vessel)
+    while vessel in alternative.deployed_vessels:
+        alternative.deployed_vessels.remove(vessel)
+    if vessel not in source_route.deployed_vessels:
+        source_route.deployed_vessels.append(vessel)
+    vessel.assigned_service_route = source_route
+    vessel.pending_assigned_service_route = None
+    vessel.current_segment = reentry_segment
+    if vessel not in reentry_segment.current_vessels:
+        reentry_segment.current_vessels.append(vessel)
+    return True
+
+
+def _restore_inactive_assignments(
+    context: Any,
+    active_disruption_key: Any,
+    vessel: Any,
+) -> None:
+    candidates = [vessel] if vessel is not None else list(context.vessels)
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        pending = getattr(candidate, "pending_assigned_service_route", None)
+        if (
+            getattr(pending, "source_service_route", None) is not None
+            and getattr(pending, "disruption_key", None) != active_disruption_key
+        ):
+            candidate.pending_assigned_service_route = None
+
+        assigned = getattr(candidate, "assigned_service_route", None)
+        if (
+            getattr(assigned, "source_service_route", None) is None
+            or getattr(assigned, "disruption_key", None) == active_disruption_key
+        ):
+            continue
+        _try_restore_empty_vessel(candidate)
+
+
 class UserStrategy:
     """Participant adapter with one safe recovery-shuttle extension."""
 
@@ -391,10 +527,10 @@ class UserStrategy:
         vessel: Any = None,
     ) -> Any:
         from maritime_data_context import Segment, ServiceRoute
-        from response_strategies.default_strategy import DefaultStrategy
 
-        DefaultStrategy.create_alternative_service_routes(context, now, vessel)
         state = _active_disruption_state(context, now)
+        active_key = state.key if state is not None else ((), ())
+        _restore_inactive_assignments(context, active_key, vessel)
         if state is None:
             return True
 
@@ -402,41 +538,39 @@ class UserStrategy:
             if not _source_route_is_affected(source_route, state):
                 continue
             matching = _matching_alternatives(context, source_route, state.key)
-            shuttle = next(
-                (
-                    route
-                    for route in matching
-                    if bool(
-                        getattr(
-                            route,
-                            "is_participant_recovery_shuttle",
-                            False,
-                        )
-                    )
-                ),
-                None,
-            )
-            if shuttle is None and matching:
-                continue
-            if shuttle is None:
-                plan = _build_recovery_plan(
+            alternative = matching[0] if matching else None
+            if alternative is None:
+                plan = _build_complete_alternative_plan(
                     context,
                     source_route,
                     state.closed_ports,
                     state.congested_legs,
                 )
+                recovery_shuttle = plan is None
+                if recovery_shuttle:
+                    plan = _build_recovery_plan(
+                        context,
+                        source_route,
+                        state.closed_ports,
+                        state.congested_legs,
+                    )
                 if plan is None:
                     continue
-                shuttle = _install_recovery_route(
+                alternative = _install_alternative_route(
                     context,
                     source_route,
                     state.key,
                     plan,
                     ServiceRoute,
                     Segment,
+                    recovery_shuttle=recovery_shuttle,
                 )
-            _clear_pending_shuttle_assignments(context, shuttle)
-            _try_switch_empty_vessel(context, vessel, source_route, shuttle)
+            if bool(getattr(alternative, "is_participant_recovery_shuttle", False)):
+                _clear_pending_shuttle_assignments(context, alternative)
+                _try_switch_empty_vessel(context, vessel, source_route, alternative)
+            else:
+                _reserve_one_source_vessel(context, source_route, alternative)
+                _try_switch_pending_vessel(vessel)
         return True
 
     @staticmethod

@@ -4,7 +4,17 @@
 
 **Goal:** Add and evaluate one deterministic recovery-shuttle response that preserves organizer fallback behavior while keeping one eligible empty vessel moving on a safe subcycle during an active disruption.
 
-**Architecture:** `UserStrategy.create_alternative_service_routes` invokes the organizer default exactly once, then extends it only when an affected original route has no alternative for the active disruption key. Pure helper functions derive the active safe graph and deterministic shuttle plan; one mutation function installs the fully planned route and one lifecycle function switches an eligible empty vessel. All other hooks remain unconditional delegates.
+**Architecture:** `UserStrategy.create_alternative_service_routes` preserves the standard alternative-route lifecycle inside participant-owned code, then extends it only when an affected original route has no complete safe alternative for the active disruption key. Pure helper functions derive the active safe graph and deterministic shuttle plan; mutation helpers install fully planned routes and manage eligible empty vessels. All other hooks remain unconditional delegates.
+
+> **Reviewed implementation deviation (2026-07-25):** The initial plan called
+> organizer-owned `response_strategies.default_strategy`, but the mandatory
+> packaging gate correctly rejected that unshipped module. RED tests were
+> updated in commit `34ece05` to require a self-contained lifecycle. The final
+> candidate imports only documented `maritime_data_context` entities and
+> independently covers ordinary alternative creation, reservation, switching,
+> restoration, and the recovery-shuttle extension. The historical task steps
+> below preserve the original plan for auditability; this note governs the
+> reviewed implementation.
 
 **Tech Stack:** Python 3.11-compatible standard library, organizer-provided maritime entities and fallback strategy, pytest, Ruff, mypy, uv, and the local Round 0 integration environment.
 

@@ -24,12 +24,18 @@ Three methods delegate to the organizer fallback without mutation:
 - `assign_associated_bookings`
 - `adjust_bookings_before_cargo_handling`
 
-`create_alternative_service_routes` first executes the organizer fallback and
-then adds one narrowly scoped extension. If an active disruption leaves an
-affected original service route without a usable alternative, it builds a
+`create_alternative_service_routes` implements the standard alternative-route
+creation, reservation, switching, and post-disruption restoration lifecycle
+inside the participant file. If an active disruption leaves an affected
+original service route without a complete safe alternative, it adds a
 temporary recovery shuttle over the largest safely connected subset of that
 route's ports. The shuttle uses only existing, non-disrupted legs and may take
 one empty vessel when it reaches the shuttle start port.
+
+This self-contained implementation is required by the submission packager:
+participant code may import documented maritime entity classes, but it may not
+depend on organizer-owned `response_strategies` implementation files that are
+absent from the archive.
 
 The policy is deterministic and derives every decision from the runtime
 context. It contains no port names, route IDs, dates, tuned thresholds,

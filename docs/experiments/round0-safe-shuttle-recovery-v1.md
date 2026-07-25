@@ -10,12 +10,13 @@ active safe-leg graph. That can remove all useful service from a still
 strongly connected subset of the route and prolong the post-disruption cargo
 backlog.
 
-This candidate first runs the organizer fallback, then creates one
-deterministic temporary cycle for an affected original route only when the
-fallback created no matching alternative. The cycle covers the largest
-mutually reachable subset of safe source-route anchors and uses only existing
-non-disrupted legs. It takes an empty source-route vessel only if that vessel
-is supplied to the hook at the cycle's start port.
+This candidate reproduces the standard alternative-route creation,
+reservation, switching, and restoration lifecycle inside participant-owned
+code. It creates one deterministic temporary cycle for an affected original
+route only when a complete safe alternative cannot be built. The cycle covers
+the largest mutually reachable subset of safe source-route anchors and uses
+only existing non-disrupted legs. It takes an empty source-route vessel only
+if that vessel is supplied to the hook at the cycle's start port.
 
 The real Round 0 contract check produces the missing `S4` recovery cycle
 `Shanghai -> Busan -> Qingdao -> Shanghai`; it leaves the organizer-created
@@ -25,7 +26,9 @@ Round 0 fixture, not constants in the participant implementation.
 ## Scope and challenge constraints
 
 - Only `UserStrategy.create_alternative_service_routes` extends behavior.
-- The organizer default is invoked exactly once by the hook.
+- No organizer-owned `response_strategies` implementation is imported.
+- Standard alternatives retain their reservation, switching, and restoration
+  behavior before the recovery-shuttle extension is considered.
 - The other three hooks return `None` unconditionally.
 - No new vessels or legs are created.
 - No organizer source, input, output, or default strategy is tracked.

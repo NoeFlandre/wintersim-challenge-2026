@@ -545,60 +545,52 @@ def test_equality_delegates(user_strategy_cls: type) -> None:
 def test_wait_then_nominal_strictly_faster_returns_false(user_strategy_cls: type) -> None:
     """When waiting for recovery is strictly faster than the safe detour, return False.
 
-    Construct: nominal path A->B->C (200 nm). Safe detour A->D->E->F->C
-    (4 edges, 50 nm each = 200 nm but with 4 headway-half-waits). Recovery
-    in a few hours.
+    Construct: nominal path A->B->C (200 nm, intersects closed port B).
+    Safe detour A->C (1000 nm, on a 2-segment alternative cycle).
+    Recovery in 1 hour.
     """
     a = make_port("A")
     b = make_port("B")
     c = make_port("C")
-    d = make_port("D")
-    e = make_port("E")
-    f = make_port("F")
     leg_ab = make_leg(a, b, 100.0)
     leg_bc = make_leg(b, c, 100.0)
     leg_ca = make_leg(c, a, 100.0)
-    leg_ad = make_leg(a, d, 50.0)
-    leg_de = make_leg(d, e, 50.0)
-    leg_ef = make_leg(e, f, 50.0)
-    leg_fc = make_leg(f, c, 50.0)
-    leg_ca2 = make_leg(c, a, 100.0)
+    leg_ac = make_leg(a, c, 1000.0)
+    leg_ca_alt = make_leg(c, a, 100.0)
     route_direct = make_route("R1")
     make_segment(1, leg_ab, route_direct)
     make_segment(2, leg_bc, route_direct)
     make_segment(3, leg_ca, route_direct)
     route_detour = make_route("R2")
-    make_segment(1, leg_ad, route_detour)
-    make_segment(2, leg_de, route_detour)
-    make_segment(3, leg_ef, route_detour)
-    make_segment(4, leg_fc, route_detour)
-    make_segment(5, leg_ca2, route_detour)
+    route_detour.source_service_route = route_direct
+    route_detour.disruption_key = (("b",), ())
+    make_segment(1, leg_ac, route_detour)
+    make_segment(2, leg_ca_alt, route_detour)
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=10.0)
     v_direct = make_vessel(1, vc, route_direct)
     v_detour = make_vessel(2, vc, route_detour)
-    # Disrupt A->B; recovery in 1 hour.
+    # Close berth at B; recovery in 1 hour.
+    target_berth = make_berth_one(b)
     plan = make_disruption_plan(
-        target_leg=leg_ab,
+        target_berth=target_berth,
         start_offset_days=60.0,
-        duration_days=1.0 / 24.0,  # 1 hour
-        multiplier=5.0,
+        duration_days=1.0 / 24.0,
+        close_berth=True,
     )
     context = FakeContext(
-        ports=[a, b, c, d, e, f],
+        ports=[a, b, c],
         service_routes=[route_direct, route_detour],
-        legs=[leg_ab, leg_bc, leg_ca, leg_ad, leg_de, leg_ef, leg_fc, leg_ca2],
+        legs=[leg_ab, leg_bc, leg_ca, leg_ac, leg_ca_alt],
         vessels=[v_direct, v_detour],
         disruption_plans=[plan],
     )
-    # Pick a moment just after start so the recovery is soon.
     inside = dt.datetime.min + dt.timedelta(days=60.0, seconds=0.5)
     demand = make_demand(a, c)
     shipment = make_shipment(9, 1, demand, a)
     res = user_strategy_cls.assign_associated_bookings(context, inside, shipment)
-    # The safe detour has 4 legs vs nominal 2; wait_then_nominal is ~1 hour;
-    # safe_now is 4 legs + 4 half-headways = roughly 4*(50/10 + 0.5*cycle/...)
-    # which is much larger than 1 hour. So wait_then_nominal < safe_now ->
-    # False.
+    # nominal A->B->C = 200 nm + 0.5 headway(300/10=30) = 20 + 15 = 35 h
+    # safe A->C = 1000 nm + 0.5 headway(1100/10=110) = 100 + 55 = 155 h
+    # wait_then_nominal = 1 + 35 = 36 h, safe_now = 155 h. 36 < 155 -> False.
     assert res is False
 
 
@@ -818,7 +810,7 @@ def test_alternative_route_without_deployed_vessel_is_unavailable(user_strategy_
     # Alternative R2 with same ports but no deployed vessel.
     r2 = make_route("R2")
     r2.source_service_route = r1
-    r2.disruption_key = ((("b",),), (("a", "c"),))
+    r2.disruption_key = (("b",), ())
     # No segments -> no vessel possible -> unavailable.
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=10.0)
     v1 = make_vessel(1, vc, r1)
@@ -855,13 +847,14 @@ def test_alternative_route_with_deployed_vessel_is_available(user_strategy_cls: 
     make_segment(1, leg_ab, r1)
     make_segment(2, leg_bc, r1)
     make_segment(3, leg_ca, r1)
-    # Alternative R2: A->C direct via a NEW physical leg.
+    # Alternative R2 as a 2-segment cycle A->C->A.
     leg_ac = make_leg(a, c, 1000.0)
+    leg_ca_alt = make_leg(c, a, 100.0)
     r2 = make_route("R2")
     r2.source_service_route = r1
-    # The disruption_key must match the current avoidance set (port B).
-    r2.disruption_key = ((("b",),), ())
+    r2.disruption_key = (("b",), ())
     make_segment(1, leg_ac, r2)
+    make_segment(2, leg_ca_alt, r2)
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=10.0)
     v1 = make_vessel(1, vc, r1)
     v2 = make_vessel(2, vc, r2)
@@ -875,18 +868,17 @@ def test_alternative_route_with_deployed_vessel_is_available(user_strategy_cls: 
     context = FakeContext(
         ports=[a, b, c],
         service_routes=[r1, r2],
-        legs=[leg_ab, leg_bc, leg_ca, leg_ac],
+        legs=[leg_ab, leg_bc, leg_ca, leg_ac, leg_ca_alt],
         vessels=[v1, v2],
         disruption_plans=[plan],
     )
     demand = make_demand(a, c)
     shipment = make_shipment(31, 1, demand, a)
     inside = dt.datetime.min + dt.timedelta(days=60.0, seconds=0.5)
-    # The candidate must compute nominal path (A->B->C disrupted) and safe
-    # detour (A->C direct via R2, longer distance but avoids B). The wait
-    # duration is ~1 hour, the safe detour is 1000/10 = 100 hours plus
-    # headway -> safe_now >> wait_then_nominal -> wait_then_nominal < safe_now
-    # -> False.
+    # nominal A->B->C = 200 nm, intersects closed port B.
+    # safe A->C on R2 = 1000 nm, avoids B.
+    # wait_then_nominal = 1 + 35 = 36 h, safe_now = 100 + 55 = 155 h.
+    # 36 < 155 -> False.
     res = user_strategy_cls.assign_associated_bookings(context, inside, shipment)
     assert res is False
 
@@ -1019,15 +1011,17 @@ def test_no_mutation_on_false_path(user_strategy_cls: type) -> None:
     leg_ab = make_leg(a, b, 100.0)
     leg_bc = make_leg(b, c, 100.0)
     leg_ca = make_leg(c, a, 100.0)
-    leg_ac = make_leg(a, c, 1000.0)  # long detour
+    leg_ac = make_leg(a, c, 1000.0)
+    leg_ca_alt = make_leg(c, a, 100.0)
     r1 = make_route("R1")
     make_segment(1, leg_ab, r1)
     make_segment(2, leg_bc, r1)
     make_segment(3, leg_ca, r1)
     r2 = make_route("R2")
     r2.source_service_route = r1
-    r2.disruption_key = ((("b",),), ())
+    r2.disruption_key = (("b",), ())
     make_segment(1, leg_ac, r2)
+    make_segment(2, leg_ca_alt, r2)
     vc = make_vessel_class("VC", teu_capacity=1000, sailing_speed=10.0)
     v1 = make_vessel(1, vc, r1)
     v2 = make_vessel(2, vc, r2)
@@ -1041,7 +1035,7 @@ def test_no_mutation_on_false_path(user_strategy_cls: type) -> None:
     context = FakeContext(
         ports=[a, b, c],
         service_routes=[r1, r2],
-        legs=[leg_ab, leg_bc, leg_ca, leg_ac],
+        legs=[leg_ab, leg_bc, leg_ca, leg_ac, leg_ca_alt],
         vessels=[v1, v2],
         disruption_plans=[plan],
     )

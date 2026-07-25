@@ -125,16 +125,6 @@ def _load_participant_user_strategy() -> tuple:
     return module.UserStrategy, module
 
 
-def _load_participant_module() -> object:
-    """Backwards-compatible alias returning the module half of the user_strategy.
-
-    The current implementation only exposes the module via
-    ``_load_participant_user_strategy``. This helper is retained for tests
-    that imported the old symbol.
-    """
-    return _load_participant_user_strategy()[1]
-
-
 def _signature_from_edges(edges: list) -> list:
     """Reduce a list of participant/fallback edges to a comparable signature.
 
@@ -255,7 +245,6 @@ def test_fallback_conformance_real_context() -> None:
     timestamps = _timestamps_for_plans(context)
     assert timestamps, "Round 0 context must declare at least one disruption plan"
 
-    # Import order matters: ``simulation_model.disruption_status`` must be
     # Import order matters: ``simulation_model.disruption_status`` must be
     # imported BEFORE ``response_strategies.default_strategy`` to avoid the
     # circular import through ``simulation_model.__init__`` ->

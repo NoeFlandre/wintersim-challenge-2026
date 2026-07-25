@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, vocabulary, and our Round 0 experiments.">
+  <title>Winter Simulation Conference 2026 Challenge — Context & Experiment Log</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18201d;
+      --muted: #68716d;
+      --line: #dce2de;
+      --paper: #fbfcfb;
+      --panel: #ffffff;
+      --soft: #f1f5f2;
+      --accent: #176b4d;
+      --accent-soft: #e8f4ee;
+      --bad: #9a3e32;
+      --bad-soft: #faece9;
+      --warn: #7a5a16;
+      --warn-soft: #faf3df;
+      --radius: 12px;
+      --content: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 5.5rem;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible { outline: 3px solid #9ecdb8; outline-offset: 3px; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgb(251 252 251 / 92%);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav {
+      max-width: var(--content);
+      margin: auto;
+      padding: .75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1.3rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .brand {
+      margin-right: auto;
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .nav a:not(.brand) {
+      color: var(--muted);
+      font-size: .88rem;
+      text-decoration: none;
+    }
+
+    .nav a:hover { color: var(--ink); }
+
+    main {
+      max-width: var(--content);
+      margin: auto;
+      padding: 4.5rem 1.25rem 5rem;
+    }
+
+    section { margin-top: 4.5rem; }
+
+    .eyebrow {
+      margin: 0 0 .7rem;
+      color: var(--accent);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.12;
+      letter-spacing: -.025em;
+    }
+
+    h1 {
+      max-width: 820px;
+      font-size: clamp(2.35rem, 6vw, 4.8rem);
+      font-weight: 780;
+    }
+
+    h2 {
+      margin-bottom: .75rem;
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+    }
+
+    h3 { font-size: 1rem; }
+
+    .lede {
+      max-width: 760px;
+      margin: 1.25rem 0 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+    }
+
+    .snapshot {
+      margin-top: 2.2rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .metric {
+      min-height: 116px;
+      padding: 1.25rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .metric:last-child { border-right: 0; }
+
+    .metric strong {
+      display: block;
+      margin-bottom: .3rem;
+      font-size: 1.55rem;
+      letter-spacing: -.03em;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    .section-intro {
+      max-width: 720px;
+      margin: 0 0 1.4rem;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      padding: 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .card p {
+      margin: .55rem 0 0;
+      color: var(--muted);
+    }
+
+    .number {
+      display: inline-grid;
+      width: 1.7rem;
+      height: 1.7rem;
+      margin-bottom: .8rem;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-size: .78rem;
+      font-weight: 800;
+    }
+
+    .formula {
+      margin-top: 1rem;
+      padding: 1rem 1.15rem;
+      border-left: 3px solid var(--accent);
+      background: var(--soft);
+      font: .9rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .rules {
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .65rem 1.5rem;
+      list-style: none;
+    }
+
+    .rules li {
+      position: relative;
+      padding-left: 1.45rem;
+    }
+
+    .rules li::before {
+      position: absolute;
+      left: 0;
+      content: "✓";
+      color: var(--accent);
+      font-weight: 850;
+    }
+
+    .callout {
+      margin-top: 1rem;
+      padding: 1rem 1.15rem;
+      border: 1px solid #ead59a;
+      border-radius: var(--radius);
+      color: #5f4814;
+      background: var(--warn-soft);
+    }
+
+    abbr {
+      text-decoration: underline dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+
+    .glossary {
+      margin: 1.4rem 0 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .75rem;
+    }
+
+    .term {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .term dt { font-weight: 780; }
+
+    .term dd {
+      margin: .3rem 0 0;
+      color: var(--muted);
+      font-size: .86rem;
+    }
+
+    .hooks {
+      margin-top: 1.4rem;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .75rem;
+    }
+
+    .hook {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .hook code {
+      display: block;
+      margin-bottom: .5rem;
+      overflow-wrap: anywhere;
+      color: var(--accent);
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .hook span {
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .88rem;
+    }
+
+    th, td {
+      padding: .85rem .9rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      background: var(--soft);
+      font-size: .72rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    td:nth-child(3), td:nth-child(4) { white-space: nowrap; }
+
+    .status {
+      display: inline-block;
+      padding: .15rem .48rem;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 800;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+
+    .worse { color: var(--bad); background: var(--bad-soft); }
+    .equal { color: var(--warn); background: var(--warn-soft); }
+
+    .note {
+      margin-top: .8rem;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    .lessons {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .lesson {
+      padding-top: 1rem;
+      border-top: 2px solid var(--ink);
+    }
+
+    .lesson p {
+      margin: .5rem 0 0;
+      color: var(--muted);
+    }
+
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: .55rem;
+      overflow-x: auto;
+    }
+
+    .step {
+      min-width: 135px;
+      flex: 1;
+      padding: .9rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .step strong {
+      display: block;
+      font-size: .86rem;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    .state {
+      display: grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap: 1rem;
+    }
+
+    .state .card:first-child {
+      color: #104b37;
+      border-color: #b9ddcd;
+      background: var(--accent-soft);
+    }
+
+    .links {
+      margin: .6rem 0 0;
+      padding-left: 1.15rem;
+    }
+
+    .links li { margin: .35rem 0; }
+
+    footer {
+      max-width: var(--content);
+      margin: auto;
+      padding: 1.5rem 1.25rem 3rem;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    @media (max-width: 800px) {
+      main { padding-top: 3rem; }
+      .snapshot { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+      .hooks { grid-template-columns: repeat(2, 1fr); }
+      .glossary { grid-template-columns: repeat(2, 1fr); }
+      .lessons { grid-template-columns: 1fr; }
+      .state { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .nav { gap: 1rem; }
+      .brand { margin-right: .5rem; }
+      .grid, .rules { grid-template-columns: 1fr; }
+      .snapshot { grid-template-columns: 1fr; }
+      .metric {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .metric:last-child { border-bottom: 0; }
+      .hooks { grid-template-columns: 1fr; }
+      .glossary { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav" aria-label="Page sections">
+      <a class="brand" href="#top">WSC 2026 / Round 0</a>
+      <a href="#context">Context</a>
+      <a href="#glossary">Terms</a>
+      <a href="#rules">Rules</a>
+      <a href="#experiments">Experiments</a>
+      <a href="#lessons">Lessons</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#state">State</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <header>
+      <p class="eyebrow">Challenge context & experiment log · 25 July 2026</p>
+      <h1>Make disrupted maritime shipping recover faster.</h1>
+      <p class="lede">
+        In the <strong>Winter Simulation Conference
+        (<abbr title="Winter Simulation Conference">WSC</abbr>) 2026 Simulation
+        Challenge</strong>, we write four decision hooks inside a simulation
+        supplied by the challenge organizer.
+        The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
+        without breaking simulation integrity or submission rules.
+      </p>
+
+      <div class="snapshot" aria-label="Current project snapshot">
+        <div class="metric">
+          <strong>18.6736</strong>
+          <span>retained fallback loss reproduced by this exact code checkout</span>
+        </div>
+        <div class="metric">
+          <strong>8</strong>
+          <span>controlled Round 0 candidates completed</span>
+        </div>
+        <div class="metric">
+          <strong>0</strong>
+          <span>candidates accepted</span>
+        </div>
+        <div class="metric">
+          <strong>72</strong>
+          <span>five-day periods required per full result</span>
+        </div>
+      </div>
+    </header>
+
+    <section id="context">
+      <p class="eyebrow">01 · Context</p>
+      <h2>The challenge in one minute</h2>
+      <p class="section-intro">
+        A maritime network moves container shipments through ports, vessels,
+        repeating service routes and transfers between services. Disruptions
+        close berths or slow sailing legs. Our participant code decides how
+        the system should respond.
+      </p>
+
+      <div class="grid">
+        <article class="card">
+          <span class="number">1</span>
+          <h3>Run the network</h3>
+          <p>A 140-day warm-up stabilizes the model before scoring. It is followed by 360 measured days under one practice disruption scenario and one fixed random seed.</p>
+        </article>
+        <article class="card">
+          <span class="number">2</span>
+          <h3>Intervene through four hooks</h3>
+          <p>We may prioritize berths, create temporary routes, assign initial booking chains, or rebook cargo already in transit.</p>
+        </article>
+        <article class="card">
+          <span class="number">3</span>
+          <h3>Measure transport time</h3>
+          <p>The simulator reports <abbr title="Twenty-foot Equivalent Unit">TEU</abbr>-weighted <abbr title="Average Transport Time">ATT</abbr> for each five-day period, so larger shipments influence the result more.</p>
+        </article>
+        <article class="card">
+          <span class="number">4</span>
+          <h3>Keep only strict improvements</h3>
+          <p>A candidate survives only when its complete 72-period loss is lower than the fixed fallback by more than 0.000000001.</p>
+        </article>
+      </div>
+
+      <div class="formula" aria-label="Scoring formula">
+        ATT ratio = baseline Average Transport Time ÷ disrupted-scenario Average Transport Time<br>
+        period loss = (1 − ATT ratio) × inclusive period days<br>
+        cumulative resilience loss = Σ period loss &nbsp;→&nbsp; lower is better
+      </div>
+    </section>
+
+    <section id="glossary">
+      <p class="eyebrow">02 · Terms</p>
+      <h2>Plain-language glossary</h2>
+      <p class="section-intro">
+        The domain and experiment vocabulary used throughout this page.
+      </p>
+
+      <dl class="glossary">
+        <div class="term">
+          <dt><abbr title="Winter Simulation Conference">WSC</abbr></dt>
+          <dd>Winter Simulation Conference, whose 2026 program includes this simulation challenge.</dd>
+        </div>
+        <div class="term">
+          <dt>Organizer</dt>
+          <dd>The challenge authors who supply the simulation, data, default behavior and official rules.</dd>
+        </div>
+        <div class="term">
+          <dt>Participant strategy</dt>
+          <dd>Our submitted decision code. It may respond through four predefined functions but may not alter the framework or outputs.</dd>
+        </div>
+        <div class="term">
+          <dt>Hook</dt>
+          <dd>A predefined function the simulator calls at a decision point, such as choosing a berth or route.</dd>
+        </div>
+        <div class="term">
+          <dt><abbr title="Twenty-foot Equivalent Unit">TEU</abbr></dt>
+          <dd>Twenty-foot Equivalent Unit: the standard measure of container volume. One 40-foot container is usually two TEU.</dd>
+        </div>
+        <div class="term">
+          <dt><abbr title="Average Transport Time">ATT</abbr></dt>
+          <dd>Average Transport Time: average cargo travel time from origin to destination, weighted here by shipment TEU.</dd>
+        </div>
+        <div class="term">
+          <dt>Cumulative Resilience Loss</dt>
+          <dd>The official score: disruption-related ATT loss summed across all measured periods. Lower is better.</dd>
+        </div>
+        <div class="term">
+          <dt>Baseline</dt>
+          <dd>The undisrupted reference ATT used inside the scoring formula. It is distinct from the fallback strategy result.</dd>
+        </div>
+        <div class="term">
+          <dt>Fallback</dt>
+          <dd>The organizer’s default response policy, used whenever our hook returns <code>None</code>. It is also our retained solution.</dd>
+        </div>
+        <div class="term">
+          <dt>Candidate</dt>
+          <dd>One proposed participant strategy tested against the fallback under the same complete run configuration.</dd>
+        </div>
+        <div class="term">
+          <dt><code>None</code>, <code>True</code>, <code>False</code></dt>
+          <dd><code>None</code> delegates to fallback. In booking assignment, <code>True</code> means assigned and <code>False</code> means retry later.</dd>
+        </div>
+        <div class="term">
+          <dt>Berth</dt>
+          <dd>A place at a port where one vessel docks to discharge and load cargo.</dd>
+        </div>
+        <div class="term">
+          <dt>Leg</dt>
+          <dd>One directed sailing connection from a departure port to an arrival port.</dd>
+        </div>
+        <div class="term">
+          <dt>Service route</dt>
+          <dd>A repeating cycle of sailing legs operated by one or more vessels.</dd>
+        </div>
+        <div class="term">
+          <dt>Booking chain</dt>
+          <dd>The ordered service-route segments a shipment plans to use from origin to destination.</dd>
+        </div>
+        <div class="term">
+          <dt>Transshipment</dt>
+          <dd>Moving cargo between vessel services at an intermediate port, adding handling and possible waiting time.</dd>
+        </div>
+        <div class="term">
+          <dt>Disruption</dt>
+          <dd>A temporary event such as a closed berth or a sailing leg slowed by a multiplier.</dd>
+        </div>
+        <div class="term">
+          <dt>Warm-up / measured horizon</dt>
+          <dd>Warm-up stabilizes the simulated network. The measured horizon is the later interval used for scoring.</dd>
+        </div>
+        <div class="term">
+          <dt>Period</dt>
+          <dd>One scoring interval. Round 0 uses 72 consecutive five-day periods over 360 measured days.</dd>
+        </div>
+        <div class="term">
+          <dt>Scenario / seed</dt>
+          <dd>A scenario defines conditions and disruptions. A random seed fixes simulation randomness for reproducibility.</dd>
+        </div>
+        <div class="term">
+          <dt>Round 0 / hidden scenario</dt>
+          <dd>Round 0 is visible practice. A hidden scenario is an unseen evaluation case used to discourage overfitting.</dd>
+        </div>
+        <div class="term">
+          <dt>No-op adapter</dt>
+          <dd>A participant strategy that makes no decisions itself: every hook returns <code>None</code> and uses fallback.</dd>
+        </div>
+        <div class="term">
+          <dt>Headway</dt>
+          <dd>The time between successive vessels serving the same route or port call.</dd>
+        </div>
+        <div class="term">
+          <dt>Smoke test / full run</dt>
+          <dd>A smoke test is a short wiring check. A full run completes warm-up plus all measured days and produces an acceptance result.</dd>
+        </div>
+        <div class="term">
+          <dt><abbr title="Test-Driven Development">TDD</abbr>, RED, GREEN</dt>
+          <dd>Test-Driven Development: prove a behavior test fails (RED), then add the minimum code that makes it pass (GREEN).</dd>
+        </div>
+        <div class="term">
+          <dt>Preflight / package</dt>
+          <dd>Preflight is the complete pre-run safety check. A package is the reproducible compressed archive containing only allowed participant files.</dd>
+        </div>
+        <div class="term">
+          <dt><abbr title="Secure Hash Algorithm 256-bit">SHA-256</abbr></dt>
+          <dd>A content fingerprint proving that a file or result is byte-for-byte identical to a fixed reference.</dd>
+        </div>
+        <div class="term">
+          <dt>Deterministic / reproducible</dt>
+          <dd>The same code, inputs, dependency versions and random seed produce exactly the same result each time.</dd>
+        </div>
+        <div class="term">
+          <dt>Current checkout</dt>
+          <dd>The exact repository files and dependency versions being used now. Different checkouts can produce different reference results.</dd>
+        </div>
+        <div class="term">
+          <dt>Acceptance threshold / strict improvement</dt>
+          <dd>The fixed score a candidate must beat. Equality is rejection; the candidate must be lower by more than 0.000000001.</dd>
+        </div>
+        <div class="term">
+          <dt>Revert</dt>
+          <dd>A version-control operation that undoes a rejected candidate while preserving its implementation and evidence in history.</dd>
+        </div>
+        <div class="term">
+          <dt>Utilization</dt>
+          <dd>The share of available service capacity actually used to move cargo.</dd>
+        </div>
+        <div class="term">
+          <dt>Detour</dt>
+          <dd>An alternative path used to avoid a disrupted berth or sailing leg.</dd>
+        </div>
+        <div class="term">
+          <dt>Real-context divergence</dt>
+          <dd>Proof that a candidate changes at least one actual simulator decision compared with fallback before an expensive full run.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="rules">
+      <p class="eyebrow">03 · Rules</p>
+      <h2>What must always remain true</h2>
+      <p class="section-intro">
+        Official material wins over this summary. These are the constraints
+        that shape every experiment and submission.
+      </p>
+
+      <ul class="rules">
+        <li><strong>Round 0 is practice only.</strong> It must never be submitted as an official entry.</li>
+        <li><strong>Lower loss wins.</strong> Mean <abbr title="Average Transport Time">ATT</abbr> alone cannot accept a candidate.</li>
+        <li><strong>Only response strategies ship.</strong> Everything required must live in <code>response_strategies/</code>, the submission folder containing our hooks.</li>
+        <li><strong>Organizer assets stay private.</strong> Source, inputs and outputs are ignored and never redistributed.</li>
+        <li><strong>Submission code is self-contained.</strong> No internet, external programs, local-file access, environment settings or assumptions about the working folder.</li>
+        <li><strong>Behavior is deterministic.</strong> No wall-clock decisions, unseeded randomness or changeable saved state shared between runs.</li>
+        <li><strong>Interfaces are exact.</strong> Non-<code>None</code> responses must satisfy organizer validation.</li>
+        <li><strong>Hidden evaluation matters.</strong> Later rounds use unseen scenarios and multiple random seeds.</li>
+      </ul>
+
+      <div class="hooks" aria-label="The four user strategy hooks">
+        <div class="hook">
+          <code>select_vessel_for_berth</code>
+          <span>Choose which waiting vessel receives a free berth.</span>
+        </div>
+        <div class="hook">
+          <code>create_alternative_service_routes</code>
+          <span>Create or manage disruption-response services.</span>
+        </div>
+        <div class="hook">
+          <code>assign_associated_bookings</code>
+          <span>Choose the initial route chain for a shipment.</span>
+        </div>
+        <div class="hook">
+          <code>adjust_bookings_before_cargo_handling</code>
+          <span>Replan cargo already aboard a vessel.</span>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Two fallback-result records exist.</strong>
+        Early experiments used the historical loss <strong>18.2766206723</strong>.
+        The current checkout reproducibly yields <strong>18.6735778198</strong>;
+        this is the operative acceptance threshold. They are not interchangeable.
+      </div>
+    </section>
+
+    <section id="experiments">
+      <p class="eyebrow">04 · Experiments</p>
+      <h2>What we tried</h2>
+      <p class="section-intro">
+        Every row is one completed full candidate. All were rejected and
+        reverted to the no-op participant adapter: all four hooks return
+        <code>None</code>, delegating each decision to the organizer fallback.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Candidate</th>
+              <th scope="col">Core idea</th>
+              <th scope="col">Loss</th>
+              <th scope="col">Result</th>
+              <th scope="col">What it taught us</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="experiments/round0-first-result.md">Age-weighted berth priority</a></td>
+              <td>Serve vessels carrying the oldest, heaviest cargo first.</td>
+              <td>22.3199</td>
+              <td><span class="status worse">+22.12%</span></td>
+              <td>Cargo age overweights old cargo; the marginal cost of delaying one <abbr title="Twenty-foot Equivalent Unit">TEU</abbr> is not age-dependent.</td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-transfer-aware-routing-v1.md">Static transfer-aware routing</a></td>
+              <td>Charge a fixed 84-hour penalty per booking edge.</td>
+              <td>30.6355</td>
+              <td><span class="status worse">+67.62%</span></td>
+              <td>An excellent early screen failed over 360 days. Static transfer penalties miss where each vessel is in its repeating schedule.</td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-alternative-route-suppression-v1.md">Suppress alternative routes</a></td>
+              <td>Do not create temporary detour services during disruption.</td>
+              <td>18.6736</td>
+              <td><span class="status equal">Equal</span></td>
+              <td>The candidate was observably equivalent to fallback for the measured output. Equality is rejection.</td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-in-transit-rebooking-suppression-v1.md">Suppress in-transit rebooking</a></td>
+              <td>Keep carried cargo on its original booking during disruption.</td>
+              <td>21.6816</td>
+              <td><span class="status worse">+16.11%</span></td>
+              <td>Reactive rebooking is valuable; suppressing it trapped or delayed cargo enough to worsen the score.</td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-temporal-safe-routing-v1.md">Temporal safe routing</a></td>
+              <td>Use the nominal path when the disrupted resource would recover before earliest possible arrival.</td>
+              <td>22.7324</td>
+              <td><span class="status worse">+21.74%</span></td>
+              <td>Optimistic lower bounds did not capture actual waiting, assignment and service timing.</td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-teu-delay-smith-priority-v1.md">Smith-rule berth priority</a></td>
+              <td>Apply Smith’s scheduling rule: prioritize the most affected <abbr title="Twenty-foot Equivalent Unit">TEU</abbr> per predicted berth-service hour.</td>
+              <td>18.6736</td>
+              <td><span class="status equal">Equal</span></td>
+              <td>The berth-choice hook made no decision that differed from the organizer fallback in this run.</td>
+            </tr>
+            <tr>
+              <td>Safe recovery shuttle</td>
+              <td>Run a temporary shuttle over the largest safe portion of a route when a complete alternative cannot be built.</td>
+              <td>23.0187</td>
+              <td><span class="status worse">+23.27%</span></td>
+              <td>The shuttle ran at about 0.30% utilization and displaced more useful capacity.</td>
+            </tr>
+            <tr>
+              <td>Recovery hold vs detour</td>
+              <td>Hold cargo at origin when waiting for recovery is predicted faster than the safe detour.</td>
+              <td>22.1967</td>
+              <td><span class="status worse">+18.87%</span></td>
+              <td>Model-derived expected time still missed enough operational timing to make origin holding harmful overall.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        Percent changes for the first two candidates use the historical
+        18.2766 fallback. Later candidates use the current-checkout 18.6736
+        fallback. Recovery-hold evidence was recorded in version-control result
+        record <code>7254b1e</code> before the candidate branch was restored.
+      </p>
+    </section>
+
+    <section id="lessons">
+      <p class="eyebrow">05 · Lessons</p>
+      <h2>What the evidence says so far</h2>
+      <div class="lessons">
+        <article class="lesson">
+          <h3>The fallback is strong</h3>
+          <p>Broad overrides have been neutral or materially worse. A useful candidate must target a narrow, evidenced decision.</p>
+        </article>
+        <article class="lesson">
+          <h3>Geometry is not time</h3>
+          <p>Distance, transfer count and optimistic sailing time miss each vessel’s place in its cycle, time between services, berth queues and cargo handling.</p>
+        </article>
+        <article class="lesson">
+          <h3>Full-horizon evidence wins</h3>
+          <p>Short screens and plausible theory cannot replace the official 72-period score. The transfer experiment demonstrated this sharply.</p>
+        </article>
+        <article class="lesson">
+          <h3>Behavioral activity must be proven</h3>
+          <p>Passing tests is insufficient if the hook never changes a real decision. We now prove real-context divergence before running.</p>
+        </article>
+        <article class="lesson">
+          <h3>One variable at a time</h3>
+          <p>Each candidate fixes one policy, threshold and acceptance rule before execution. No tuning occurs after seeing the result.</p>
+        </article>
+        <article class="lesson">
+          <h3>Rejection is a clean outcome</h3>
+          <p>Evidence is preserved, candidate changes are reverted, and the exact fixed fallback is restored and reverified.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <p class="eyebrow">06 · Workflow</p>
+      <h2>How an experiment is controlled</h2>
+      <p class="section-intro">
+        The process is intentionally stricter than ordinary feature work
+        because a 20–35 minute run is expensive and results are easy to contaminate.
+      </p>
+
+      <div class="flow" aria-label="Controlled experiment workflow">
+        <div class="step"><strong>Audit</strong><span>rules, hook usage, repository state, baseline</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="step"><strong>Fix the plan</strong><span>one hypothesis and threshold</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="step"><strong><abbr title="Test-Driven Development">TDD</abbr></strong><span>failing test, minimal code, passing test</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="step"><strong>Preflight</strong><span>code quality, type checks, tests, package, smoke test</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="step"><strong>Run once</strong><span>360 days, 72 periods</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="step"><strong>Decide</strong><span>strict accept or revert</span></div>
+      </div>
+    </section>
+
+    <section id="state">
+      <p class="eyebrow">07 · Current state</p>
+      <h2>Clean baseline retained</h2>
+      <div class="state">
+        <article class="card">
+          <h3>No experiment has beaten the fallback.</h3>
+          <p>
+            The active participant strategy again returns <code>None</code>
+            from all four hooks. The current-checkout fallback
+            <abbr title="Average Transport Time">ATT</abbr>
+            <abbr title="Secure Hash Algorithm 256-bit">SHA-256</abbr>
+            fingerprint is <code>10234375…2488658</code> and its loss is
+            <strong>18.6735778198</strong>.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Primary references</h3>
+          <ul class="links">
+            <li><a href="challenge-rules.md">Rules summary</a></li>
+            <li><a href="architecture.md">Repository architecture</a></li>
+            <li><a href="experiments/round0-fallback-reproducibility.md">Fallback audit</a></li>
+            <li><a href="WSC-2026-Simulation-Challenge-Brief.pdf">Official challenge brief document</a></li>
+            <li><a href="WSC-2026-Simulation-Challenge-Tech-Document.pdf">Official technical document</a></li>
+            <li><a href="https://meetings.informs.org/wordpress/wsc2026/simulation-challenge/">Official challenge page</a></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Concise project map derived from the tracked rules, architecture, experiment
+    reports and verified recovery-hold result. Official challenge materials
+    remain authoritative.
+  </footer>
+</body>
+</html>

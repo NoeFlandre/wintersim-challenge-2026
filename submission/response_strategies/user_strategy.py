@@ -54,16 +54,40 @@ _NARROW_EXCEPTIONS = (
 )
 
 
-class _BookingEdge:
-    """Immutable booking edge used for both nominal and safe path construction.
+class _NominalBookingEdge:
+    __slots__ = (
+        "service_route",
+        "departure_port",
+        "arrival_port",
+        "departure_segment_index",
+        "arrival_segment_index",
+        "candidate_segments",
+        "total_distance",
+    )
 
-    The same shape is used for both paths because the only difference is
-    which edges are filtered out before pathfinding. The fields are
-    identical to the organizer's ``_CandidateBookingEdge`` dataclass:
-    service route, departure and arrival ports, departure and arrival
-    segment indices, candidate segments, and total distance.
-    """
+    def __init__(
+        self,
+        service_route: Any,
+        departure_port: Any,
+        arrival_port: Any,
+        departure_segment_index: int,
+        arrival_segment_index: int,
+        candidate_segments: list[Any],
+    ) -> None:
+        self.service_route = service_route
+        self.departure_port = departure_port
+        self.arrival_port = arrival_port
+        self.departure_segment_index = int(departure_segment_index)
+        self.arrival_segment_index = int(arrival_segment_index)
+        self.candidate_segments = list(candidate_segments)
+        self.total_distance = 0.0
+        for segment in self.candidate_segments:
+            leg = getattr(segment, "associated_leg", None)
+            distance = getattr(leg, "sailing_distance", 0.0)
+            self.total_distance += float(distance)
 
+
+class _SafeBookingEdge:
     __slots__ = (
         "service_route",
         "departure_port",
@@ -111,14 +135,16 @@ def _is_finite_nonnegative(value: object) -> bool:
 
 
 def _as_finite_positive(value: object) -> float | None:
+    """Return value as float when it is a finite positive number, else None."""
     if not _is_finite_positive(value):
         return None
-    # _is_finite_positive has already validated the type as int or float,
-    # so the cast is a no-op at runtime; it just satisfies mypy.
+    # _is_finite_positive already verified ``isinstance(value, (int, float))``,
+    # so the ``cast`` here is a no-op at runtime; it just satisfies mypy.
     return float(value if isinstance(value, (int, float)) else 0.0)
 
 
 def _as_finite_nonnegative(value: object) -> float | None:
+    """Return value as float when it is a finite non-negative number, else None."""
     if not _is_finite_nonnegative(value):
         return None
     return float(value if isinstance(value, (int, float)) else 0.0)
@@ -146,16 +172,16 @@ def _route_cycle_distance(route: Any) -> float:
 def _route_eligible_speeds(route: Any) -> list[float]:
     """Positive sailing speeds for the route's eligible vessels.
 
-    Eligible vessels are the route's currently deployed vessels. If the
-    route has none deployed, vessels on the route's segments are
-    considered, but only vessels whose ``assigned_service_route is route``
-    qualify. Identity-based deduplication is applied. Returns an empty
-    list when no positive speed is available; the caller delegates with
-    ``None`` in that case.
+    Eligible vessels are the route's currently deployed vessels. When the
+    route has none deployed, vessels on the route's segment ``current_vessels``
+    lists are also considered (they reflect vessels currently sailing the
+    route). Returns an empty list when no positive speed is available; the
+    caller delegates with ``None`` in that case.
     """
     speeds: list[float] = []
     seen: set[int] = set()
-    for vessel in list(getattr(route, "deployed_vessels", None) or []):
+    deployed = getattr(route, "deployed_vessels", None) or []
+    for vessel in deployed:
         vid = id(vessel)
         if vid in seen:
             continue
@@ -165,10 +191,10 @@ def _route_eligible_speeds(route: Any) -> list[float]:
         if speed is not None:
             speeds.append(speed)
     if not speeds:
-        for segment in list(getattr(route, "segments", None) or []):
-            for vessel in list(getattr(segment, "current_vessels", None) or []):
-                if getattr(vessel, "assigned_service_route", None) is not route:
-                    continue
+        segments = getattr(route, "segments", None) or []
+        for segment in segments:
+            current = getattr(segment, "current_vessels", None) or []
+            for vessel in current:
                 vid = id(vessel)
                 if vid in seen:
                     continue
@@ -220,7 +246,7 @@ def _route_is_available_for_booking(
     return bool(getattr(route, "deployed_vessels", None))
 
 
-def _route_edges_for_nominal(route: Any) -> list[_BookingEdge]:
+def _route_edges_for_nominal(route: Any) -> list[Any]:
     """Build candidate booking edges for the nominal path on one route.
 
     Only original routes (``source_service_route is None``) are eligible.
@@ -237,7 +263,34 @@ def _route_edges_for_nominal(route: Any) -> list[_BookingEdge]:
     segment_count = len(segments)
     if segment_count < 2:
         return []
-    return _enumerate_route_edges(route, segments)
+    edges: list[Any] = []
+    for start_index in range(segment_count):
+        departure_leg = segments[start_index].associated_leg
+        departure_port = getattr(departure_leg, "departure_port", None)
+        if departure_port is None:
+            continue
+        for step in range(1, segment_count):
+            last_index = (start_index + step - 1) % segment_count
+            last_leg = segments[last_index].associated_leg
+            arrival_port = getattr(last_leg, "arrival_port", None)
+            if arrival_port is None:
+                continue
+            if departure_port is arrival_port:
+                continue
+            candidate_segments = [
+                segments[(start_index + offset) % segment_count] for offset in range(step)
+            ]
+            edges.append(
+                _NominalBookingEdge(
+                    service_route=route,
+                    departure_port=departure_port,
+                    arrival_port=arrival_port,
+                    departure_segment_index=start_index + 1,
+                    arrival_segment_index=last_index + 1,
+                    candidate_segments=candidate_segments,
+                )
+            )
+    return edges
 
 
 def _route_edges_for_safe(
@@ -245,16 +298,15 @@ def _route_edges_for_safe(
     avoid_port_names: set[str],
     congested_legs: set[int],
     disruption_key: tuple[tuple[str, ...], tuple[tuple[str, str], ...]],
-) -> list[_BookingEdge]:
+) -> list[Any]:
     """Build candidate booking edges for the safe path on one route.
 
-    Mirrors the organizer's fallback availability and filtering exactly:
+    Mirrors the organizer's fallback availability and filtering:
 
     * Original routes are eligible.
     * Alternative routes are eligible only when their ``disruption_key``
-      matches and they have at least one deployed vessel.
-    * Closed ports are excluded as **arrival** or **intermediate** ports
-      of the edge (the departure port is not independently filtered).
+      matches ``disruption_key`` and they have at least one deployed vessel.
+    * Closed ports are excluded as departure, intermediate, or arrival.
     * Congested legs are excluded as any segment of an edge.
     * Whole-cycle origin-to-same-origin edges are excluded.
     """
@@ -267,7 +319,7 @@ def _route_edges_for_safe(
     segment_count = len(segments)
     if segment_count < 2:
         return []
-    edges: list[_BookingEdge] = []
+    edges: list[Any] = []
     for start_index in range(segment_count):
         departure_leg = segments[start_index].associated_leg
         departure_port = getattr(departure_leg, "departure_port", None)
@@ -306,43 +358,7 @@ def _route_edges_for_safe(
             ):
                 continue
             edges.append(
-                _BookingEdge(
-                    service_route=route,
-                    departure_port=departure_port,
-                    arrival_port=arrival_port,
-                    departure_segment_index=start_index + 1,
-                    arrival_segment_index=last_index + 1,
-                    candidate_segments=candidate_segments,
-                )
-            )
-    return edges
-
-
-def _enumerate_route_edges(route: Any, segments: list[Any]) -> list[_BookingEdge]:
-    """Enumerate every proper contiguous slice of ``segments`` as a booking edge.
-
-    Whole-cycle origin-to-same-origin edges are excluded.
-    """
-    segment_count = len(segments)
-    edges: list[_BookingEdge] = []
-    for start_index in range(segment_count):
-        departure_leg = segments[start_index].associated_leg
-        departure_port = getattr(departure_leg, "departure_port", None)
-        if departure_port is None:
-            continue
-        for step in range(1, segment_count):
-            last_index = (start_index + step - 1) % segment_count
-            last_leg = segments[last_index].associated_leg
-            arrival_port = getattr(last_leg, "arrival_port", None)
-            if arrival_port is None:
-                continue
-            if departure_port is arrival_port:
-                continue
-            candidate_segments = [
-                segments[(start_index + offset) % segment_count] for offset in range(step)
-            ]
-            edges.append(
-                _BookingEdge(
+                _SafeBookingEdge(
                     service_route=route,
                     departure_port=departure_port,
                     arrival_port=arrival_port,
@@ -393,7 +409,11 @@ def _pathfind(
             if current < best_distance:
                 best_distance = current
                 best_port = port
-        if best_port is None or math.isinf(best_distance) or best_port is destination_port:
+        if best_port is None:
+            break
+        if math.isinf(best_distance):
+            break
+        if best_port is destination_port:
             break
         unvisited[:] = [port for port in unvisited if port is not best_port]
         for edge in outgoing.get(id(best_port), []):
@@ -427,12 +447,7 @@ def _pathfind(
 
 
 def _plan_active_window(plan: Any, now: dt.datetime) -> tuple[dt.datetime, dt.datetime] | None:
-    """Return (start, end) of an active disruption plan, or None if inactive.
-
-    ``start`` is anchored at ``datetime.min + start_offset_days`` and
-    ``end`` is ``start + duration_days``. The active window is half-open:
-    ``start <= now < end``.
-    """
+    """Return (start, end) of an active disruption plan, or None if inactive."""
     start_offset = getattr(plan, "start_offset_days", None)
     duration = getattr(plan, "duration_days", None)
     if start_offset is None or duration is None:
@@ -452,35 +467,36 @@ def _plan_active_window(plan: Any, now: dt.datetime) -> tuple[dt.datetime, dt.da
 
 
 def _plan_intersects_path(plan: Any, path: list[Any]) -> bool:
-    """Whether a disruption plan intersects the nominal booking path.
-
-    Independently checks the closed-berth and congested-leg effects; a
-    plan carrying both contributes both, and either kind of intersection
-    counts as a hit.
-    """
+    """Whether a disruption plan intersects the nominal booking path."""
     if getattr(plan, "close_berth", False):
         target_berth = getattr(plan, "target_berth", None)
         target_port = getattr(target_berth, "port", None) if target_berth is not None else None
-        if target_port is not None:
-            for edge in path:
-                if edge.departure_port is target_port or edge.arrival_port is target_port:
+        if target_port is None:
+            return False
+        for edge in path:
+            if edge.departure_port is target_port:
+                return True
+            if edge.arrival_port is target_port:
+                return True
+            for segment in getattr(edge, "candidate_segments", []) or []:
+                intermediate = getattr(
+                    getattr(segment, "associated_leg", None),
+                    "arrival_port",
+                    None,
+                )
+                if intermediate is target_port:
                     return True
-                for segment in getattr(edge, "candidate_segments", []) or []:
-                    intermediate = getattr(
-                        getattr(segment, "associated_leg", None),
-                        "arrival_port",
-                        None,
-                    )
-                    if intermediate is target_port:
-                        return True
+        return False
     if float(getattr(plan, "multiplier", 1.0) or 1.0) > 1.0:
         target_leg = getattr(plan, "target_leg", None)
-        if target_leg is not None:
-            target_id = id(target_leg)
-            for edge in path:
-                for segment in getattr(edge, "candidate_segments", []) or []:
-                    if id(getattr(segment, "associated_leg", None)) == target_id:
-                        return True
+        if target_leg is None:
+            return False
+        target_id = id(target_leg)
+        for edge in path:
+            for segment in getattr(edge, "candidate_segments", []) or []:
+                if id(getattr(segment, "associated_leg", None)) == target_id:
+                    return True
+        return False
     return False
 
 
@@ -509,13 +525,12 @@ def _collect_active_disruption_keys(
     The disruption_key mirrors the organizer's fallback format:
     ``(tuple_of_avoid_port_names, tuple_of_congested_leg_keys)`` where each
     congested_leg_key is ``(departure_port_name.casefold(),
-    arrival_port_name.casefold())``. A plan carrying both valid effects
-    contributes both; duplicate plans targeting the same leg collapse to a
-    single key entry.
+    arrival_port_name.casefold())``. Alternative routes use this same key
+    to advertise their availability.
     """
     avoid_port_names: set[str] = set()
     congested_legs: set[int] = set()
-    congested_leg_keys: set[tuple[str, str]] = set()
+    congested_leg_keys_list: list[tuple[str, str]] = []
     for plan in list(getattr(context, "disruption_plans", []) or []):
         if _plan_active_window(plan, now) is None:
             continue
@@ -525,7 +540,7 @@ def _collect_active_disruption_keys(
             target_name = getattr(target_port, "name", None)
             if isinstance(target_name, str):
                 avoid_port_names.add(target_name.casefold())
-        if float(getattr(plan, "multiplier", 1.0) or 1.0) > 1.0:
+        elif float(getattr(plan, "multiplier", 1.0) or 1.0) > 1.0:
             target_leg = getattr(plan, "target_leg", None)
             if target_leg is not None:
                 congested_legs.add(id(target_leg))
@@ -534,10 +549,12 @@ def _collect_active_disruption_keys(
                 departure_name = getattr(departure_port, "name", None)
                 arrival_name = getattr(arrival_port, "name", None)
                 if isinstance(departure_name, str) and isinstance(arrival_name, str):
-                    congested_leg_keys.add((departure_name.casefold(), arrival_name.casefold()))
+                    congested_leg_keys_list.append(
+                        (departure_name.casefold(), arrival_name.casefold())
+                    )
     disruption_key = (
         tuple(sorted(avoid_port_names)),
-        tuple(sorted(congested_leg_keys)),
+        tuple(sorted(congested_leg_keys_list)),
     )
     return avoid_port_names, congested_legs, disruption_key
 

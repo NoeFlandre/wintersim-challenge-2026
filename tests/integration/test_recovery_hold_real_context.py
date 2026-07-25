@@ -65,7 +65,8 @@ def _add_source_to_path(source: Path) -> None:
     )
     for module_name in list(sys.modules):
         if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
+            module_name == prefix or module_name.startswith(f"{prefix}.")
+            for prefix in prefixes
         ):
             sys.modules.pop(module_name, None)
 
@@ -91,8 +92,12 @@ def _snapshot(context) -> dict:
         "legs": tuple(context.legs),
         "service_routes": tuple(context.service_routes),
         "vessels": tuple(context.vessels),
-        "assigned_routes": tuple(v.assigned_service_route for v in context.vessels),
-        "vessel_segments": tuple(getattr(v, "current_segment", None) for v in context.vessels),
+        "assigned_routes": tuple(
+            v.assigned_service_route for v in context.vessels
+        ),
+        "vessel_segments": tuple(
+            getattr(v, "current_segment", None) for v in context.vessels
+        ),
         "disruption_plans": tuple(context.disruption_plans),
         "demands": tuple(context.demands),
     }

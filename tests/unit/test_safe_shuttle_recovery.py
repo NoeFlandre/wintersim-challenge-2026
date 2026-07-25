@@ -321,6 +321,37 @@ def test_hook_restores_empty_alternative_vessel_after_recovery(monkeypatch) -> N
     assert vessel not in alternative.deployed_vessels
 
 
+def test_inactive_hook_clears_stale_pending_alternative(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    install_fake_maritime_module(monkeypatch)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    shuttle = context.service_routes[-1]
+    vessel = Vessel(1, source)
+    vessel.pending_assigned_service_route = shuttle
+    context.vessels.append(vessel)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(15), vessel) is True
+    assert vessel.pending_assigned_service_route is None
+    assert vessel.assigned_service_route is source
+
+
+def test_inactive_hook_does_not_restore_loaded_alternative_vessel(network, monkeypatch) -> None:
+    context, source, _, _ = network
+    install_fake_maritime_module(monkeypatch)
+    UserStrategy.create_alternative_service_routes(context, now(12))
+    shuttle = context.service_routes[-1]
+    vessel = Vessel(1, shuttle)
+    vessel.current_segment = shuttle.segments[-1]
+    vessel.carried_shipments.append(object())
+    shuttle.deployed_vessels.append(vessel)
+    context.vessels.append(vessel)
+
+    assert UserStrategy.create_alternative_service_routes(context, now(15), vessel) is True
+    assert vessel.assigned_service_route is shuttle
+    assert vessel in shuttle.deployed_vessels
+    assert vessel not in source.deployed_vessels
+
+
 def test_hook_skips_route_without_viable_recovery_cycle(network, monkeypatch) -> None:
     context, source, _, (_, _, _, _, bc, ca) = network
     install_fake_maritime_module(monkeypatch)

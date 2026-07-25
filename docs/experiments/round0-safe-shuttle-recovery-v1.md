@@ -1,6 +1,6 @@
 # Round 0 safe-shuttle recovery v1
 
-**Status:** READY_FOR_ONE_FULL_RUN
+**Status:** SUCCESS_REJECTED
 
 ## Fixed hypothesis
 
@@ -40,7 +40,7 @@ Round 0 fixture, not constants in the participant implementation.
 ## Candidate identity
 
 - Branch: `codex/round0-safe-shuttle-recovery-v1`
-- Reviewed candidate HEAD: `1f7e70c4397b85b047ff5b1535346c3c8099faa6`
+- Full-run candidate HEAD: `50f1cbff2274fe493613ad7a65c1b75049c17b3e`
 - Initial implementation commit: `1d3a770`
 - Package-compliance RED test commit: `34ece05`
 - Self-contained lifecycle correction: `1f7e70c`
@@ -104,4 +104,52 @@ rewrite is authorized.
 
 ## Result
 
-Pending the single complete run.
+| Measure | Value |
+| --- | --- |
+| Candidate Cumulative Resilience Loss | `23.018662496580724` |
+| Current-checkout fallback | `18.673577819840556` |
+| Delta vs fallback | `+4.345084676740168` |
+| Relative change vs fallback | `+23.26862435608641%` |
+| Candidate ATT SHA-256 | `af28d1e6afd32a1e0bce32818385be380c5836f7f51ccb7470d32b2389fb47ce` |
+| Mean ATT over numbered periods | `20.613472222222224` days |
+| Period count | `72` |
+| Periods better / equal / worse than fallback | `16 / 17 / 39` |
+| Simulation runtime | `00:18:02` |
+| Beats historical `18.276620672293834`? | No |
+| Beats current-checkout fallback by more than `1e-9`? | No |
+
+The result is rejected. The complete candidate score is higher than the
+current-checkout fallback by `4.345084676740168`, so it fails the fixed
+strict-improvement rule without ambiguity.
+
+The runtime evidence confirms that the policy was behaviorally active:
+the standard `S2` alternative remained present, an `S4` recovery shuttle was
+created over the safe three-port subcycle, and one 13,000-TEU vessel transferred
+to it during the disruption. The shuttle's observed utilization was very low
+(about `0.30%` in the cumulative route table), and 39 of 72 ATT periods were
+worse than the pinned fallback. These observations are consistent with the
+extra shuttle displacing more valuable capacity than it recovered, but the run
+did not instrument shipment-level counterfactuals, so that causal explanation
+remains plausible rather than proven.
+
+The first candidate implementation failed the mandatory package gate because
+it imported the unshipped organizer-owned
+`response_strategies.default_strategy` module. That candidate was not run.
+The package-valid candidate evaluated here instead implemented the standard
+alternative-route lifecycle within participant-owned code and passed
+deterministic packaging twice before simulation.
+
+## Evidence
+
+- Candidate ATT snapshot (ignored):
+  `.challenge/round0/results/safe_shuttle_recovery_v1_2026/ATT_By_Statistics_Interval.csv`
+- Aggregate result (ignored):
+  `experiments/results/safe_shuttle_recovery_v1_2026.json`
+- Candidate package SHA-256:
+  `137bc9b5e55f8b4b044606dfef4fb6e1d7c280367cd56e976371a978f73d2fa3`
+- The package contained only
+  `response_strategies/README.md` and
+  `response_strategies/user_strategy.py`.
+
+Exactly one complete candidate was run. No tuning or second strategy was
+attempted.

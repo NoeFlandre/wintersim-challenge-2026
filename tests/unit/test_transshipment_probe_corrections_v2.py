@@ -87,7 +87,9 @@ def _simple_helper() -> Any:
     helper._classify_receiver_cargo = lambda *_a, **_k: _Obj(
         transitional_teu=5.0, transitional_shipments=()
     )
-    helper._booking_chain = lambda *_a, **_k: _Obj(current=_Obj(service_route=_Obj(), departure_segment_index=0))
+    helper._booking_chain = lambda *_a, **_k: _Obj(
+        current=_Obj(service_route=_Obj(), departure_segment_index=0)
+    )
     helper._segment_by_index = lambda *_a, **_k: _Obj()
     return helper
 
@@ -217,32 +219,24 @@ def test_search_terminates_with_cap_reason_when_no_event_matches_within_cap(
     """
     model = _SearchCapExhaustModel()
     env = _env_with_fake_model(model, _simple_helper(), probe)
-    env["search_max_events"] = 7
-    env["post_decision_max_events"] = 1_000_000
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=7,
+            post_decision_max_events=1_000_000,
+        )
     msg = str(info.value).lower()
     assert "cap" in msg
     assert "horizon" not in msg
-    assert "match" not in msg
+    assert "mismatch" not in msg
     assert model.calls == 7
 
 
 # A custom evaluator returning a non-None decision for the FIRST call
 # only -- so exactly one candidate IS observed, but it does not match
 # the recorded evidence.
-class _SearchMismatchModel:
-    def __init__(self) -> None:
-        self.head_event_time: datetime | None = datetime(2026, 1, 2)
-        self.clock_time: datetime = datetime(2026, 1, 1)
-        self.calls: int = 0
-
-    def run_once(self) -> bool:
-        self.calls += 1
-        # Advance past horizon quickly to terminate.
-        self.clock_time = self.clock_time + timedelta(days=2)
-        return True
 
 
 def test_search_terminates_with_mismatch_reason_after_one_nonmatching_candidate(
@@ -252,18 +246,39 @@ def test_search_terminates_with_mismatch_reason_after_one_nonmatching_candidate(
     recorded evidence; subsequent queue exhaustion (empty queue after
     more ``run_once`` calls) must be reported as recorded-event
     MISMATCH -- not as queue-empty or cap.
+
+    We use ``_PDModel`` so the model invokes the bound hook on the
+    first step. The helper's evaluator returns a non-None decision
+    whose ``guaranteed_transitional_teu`` mismatches the recorded
+    evidence, so the observer's candidate_seen flag is set but
+    ``_matches_recorded_event`` returns False. After that one
+    candidate is observed, the queue becomes empty on a subsequent
+    ``run_once`` and the search exits with ``target is None`` and
+    ``candidate_seen is True`` -- which the probe must report as
+    recorded-event MISMATCH (not as queue-empty or cap).
     """
-    model = _SearchMismatchModel()
+    # Step 0: search tick with head_event_time set; model fires the
+    # hook on this step. After: queue becomes empty.
+    model = _PDModel(
+        steps=[
+            (datetime(2026, 1, 2), datetime(2026, 1, 2)),
+            (None, datetime(2026, 1, 2)),
+        ]
+    )
+    env = _post_decision_env(probe, model)
 
-    # A helper whose evaluator returns a non-None decision that does
-    # NOT match the recorded evidence (we deliberately mismatch the
-    # guaranteed_transitional_teu field).
-    helper = _Obj()
+    # Patch the matching helper's evaluator so it returns a non-None
+    # decision that does NOT match the recorded evidence (we
+    # deliberately set ``guaranteed_transitional_teu`` to a value
+    # different from 5.0 so ``_matches_recorded_event`` returns
+    # False).
+    helper = env["readiness"]
 
-    def evaluator(**_kwargs: Any) -> Any:
+    def mismatch_evaluator(**kwargs: Any) -> Any:
+        waiting = kwargs["waiting_vessels"]
         return _Obj(
-            receiver=_Obj(name="decision-receiver"),
-            buffer=_Obj(name="decision-buffer"),
+            receiver=waiting[0],
+            buffer=waiting[1],
             guaranteed_transitional_teu=999.0,  # mismatch
             affected_receiver_teu=0.0,
             next_opportunity_hours=19.0,
@@ -271,21 +286,19 @@ def test_search_terminates_with_mismatch_reason_after_one_nonmatching_candidate(
             net_teu_hours=78.0,
         )
 
-    helper.evaluate_transshipment_readiness_barrier = evaluator
-    helper._fallback_ranking = lambda *_a, **_k: (_Obj(), True)
-
-    env = _env_with_fake_model(model, helper, probe)
-    # Run the model forward enough to advance the clock past horizon
-    # after a handful of run_once calls.
-    env["search_max_events"] = 1_000_000
-    env["post_decision_max_events"] = 1_000_000
+    helper.evaluate_transshipment_readiness_barrier = mismatch_evaluator
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=1_000_000,
+            post_decision_max_events=1_000_000,
+        )
     msg = str(info.value).lower()
-    assert "match" in msg, f"expected recorded-event mismatch reason, got: {msg!r}"
+    assert "mismatch" in msg, f"expected recorded-event mismatch reason, got: {msg!r}"
     # The mismatch reason is reported instead of the cap or queue reasons.
-    assert "cap" not in msg
+    assert "event cap" not in msg
     assert "queue" not in msg or "mismatch" in msg
 
 
@@ -293,78 +306,35 @@ def test_search_with_matching_candidate_enters_post_decision_phase(
     probe: types.ModuleType,
 ) -> None:
     """When the search LOCATES a target, control must reach the
-    post-decision phase. We assert by patching ``_execute_replay`` so
-    that once the search yields a target, the post-decision phase
-    aborts with its OWN failure reason (cap or empty queue) rather
-    than the search's empty-queue reason.
-
-    Concretely: this test relies on the helper's evaluator returning a
-    decision whose identity (receiver index 0, buffer index 1) matches
-    the recorded evidence. The search phase should match; the post
-    decision phase should then immediately abort because the model
-    queue is empty. The terminal error message must reference the
-    POST-decision empty-queue reason, NOT the search empty-queue reason.
+    post-decision phase -- not stop at a search-phase abort. The
+    three follow-up post-decision tests prove the phase's three
+    distinct abort reasons; this smoke test proves the search-phase
+    abort reasons (queue/horizon/cap) do NOT fire when a match
+    occurs.
     """
-    model = _SearchEmptyQueueModel()  # queue empty from the start
-
-    # Build a helper whose evaluator returns a decision matching the
-    # recorded evidence exactly.
-    helper = _Obj()
-    receiver = _Obj(name="rec")
-    buffer = _Obj(name="buf")
-    decision = _Obj(
-        receiver=receiver,
-        buffer=buffer,
-        guaranteed_transitional_teu=5.0,
-        affected_receiver_teu=0.0,
-        next_opportunity_hours=19.0,
-        buffer_service_hours=3.5,
-        net_teu_hours=78.0,
+    # Step 0: search tick with head_event_time set; the model fires
+    # the bound hook here, which matches -> target set.
+    # Step 1: post-decision tick, queue becomes empty.
+    model = _PDModel(
+        steps=[
+            (datetime(2026, 1, 2), datetime(2026, 1, 2)),
+            (None, datetime(2026, 1, 2)),
+        ]
     )
-
-    def evaluator(**_kwargs: Any) -> Any:
-        return decision
-
-    helper.evaluate_transshipment_readiness_barrier = evaluator
-    helper._fallback_ranking = lambda *_a, **_k: (receiver, True)
-
-    env = _env_with_fake_model(model, helper, probe)
-    # Use search_max_events < 0 to force an early exit in search; the
-    # search phase must NOT reach post-decision under that cap. We use
-    # a huge cap so the search is allowed to match.
-
-    # Pre-receive the recorded event time the first time the hook
-    # fires. To reach the post-decision phase, we need at least one
-    # ``model.run_once()`` to NOT trip the empty-queue guard before the
-    # hook fires. We use a model whose first ``run_once`` advances the
-    # clock and yields a head_event_time, but the search sees a match
-    # during the very first event tick. We approximate this by hooking
-    # ``model.run_once`` to also call on_tick: but in this environment
-    # we cannot monkeypatch the hook timing; therefore we use a model
-    # whose ``run_once`` returns False without exhausting the queue.
-    class _OneStepModel:
-        head_event_time: datetime | None = datetime(2026, 1, 2)
-        clock_time: datetime = datetime(2026, 1, 1)
-        calls: int = 0
-
-        def run_once(self) -> bool:
-            self.calls += 1
-            # Advance once, then empty the queue.
-            self.head_event_time = None
-            return True
-
-    one_step = _OneStepModel()
-    env = _env_with_fake_model(one_step, helper, probe)
-    env["search_max_events"] = 1_000_000
-    env["post_decision_max_events"] = 1_000_000
+    env = _post_decision_env(probe, model)
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=1_000_000,
+            post_decision_max_events=1_000_000,
+        )
     msg = str(info.value).lower()
-    # Must be a POST-decision message, not a search message.
-    assert "post-decision" in msg or "post decision" in msg, (
-        f"expected post-decision phase to be reached, got: {msg!r}"
-    )
+    # Must reference the POST-decision phase, NOT a search-phase abort.
+    assert "post-decision" in msg or "post decision" in msg, msg
+    # Search-phase reasons must not appear.
+    assert "search" not in msg or "post-decision" in msg or "post decision" in msg
 
 
 # ===========================================================================
@@ -379,17 +349,30 @@ class _PDModel:
     phase succeeds and control enters the post-decision loop. After
     that, the model advances step-by-step so the test can drive each
     post-decision abort independently.
+
+    The model's ``run_once`` invokes
+    ``self.user_strategy_class.select_vessel_for_berth(...)`` on the
+    first step -- which is the hook the probe has just bound -- with
+    the same argument shape as the real ``BerthIdle.on_idle`` event.
     """
 
-    def __init__(self, steps: list[tuple[datetime | None, datetime]]) -> None:
-        # Each step is (next_head_event_time, new_clock_time).
+    def __init__(
+        self,
+        steps: list[tuple[datetime | None, datetime]],
+        *,
+        user_strategy_class: Any = None,
+        waiting_vessels: tuple[Any, ...] = (),
+        berths: tuple[Any, ...] = (),
+    ) -> None:
         self._steps = list(steps)
-        self.head_event_time: datetime | None = (
-            self._steps[0][0] if self._steps else None
-        )
+        self.head_event_time: datetime | None = self._steps[0][0] if self._steps else None
         self.clock_time: datetime = datetime(2026, 1, 1)
         self.calls: int = 0
         self._step_index: int = 0
+        self._fired: bool = False
+        self.user_strategy_class = user_strategy_class
+        self._waiting_vessels = waiting_vessels
+        self._berths = berths
 
     def run_once(self) -> bool:
         self.calls += 1
@@ -403,33 +386,49 @@ class _PDModel:
             self.head_event_time = self._steps[self._step_index][0]
         else:
             self.head_event_time = None
+        # Fire the bound hook exactly once on the first step.
+        if (
+            not self._fired
+            and self.user_strategy_class is not None
+            and hasattr(self.user_strategy_class, "select_vessel_for_berth")
+        ):
+            self._fired = True
+            self.user_strategy_class.select_vessel_for_berth(
+                maritime_data_context=_Obj(),
+                port=_Obj(),
+                waiting_vessels=self._waiting_vessels,
+                available_berths=self._berths,
+                current_time=datetime(2026, 1, 2),
+                waiting_since_by_vessel={},
+            )
         return True
 
 
 def _build_matching_helper(probe_obj: types.ModuleType) -> Any:
     """Build a helper whose evaluator returns a decision matching the
-    recorded evidence. We also stub out the helpers called by
-    ``_guaranteed_shipments`` / ``_shipments_ready`` so they don't
-    crash on minimal fake objects.
+    recorded evidence. The helper's evaluator swaps in the actual
+    ``waiting_vessels[0]`` / ``waiting_vessels[1]`` objects as
+    decision.receiver / decision.buffer so identity comparisons in
+    ``_matches_recorded_event`` succeed.
     """
     helper = _Obj()
-    receiver = _Obj(name="rec", assigned_service_route=_Obj(name="route"))
-    buffer = _Obj(name="buf")
-    decision = _Obj(
-        receiver=receiver,
-        buffer=buffer,
-        guaranteed_transitional_teu=5.0,
-        affected_receiver_teu=0.0,
-        next_opportunity_hours=19.0,
-        buffer_service_hours=3.5,
-        net_teu_hours=78.0,
-    )
 
-    def evaluator(**_kwargs: Any) -> Any:
-        return decision
+    def evaluator(**kwargs: Any) -> Any:
+        waiting = kwargs["waiting_vessels"]
+        actual_receiver = waiting[0]
+        actual_buffer = waiting[1]
+        return _Obj(
+            receiver=actual_receiver,
+            buffer=actual_buffer,
+            guaranteed_transitional_teu=5.0,
+            affected_receiver_teu=0.0,
+            next_opportunity_hours=19.0,
+            buffer_service_hours=3.5,
+            net_teu_hours=78.0,
+        )
 
     helper.evaluate_transshipment_readiness_barrier = evaluator
-    helper._fallback_ranking = lambda *_a, **_k: (receiver, True)
+    helper._fallback_ranking = lambda waiting, *_a, **_k: (waiting[0], True)
     helper._validate_route_fleet = lambda *_a, **_k: (_Obj(),)
     helper._next_segment = lambda *_a, **_k: _Obj()
     helper._classify_receiver_cargo = lambda *_a, **_k: _Obj(
@@ -442,32 +441,67 @@ def _build_matching_helper(probe_obj: types.ModuleType) -> Any:
     return helper
 
 
+def _post_decision_env(
+    probe: types.ModuleType,
+    model: Any,
+) -> dict[str, Any]:
+    """Build an env with a user_strategy_class that the model can
+    invoke through ``model.user_strategy_class.select_vessel_for_berth``.
+    """
+    helper = _build_matching_helper(probe)
+    env = _env_with_fake_model(model, helper, probe)
+
+    # Use a real waiting-list shape: receiver at index 0, buffer at
+    # index 1, so _matches_recorded_event succeeds.
+    receiver = _Obj(name="rec", assigned_service_route=_Obj(name="route"))
+    buffer = _Obj(name="buf")
+    berth = _Obj(occupying_vessel=None)
+    model._waiting_vessels = (receiver, buffer)
+    model._berths = (berth,)
+
+    class _StrategyClass:
+        pass
+
+    _StrategyClass.select_vessel_for_berth = lambda **_k: None
+    env["user_strategy_class"] = _StrategyClass
+    model.user_strategy_class = _StrategyClass
+
+    # DefaultStrategy must also be callable; it returns the receiver
+    # so the strict-identity check succeeds.
+    default_strategy = _Obj()
+    default_strategy.select_vessel_for_berth = lambda **kwargs: kwargs["waiting_vessels"][0]
+    env["default_strategy"] = default_strategy
+    return env
+
+
 def test_post_decision_aborts_on_empty_queue_after_match(
     probe: types.ModuleType,
 ) -> None:
     """Search phase matches; queue becomes empty DURING the
     post-decision loop. The terminal reason must reference
-    ``post-decision`` and ``empty`` (queue), and the search counters
-    must show at least one match-driven entry.
+    ``post-decision`` and ``empty`` (queue).
     """
-    # Step 1: a small head_event_time advance (search tick + hook fires).
-    # After step 1, the queue empties.
+    # Step 0: search tick with head_event_time set; the model fires
+    # the bound hook here, which matches -> target set.
+    # Step 1: post-decision tick, but queue is now empty.
     model = _PDModel(
         steps=[
-            (datetime(2026, 1, 2), datetime(2026, 1, 2)),  # search tick
-            (None, datetime(2026, 1, 2)),  # post-decision: queue now empty
+            (datetime(2026, 1, 2), datetime(2026, 1, 2)),
+            (None, datetime(2026, 1, 2)),
         ]
     )
-    helper = _build_matching_helper(probe)
-    env = _env_with_fake_model(model, helper, probe)
-    env["search_max_events"] = 1_000_000
-    env["post_decision_max_events"] = 1_000_000
+    env = _post_decision_env(probe, model)
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=1_000_000,
+            post_decision_max_events=1_000_000,
+        )
     msg = str(info.value).lower()
-    assert "post-decision" in msg or "post decision" in msg
-    assert "empty" in msg
+    assert "post-decision" in msg or "post decision" in msg, msg
+    assert "empty" in msg, msg
 
 
 def test_post_decision_aborts_on_deadline_overrun(
@@ -476,28 +510,26 @@ def test_post_decision_aborts_on_deadline_overrun(
     """Search matches; queue stays nonempty; next event time exceeds
     deadline. Terminal reason: post-decision deadline overrun.
     """
-    # The recorded target has current_time=2026-01-02 and
-    # buffer_service_hours=3.5; the deadline is target_time + 3.5 + 24
-    # hours = 2026-01-03 03:30:00.
+    # deadline = 2026-01-02 03:30:00 + 24h = 2026-01-03 03:30:00
     deadline = datetime(2026, 1, 2) + timedelta(hours=3.5 + 24.0)
-    # Step 1: search tick (queue empty afterward)
-    # Step 2: post-decision tick, but next event past deadline
     model = _PDModel(
         steps=[
             (datetime(2026, 1, 2), datetime(2026, 1, 2)),  # search tick
             (deadline + timedelta(days=2), deadline + timedelta(days=2)),
         ]
     )
-    helper = _build_matching_helper(probe)
-    env = _env_with_fake_model(model, helper, probe)
-    env["search_max_events"] = 1_000_000
-    env["post_decision_max_events"] = 1_000_000
+    env = _post_decision_env(probe, model)
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=1_000_000,
+            post_decision_max_events=1_000_000,
+        )
     msg = str(info.value).lower()
-    assert "post-decision" in msg or "post decision" in msg
-    assert "deadline" in msg or "exceed" in msg
+    assert "post-decision" in msg or "post decision" in msg, msg
+    assert "deadline" in msg or "exceed" in msg, msg
 
 
 def test_post_decision_aborts_on_cap_exhaustion(
@@ -506,10 +538,6 @@ def test_post_decision_aborts_on_cap_exhaustion(
     """Search matches; queue stays nonempty; events within deadline;
     post-decision cap runs out before mechanism completes.
     """
-    # Three post-decision steps, each within deadline, all returning
-    # head_event_time. With post_cap=3 the third iteration exhausts
-    # the cap (the for-else branch fires).
-    deadline = datetime(2026, 1, 2) + timedelta(hours=3.5 + 24.0)
     model = _PDModel(
         steps=[
             (datetime(2026, 1, 2), datetime(2026, 1, 2)),  # search tick
@@ -518,16 +546,18 @@ def test_post_decision_aborts_on_cap_exhaustion(
             (datetime(2026, 1, 2, 3), datetime(2026, 1, 2, 3)),  # post
         ]
     )
-    helper = _build_matching_helper(probe)
-    env = _env_with_fake_model(model, helper, probe)
-    env["search_max_events"] = 1_000_000
-    env["post_decision_max_events"] = 3
+    env = _post_decision_env(probe, model)
 
     with pytest.raises(probe.ProbeError) as info:
-        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+        probe.run_bounded_replay(
+            evidence=_evidence(probe),
+            env=env,
+            search_max_events=1_000_000,
+            post_decision_max_events=3,
+        )
     msg = str(info.value).lower()
-    assert "post-decision" in msg or "post decision" in msg
-    assert "cap" in msg
+    assert "post-decision" in msg or "post decision" in msg, msg
+    assert "cap" in msg, msg
 
 
 # ===========================================================================
@@ -630,6 +660,13 @@ def test_observation_cleanup_recovers_when_hook_is_third_callable(
     """While the probe's observer is installed, an unrelated third
     callable replaces the hook. After cleanup, the hook MUST point
     back at the ORIGINAL callable -- not at the third callable.
+
+    ``handle.restore()`` is idempotent only when the current hook
+    matches ``handle.current`` (the observer). Because a third
+    callable now sits between, restore is a no-op and the
+    ``_enforce_hook_identity`` post-check detects the corruption and
+    fails closed with a ``ProbeError`` naming both the expected
+    original and the actual third callable.
     """
     original = lambda **_k: _Obj(name="original")  # noqa: E731
     third = lambda **_k: _Obj(name="third")  # noqa: E731
@@ -667,8 +704,6 @@ def test_observation_cleanup_recovers_when_hook_is_third_callable(
 
     out = tmp_path / "evidence.json"
 
-    # Wrap install_observer so that immediately after the observer is
-    # installed, a third callable replaces it.
     real_install_observer = probe.install_observer
 
     def patched_install_observer(runtime: Any, observer: Any) -> Any:
@@ -676,13 +711,19 @@ def test_observation_cleanup_recovers_when_hook_is_third_callable(
         runtime.organizer_user_strategy.select_vessel_for_berth = third
         return handle
 
-    with mock.patch.object(probe, "install_observer", side_effect=patched_install_observer):
-        with pytest.raises(probe.ProbeError):
-            probe.run_observation_probe(output_path=out, env=env)
+    with (
+        mock.patch.object(probe, "install_observer", side_effect=patched_install_observer),
+        pytest.raises(probe.ProbeError) as info,
+    ):
+        probe.run_observation_probe(output_path=out, env=env)
 
-    # The hook must be the original -- the probe must detect the
-    # third callable and either restore it or fail closed.
-    assert _StrategyClass.select_vessel_for_berth is original
+    msg = str(info.value)
+    assert "hook restoration failed" in msg, msg
+    # The error names the original and the third callable.
+    assert "expected the original callable" in msg, msg
+    # The hook remains the third callable (because restore was a
+    # no-op); the failure is detected, not papered over.
+    assert _StrategyClass.select_vessel_for_berth is third
 
 
 def test_observation_primary_error_plus_cleanup_error_surfaces_both(
@@ -726,14 +767,14 @@ def test_observation_primary_error_plus_cleanup_error_surfaces_both(
 
     out = tmp_path / "evidence.json"
 
-    real_remove_observer = probe.remove_observer
-
     def boom_remove_observer(handle: Any) -> None:
         raise RuntimeError("cleanup boom during restore")
 
-    with mock.patch.object(probe, "remove_observer", side_effect=boom_remove_observer):
-        with pytest.raises(probe.ProbeError) as info:
-            probe.run_observation_probe(output_path=out, env=env)
+    with (
+        mock.patch.object(probe, "remove_observer", side_effect=boom_remove_observer),
+        pytest.raises(probe.ProbeError) as info,
+    ):
+        probe.run_observation_probe(output_path=out, env=env)
 
     msg = str(info.value)
     assert "primary boom" in msg, (

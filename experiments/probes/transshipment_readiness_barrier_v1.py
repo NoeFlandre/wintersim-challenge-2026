@@ -297,6 +297,23 @@ def remove_observer(handle: ObserverHandle) -> None:
     handle.restore()
 
 
+def _enforce_hook_identity(handle: ObserverHandle) -> None:
+    """Fail-closed verification that the hook attribute matches the original.
+
+    Compares the post-cleanup hook value to ``handle.original`` by
+    identity (not ``is not observer``). If they do not match, raises
+    a ``ProbeError`` naming both the expected and actual callable so
+    the caller can diagnose the corruption. Does NOT use Python
+    ``assert`` so the check survives ``python -O``.
+    """
+    current = getattr(handle.owner, handle.attribute, None)
+    if current is not handle.original:
+        raise ProbeError(
+            f"hook restoration failed: expected the original callable "
+            f"{handle.original!r}, found {current!r}"
+        )
+
+
 def _hook_snapshot(kwargs: dict[str, Any]) -> tuple[Any, ...]:
     """Snap the kwargs the participant receives, including waiting_since.
 
@@ -918,12 +935,14 @@ def _execute_observation(
             remove_observer(handle)
         except BaseException as exc:  # noqa: BLE001
             cleanup_error = exc
-        # The user strategy class hook must point at the ORIGINAL
-        # callable, not at the observer, after this function returns
-        # regardless of success or failure.
-        assert user_strategy_class.select_vessel_for_berth is not observer, (
-            "observation cleanup failed to restore the original hook"
-        )
+        # Fail-closed hook-identity validation: the hook attribute must
+        # point at the exact ORIGINAL callable (compared by identity),
+        # not at the observer and not at any unrelated third callable.
+        # This must NOT use ``assert`` so it survives ``python -O``.
+        try:
+            _enforce_hook_identity(handle)
+        except BaseException as exc:  # noqa: BLE001
+            cleanup_error = cleanup_error or exc
         if cleanup_error is not None and primary_error is not None:
             raise ProbeError(f"{primary_error}: cleanup failed: {cleanup_error}") from primary_error
         if cleanup_error is not None:
@@ -1170,7 +1189,41 @@ def _execute_replay(
     search_cap: int,
     post_cap: int,
 ) -> dict[str, Any]:
-    """Run the search + post-decision mechanism with hook restoration guaranteed."""
+    """Run the search + post-decision mechanism with hook restoration guaranteed.
+
+    Search-phase termination precedence (must be deterministic):
+
+    1. A matching candidate is observed -> leave the search loop and
+       enter the post-decision phase.
+    2. Otherwise, the search loop runs up to ``search_cap`` real
+       ``model.run_once()`` calls. The loop body checks
+       ``head_event_time`` (queue empty) and ``head_event_time >
+       horizon`` (horizon reached) BEFORE incrementing the counter,
+       so the cap is not exceeded for empty/horizon reasons.
+    3. After the loop exits without a match, the terminal reason is:
+
+       * recorded-event mismatch -- if at least one non-``None``
+         candidate was observed during the search but none matched
+         the recorded evidence;
+       * otherwise queue-empty -- if the model event queue is empty
+         at loop exit;
+       * otherwise horizon -- if the next event time exceeds the
+         measured horizon;
+       * otherwise cap -- if the loop completed all
+         ``search_cap`` iterations without finding a match.
+
+    Cleanup guarantees (no ``assert``):
+
+    * The post-cleanup hook attribute on
+      ``user_strategy_class.select_vessel_for_berth`` is compared by
+      identity to ``handle.original``. If they do not match, the
+      probe raises a fail-closed ProbeError that names both the
+      expected and the actual hook.
+    * Cleanup runs on every exit path (success and failure).
+    * If both the primary action and the cleanup fail, both messages
+      are surfaced (cleanup as context); a failure solely in cleanup
+      is also surfaced.
+    """
     model = env["model"]
     user_strategy_class = env["user_strategy_class"]
     default_strategy = env["default_strategy"]
@@ -1179,7 +1232,7 @@ def _execute_replay(
     target: dict[str, Any] | None = None
     candidate_seen = False
     executed_search_count = 0
-    started_queue_nonempty = model.head_event_time is not None
+    horizon = model.clock_time + _dt.timedelta(days=WARMUP_DAYS + MEASURED_DAYS)
 
     def allow_recorded_candidate(**kwargs: Any) -> Any:
         nonlocal target, candidate_seen
@@ -1223,56 +1276,67 @@ def _execute_replay(
     def stop_search() -> bool:
         return target is not None
 
-    primary_error: BaseException | None = None
     cleanup_error: BaseException | None = None
+    post_phase_error: BaseException | None = None
     try:
-        with _with_wrapped_run_once(model, max_events=search_cap, stop_check=stop_search):
-            horizon = model.clock_time + _dt.timedelta(days=WARMUP_DAYS + MEASURED_DAYS)
-            while target is None:
-                if model.head_event_time is None:
-                    raise ProbeError(
-                        "replay aborted: search exhausted because the model event queue is empty"
-                    )
-                if model.head_event_time > horizon:
-                    raise ProbeError(
-                        "replay aborted: search reached the measured "
-                        "horizon without locating a matching candidate"
-                    )
-                executed_search_count += 1
-                try:
-                    model.run_once()
-                except _DivergenceStop:
-                    break
-            if target is None:
-                if not candidate_seen:
-                    if not started_queue_nonempty:
+        try:
+            with _with_wrapped_run_once(model, max_events=search_cap, stop_check=stop_search):
+                for _executed_search_count in range(search_cap):
+                    if target is not None:
+                        break
+                    if model.head_event_time is None:
+                        # If we have already observed a non-None
+                        # candidate that did not match the recorded
+                        # evidence, exit cleanly so the post-loop
+                        # analysis can report the MISMATCH reason
+                        # rather than masking it with a queue-empty
+                        # error.
+                        if candidate_seen:
+                            break
                         raise ProbeError(
-                            "replay aborted: the model event queue was "
-                            "empty at the start of the search"
+                            "replay aborted: search terminated because "
+                            "the model event queue is empty"
                         )
-                    raise ProbeError(
-                        "replay aborted: search exhausted the configured "
-                        f"event cap ({search_cap}) without finding a "
-                        "matching candidate"
-                    )
-                if model.head_event_time is None:
-                    raise ProbeError(
-                        "replay aborted: search exhausted because the "
-                        "model event queue became empty"
-                    )
-                if model.head_event_time > horizon:
-                    raise ProbeError(
-                        "replay aborted: search exhausted because the "
-                        "next event is past the measured horizon"
-                    )
-                # Some candidates were observed but none matched the
-                # recorded evidence.
+                    if model.head_event_time > horizon:
+                        if candidate_seen:
+                            break
+                        raise ProbeError(
+                            "replay aborted: search terminated because "
+                            "the next event is past the measured horizon"
+                        )
+                    executed_search_count = _executed_search_count + 1
+                    try:
+                        model.run_once()
+                    except _DivergenceStop:
+                        break
+        except _DivergenceStop:
+            pass
+
+        if target is None:
+            # Determine the search-phase terminal reason.
+            if candidate_seen:
+                # At least one non-None candidate was observed, but
+                # none matched the recorded evidence -> MISMATCH.
                 raise ProbeError(
-                    "replay aborted: one or more non-None candidate "
-                    "decisions were observed during the search, but "
-                    "none matched the recorded evidence (recorded-event "
-                    "mismatch)"
+                    "replay aborted: search exhausted because one or "
+                    "more non-None candidate decisions were observed "
+                    "but none matched the recorded evidence "
+                    "(recorded-event mismatch)"
                 )
+            if model.head_event_time is None:
+                raise ProbeError(
+                    "replay aborted: search terminated because the model event queue is empty"
+                )
+            if model.head_event_time > horizon:
+                raise ProbeError(
+                    "replay aborted: search terminated because the next "
+                    "event is past the measured horizon"
+                )
+            raise ProbeError(
+                "replay aborted: search exhausted the configured event "
+                f"cap of {search_cap} run_once calls without locating "
+                "a matching candidate"
+            )
 
         decision = target["decision"]
         berth = target["berth"]
@@ -1284,69 +1348,73 @@ def _execute_replay(
         receiver_selected_next = False
         guaranteed_shipments_loaded = False
 
-        for _executed_post_count in range(post_cap):
-            if model.head_event_time is None:
-                raise ProbeError(
-                    "replay aborted: post-decision phase aborted because "
-                    "the model event queue is empty"
-                )
-            if model.head_event_time > deadline:
-                raise ProbeError(
-                    "replay aborted: post-decision phase aborted because "
-                    "the next event exceeds the buffer-deadline"
-                )
-            try:
-                model.run_once()
-            except _DivergenceStop:
-                break
-            occupant = berth.occupying_vessel
-            buffer_served = buffer_served or occupant is decision.buffer
-            if buffer_served and not buffer_departed and occupant is not decision.buffer:
-                buffer_departed = True
-            if buffer_departed and not receiver_selected_next:
-                if occupant is decision.receiver:
-                    receiver_selected_next = True
-                elif occupant is not None:
+        try:
+            for _executed_post_count in range(post_cap):
+                if model.head_event_time is None:
                     raise ProbeError(
-                        "bounded replay: a vessel other than the receiver "
-                        "occupied the berth right after the buffer"
+                        "replay aborted: post-decision phase aborted "
+                        "because the model event queue is empty"
                     )
-            shipments_ready = shipments_ready or _shipments_ready(env, shipments, decision.receiver)
-            guaranteed_shipments_loaded = all(
-                any(carried is shipment for carried in decision.receiver.carried_shipments)
-                and shipment.carrying_vessel is decision.receiver
-                for shipment in shipments
-            )
-            if (
-                buffer_served
-                and shipments_ready
-                and receiver_selected_next
-                and guaranteed_shipments_loaded
-            ):
-                break
-        else:
-            raise ProbeError(
-                "replay aborted: post-decision phase exhausted its event "
-                f"cap ({post_cap}) without completing the mechanism"
-            )
-    except _DivergenceStop:
-        pass
+                if model.head_event_time > deadline:
+                    raise ProbeError(
+                        "replay aborted: post-decision phase aborted "
+                        "because the next event exceeds the buffer-deadline"
+                    )
+                try:
+                    model.run_once()
+                except _DivergenceStop:
+                    break
+                occupant = berth.occupying_vessel
+                buffer_served = buffer_served or occupant is decision.buffer
+                if buffer_served and not buffer_departed and occupant is not decision.buffer:
+                    buffer_departed = True
+                if buffer_departed and not receiver_selected_next:
+                    if occupant is decision.receiver:
+                        receiver_selected_next = True
+                    elif occupant is not None:
+                        raise ProbeError(
+                            "bounded replay: a vessel other than the "
+                            "receiver occupied the berth right after the buffer"
+                        )
+                shipments_ready = shipments_ready or _shipments_ready(
+                    env, shipments, decision.receiver
+                )
+                guaranteed_shipments_loaded = all(
+                    any(carried is shipment for carried in decision.receiver.carried_shipments)
+                    and shipment.carrying_vessel is decision.receiver
+                    for shipment in shipments
+                )
+                if (
+                    buffer_served
+                    and shipments_ready
+                    and receiver_selected_next
+                    and guaranteed_shipments_loaded
+                ):
+                    break
+            else:
+                raise ProbeError(
+                    "replay aborted: post-decision phase exhausted its "
+                    f"event cap ({post_cap}) without completing the "
+                    "mechanism"
+                )
+        except _DivergenceStop:
+            pass
     except ProbeError as exc:
-        primary_error = exc
+        post_phase_error = exc
         raise
     except BaseException as exc:
-        primary_error = exc
+        post_phase_error = exc
         raise
     finally:
         try:
             remove_observer(handle)
         except BaseException as exc:  # noqa: BLE001
             cleanup_error = exc
-        assert user_strategy_class.select_vessel_for_berth is not allow_recorded_candidate, (
-            "replay cleanup failed to restore the original hook"
-        )
-        if cleanup_error is not None and primary_error is not None:
-            raise ProbeError(f"{primary_error}: cleanup failed: {cleanup_error}") from primary_error
+        _enforce_hook_identity(handle)
+        if cleanup_error is not None and post_phase_error is not None:
+            raise ProbeError(
+                f"{post_phase_error}: cleanup failed: {cleanup_error}"
+            ) from post_phase_error
         if cleanup_error is not None:
             raise cleanup_error
 
@@ -1424,16 +1492,31 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _serializable(value: Any) -> Any:
-    """Convert non-JSON-serializable values into plain dicts/strings."""
+    """Recursively convert a value into a JSON-native representation.
+
+    Native JSON types (``None``, ``bool``, ``int``, ``float`` -- finite
+    only -- and ``str``) are returned unchanged. ``Path`` is converted
+    to its string form. Mappings and sequences are recursed. Anything
+    else is rendered as its ``repr()`` string so unsupported objects do
+    not crash the CLI's JSON encoder.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Path):
+        return str(value)
     if isinstance(value, dict):
         return {k: _serializable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_serializable(v) for v in value]
-    if isinstance(value, Path):
-        return str(value)
-    if hasattr(value, "__dict__"):
-        return _serializable(vars(value))
-    return str(value)
+    return repr(value)
 
 
 if __name__ == "__main__":

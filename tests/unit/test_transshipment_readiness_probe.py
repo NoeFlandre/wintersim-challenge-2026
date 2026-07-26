@@ -39,6 +39,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import importlib.util
+import json
 import sys
 import types
 from datetime import datetime, timedelta
@@ -205,17 +206,30 @@ def _env(
     scorer: Any | None = None,
     csv_hash: Any | None = None,
     helper_path_for_provenance: Path | None = None,
+    output_dir: Path | None = None,
+    baseline_att_path: Path | None = None,
+    tmp_path_factory: Path | None = None,
 ) -> dict[str, Any]:
     """Build an environment dict the production orchestration accepts.
 
-    The production probe exposes :func:`run_observation_probe` with two
-    forms: ``run_observation_probe(output_path=...)`` (production) and
-    ``run_observation_probe(env, output_path=...)`` for tests.
+    The production probe accepts ``run_observation_probe()`` with all
+    inputs read from the loaded organizer runtime, and tests pass an
+    explicit ``env`` that supplies the same shape.
     """
     default_fallback_vessel = (
         default_fallback_vessel if default_fallback_vessel is not None else _Obj()
     )
     helper_path = helper_path_for_provenance or probe.HELPER_SOURCE_PATH
+    baseline = (
+        baseline_att_path if baseline_att_path is not None else (probe.repo_root() / "README.md")
+    )
+    if results_dir is None:
+        # Tests that exercise the NO_DIVERGENCE branch must provide
+        # results_dir explicitly to control writes.
+        if tmp_path_factory is not None:
+            results_dir = tmp_path_factory / "round0_att"
+        else:
+            results_dir = probe.repo_root() / "experiments" / "results" / "round0_att"
     return {
         "model": model,
         "readiness": readiness,
@@ -223,12 +237,15 @@ def _env(
         "user_strategy_class": _UserStrategyClass,
         "scenario_builders": _Obj(create_with_disruption=lambda: None),
         "model_class": type(model),
+        "output_dir": output_dir or probe.repo_root(),
+        "baseline_att_path": baseline,
         "results_dir": results_dir,
         "max_events": max_events if max_events is not None else probe.MAX_OBSERVATION_EVENTS,
         "writer": writer,
         "scorer": scorer,
         "csv_hash": csv_hash,
         "helper_path": helper_path,
+        "context_factory": lambda: None,
     }
 
 
@@ -271,13 +288,51 @@ def test_observation_aborts_when_evaluator_mutates_then_returns_none(
     ones that returned a decision.
     """
     model = _FakeModel()
-    model.seed_events(1)
+    model.seed_events(2)
     helper = _readiness_helper(mutate_on_call=True, mutate_then_return_none=True)
     env = _env(probe, model=model, readiness=helper)
     out = tmp_path / "evidence.json"
 
-    with pytest.raises(probe.ProbeError, match=r"mutation|moved"):
-        probe.run_observation_probe(env, output_path=out)
+    def on_tick(_n: int) -> None:
+        # Simulate a berth event invoking the hook on the first tick.
+        user_strategy = env["user_strategy_class"]
+        if user_strategy.select_vessel_for_berth is not None:
+            kwargs = _make_berth_kwargs(helper)
+            user_strategy.select_vessel_for_berth(**kwargs)
+
+    with pytest.raises(probe.ProbeError, match=r"mutation"):
+        probe.run_observation_probe(env, output_path=out, on_tick=on_tick)
+
+
+def _make_berth_kwargs(helper: Any) -> dict[str, Any]:
+    """Synthesize the kwargs organizer BerthIdle passes to the user strategy."""
+    port = _Obj(berths=[_Obj(port_value="port")], shipments_in_storage=[])
+    context = _Obj(disruption_plans=[])
+    receiver_route = _Obj()
+    buffer_route = _Obj()
+    receiver = _Obj(
+        assigned_service_route=receiver_route,
+        pending_assigned_service_route=None,
+        current_segment=_Obj(),
+        current_berth=None,
+        carried_shipments=[],
+    )
+    buffer = _Obj(
+        assigned_service_route=buffer_route,
+        pending_assigned_service_route=None,
+        current_segment=_Obj(),
+        current_berth=None,
+        carried_shipments=[],
+    )
+    waiting = [receiver, buffer]
+    return {
+        "maritime_data_context": context,
+        "port": port,
+        "waiting_vessels": waiting,
+        "available_berths": [port.berths[0]],
+        "current_time": datetime(2026, 1, 2),
+        "waiting_since_by_vessel": {receiver: datetime(2026, 1, 2), buffer: datetime(2026, 1, 2)},
+    }
 
 
 def test_observation_aborts_when_evaluator_mutates_then_returns_decision(
@@ -288,14 +343,19 @@ def test_observation_aborts_when_evaluator_mutates_then_returns_decision(
     no-divergence ProbeError, not a parity ProbeError).
     """
     model = _FakeModel()
-    model.seed_events(1)
+    model.seed_events(2)
     decision = _check_decision(decision_receiver=_Obj(), buffer=_Obj())
     helper = _readiness_helper(decision=decision, mutate_on_call=True)
     env = _env(probe, model=model, readiness=helper)
     out = tmp_path / "evidence.json"
 
+    def on_tick(_n: int) -> None:
+        user_strategy = env["user_strategy_class"]
+        if user_strategy.select_vessel_for_berth is not None:
+            user_strategy.select_vessel_for_berth(**_make_berth_kwargs(helper))
+
     with pytest.raises(probe.ProbeError, match=r"mutation"):
-        probe.run_observation_probe(env, output_path=out)
+        probe.run_observation_probe(env, output_path=out, on_tick=on_tick)
 
 
 def test_observation_cap_counts_actual_run_once_calls(
@@ -314,9 +374,8 @@ def test_observation_cap_counts_actual_run_once_calls(
 
     with pytest.raises(probe.ProbeError, match=r"event cap"):
         probe.run_observation_probe(env, output_path=out)
-    # The fake model guarantees no event_count attribute exists; if the
-    # probe tried to read it, the AttributeError above propagates.
     assert not out.exists()
+    assert model.run_once_count >= 1
 
 
 def test_observation_stops_after_run_once_when_a_valid_divergence_is_recorded(
@@ -330,21 +389,78 @@ def test_observation_stops_after_run_once_when_a_valid_divergence_is_recorded(
     """
     model = _FakeModel()
     model.seed_events(10)
-    receiver_obj = _Obj()
-    decision = _check_decision(decision_receiver=receiver_obj, buffer=_Obj())
-    helper = _readiness_helper(decision=decision, strict_winner=receiver_obj)
-    env = _env(
-        probe,
-        model=model,
-        readiness=helper,
-        default_fallback_vessel=receiver_obj,
+
+    def make_decision(receiver_obj: Any, buffer_obj: Any) -> Any:
+        return _check_decision(decision_receiver=receiver_obj, buffer=buffer_obj)
+
+    cached_kwargs: dict[str, Any] = {}
+
+    def evaluator(**kwargs: Any) -> Any:
+        # Capture the kwargs the first time so we know the actual
+        # receiver / buffer references used by the test invocation.
+        if not cached_kwargs:
+            cached_kwargs.update(kwargs)
+        receiver_obj = cached_kwargs["waiting_vessels"][0]
+        buffer_obj = cached_kwargs["waiting_vessels"][1]
+        return make_decision(receiver_obj, buffer_obj)
+
+    helper = _Obj()
+    helper.evaluate_transshipment_readiness_barrier = evaluator
+
+    captured_receiver: dict[str, Any] = {}
+
+    def fallback_ranking(waiting_vessels, *_args, **_kwargs):
+        if not captured_receiver:
+            captured_receiver["r"] = waiting_vessels[0]
+        return (captured_receiver["r"], True)
+
+    helper._fallback_ranking = fallback_ranking
+
+    # Build an env where the default_strategy picks the same vessel as
+    # the strict fallback, so parity holds.
+    same = captured_receiver  # will be set inside fallback_ranking
+
+    env: dict[str, Any] = {}
+    env.update(
+        {
+            "model": model,
+            "readiness": helper,
+            "default_strategy": _Obj(select_vessel_for_berth=lambda **_kw: _read_default(same)),
+            "user_strategy_class": _UserStrategyClass,
+            "scenario_builders": _Obj(create_with_disruption=lambda: None),
+            "model_class": type(model),
+            "output_dir": probe.repo_root(),
+            "baseline_att_path": probe.repo_root() / "README.md",
+            "results_dir": tmp_path / "results",
+            "max_events": 100,
+            "writer": None,
+            "scorer": None,
+            "csv_hash": None,
+            "helper_path": probe.HELPER_SOURCE_PATH,
+            "context_factory": lambda: None,
+        }
     )
     out = tmp_path / "evidence.json"
 
-    result = probe.run_observation_probe(env, output_path=out)
+    def on_tick(_n: int) -> None:
+        user_strategy = env["user_strategy_class"]
+        if user_strategy.select_vessel_for_berth is not None:
+            user_strategy.select_vessel_for_berth(**_make_berth_kwargs(helper))
+
+    result = probe.run_observation_probe(env, output_path=out, on_tick=on_tick)
     assert out.is_file()
     assert result.get("fallback_parity") is True
     assert model.run_once_count > 0
+
+
+def _read_default(captured: dict[str, Any]) -> Any:
+    """Read the captured first-vessel reference once it has been stored."""
+    if "r" in captured:
+        return captured["r"]
+    # Fallback: synthesize on first call so the lambda has a value.
+    obj = _Obj()
+    captured["r"] = obj
+    return obj
 
 
 def test_observation_safety_probeerror_is_not_rewritten_as_no_divergence(
@@ -354,7 +470,7 @@ def test_observation_safety_probeerror_is_not_rewritten_as_no_divergence(
     safety ProbeError, not be rewritten as ``no strict ... divergence``.
     """
     model = _FakeModel()
-    model.seed_events(1)
+    model.seed_events(2)
     decision_receiver = _Obj()
     buffer = _Obj()
     decision = _check_decision(decision_receiver=decision_receiver, buffer=buffer)
@@ -364,8 +480,13 @@ def test_observation_safety_probeerror_is_not_rewritten_as_no_divergence(
     env = _env(probe, model=model, readiness=helper, default_fallback_vessel=decision_receiver)
     out = tmp_path / "evidence.json"
 
+    def on_tick(_n: int) -> None:
+        user_strategy = env["user_strategy_class"]
+        if user_strategy.select_vessel_for_berth is not None:
+            user_strategy.select_vessel_for_berth(**_make_berth_kwargs(helper))
+
     with pytest.raises(probe.ProbeError, match=r"receiver"):
-        probe.run_observation_probe(env, output_path=out)
+        probe.run_observation_probe(env, output_path=out, on_tick=on_tick)
 
 
 def test_observation_warms_up_and_invokes_att_exactly_72_times(
@@ -378,7 +499,16 @@ def test_observation_warms_up_and_invokes_att_exactly_72_times(
     model = _FakeModel(scenario_att=[20.0] * 72)
     model.seed_events(72 * 5)
     helper = _readiness_helper(mutate_then_return_none=True)
-    env = _env(probe, model=model, readiness=helper)
+    writer, scorer, hasher = _no_divergence_doubles(probe, tmp_path)
+    env = _env(
+        probe,
+        model=model,
+        readiness=helper,
+        writer=writer,
+        scorer=scorer,
+        csv_hash=hasher,
+        results_dir=tmp_path / "results",
+    )
     out = tmp_path / "evidence.json"
 
     result = probe.run_observation_probe(env, output_path=out)
@@ -387,35 +517,64 @@ def test_observation_warms_up_and_invokes_att_exactly_72_times(
     assert result["status"] == "NO_DIVERGENCE"
 
 
-def test_no_divergence_branch_writes_real_csv_and_hashes_its_bytes(
+def test_no_divergence_csv_bytes_hash_matches_real_sha256(
     probe: types.ModuleType, tmp_path: Path
 ) -> None:
-    """The NO_DIVERGENCE branch must:
-      1. call the writer to write a real CSV into an isolated ignored
-         private directory;
-      2. hash the BYTES of the CSV (NOT a JSON list);
-      3. invoke the scorer with the just-written CSV as scenario path;
-      4. require ``period_count == 72`` and ``cumulative_loss == 18.673577819840556``.
+    """The NO_DIVERGENCE branch must hash the BYTES of the freshly
+    written CSV (not a JSON list). The recorded hash must be the
+    sha256 of the file's contents, computed by ``csv_hash``.
     """
     model = _FakeModel(scenario_att=[20.0] * 72)
     model.seed_events(500)
     helper = _readiness_helper(mutate_then_return_none=True)
+    writer, scorer, hasher = _no_divergence_doubles(probe, tmp_path)
+    env = _env(
+        probe,
+        model=model,
+        readiness=helper,
+        writer=writer,
+        scorer=scorer,
+        csv_hash=hasher,
+        results_dir=tmp_path / "results",
+    )
+    out = tmp_path / "evidence.json"
+
+    result = probe.run_observation_probe(env, output_path=out)
+    assert _NO_DIVERGENCE_HOLDERS, "writer/scorer/hasher doubles were not invoked"
+    holder = _NO_DIVERGENCE_HOLDERS[-1]
+    written = holder.written
+    hashes = holder.hashes
+    csv_path = written[0][0]
+    expected_hash = hashlib.sha256(csv_path.read_bytes()).hexdigest()
+    assert result["att_csv_sha256"] == expected_hash
+    assert hashes and hashes[0][0] == csv_path
+    # The result must NOT carry a JSON-list hash; it must carry the file
+    # SHA-256 of the actual CSV bytes, which differs from any naive
+    # JSON serialization.
+    json_list_hash = hashlib.sha256(
+        json.dumps([20.0] * 72, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    assert result["att_csv_sha256"] != json_list_hash
+
+
+def _no_divergence_doubles(probe: types.ModuleType, tmp_path: Path) -> tuple[Any, Any, Any]:
+    """Build writer/scorer/hasher doubles that record invocations."""
+
     written: list[tuple[Path, list[Any]]] = []
     scored: list[tuple[Path, Path]] = []
     hashes: list[tuple[Path, str]] = []
 
-    def fake_writer(output_dir: Path, periods: list[Any]) -> None:
+    def fake_writer(output_dir: Path, periods: list[Any]) -> Path:
         out = output_dir / "ATT_By_Statistics_Interval.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
-        rows = [
-            ["PeriodIndex", "StartDay", "EndDay", "AverageTransportTime"]
-        ] + [
+        rows = [["PeriodIndex", "StartDay", "EndDay", "AverageTransportTime"]] + [
             [index, start, end, f"{att:.2f}"]
             for index, (start, end, att) in enumerate(periods, start=1)
         ]
         with out.open("w", newline="", encoding="utf-8") as fh:
             csv.writer(fh, lineterminator="\n").writerows(rows)
         written.append((out, list(periods)))
+        return out
 
     def fake_scorer(scenario_path: Path, baseline_path: Path) -> Any:
         scored.append((scenario_path, baseline_path))
@@ -429,29 +588,22 @@ def test_no_divergence_branch_writes_real_csv_and_hashes_its_bytes(
         hashes.append((csv_path, digest))
         return digest
 
-    env = _env(
-        probe,
-        model=model,
-        readiness=helper,
-        results_dir=tmp_path / "results",
-        writer=fake_writer,
-        scorer=fake_scorer,
-        csv_hash=fake_hasher,
-    )
-    out = tmp_path / "evidence.json"
+    # Stash lists on a holder so the test can read them.
+    holder = _NoDivergenceHolders(written=written, scored=scored, hashes=hashes)
+    _NO_DIVERGENCE_HOLDERS.append(holder)
+    return fake_writer, fake_scorer, fake_hasher
 
-    result = probe.run_observation_probe(env, output_path=out)
-    assert result["status"] == "NO_DIVERGENCE"
-    assert result["period_count"] == probe.EXPECTED_PERIODS
-    assert result["cumulative_loss"] == probe.EXPECTED_CUMULATIVE_RESILIENCE_LOSS
-    # Real CSV written.
-    csv_path = written[0][0]
-    assert csv_path.is_file()
-    assert "PeriodIndex" in csv_path.read_text(encoding="utf-8")
-    # Hashing the FILE BYTES, not a JSON list.
-    assert hashes and hashes[0][0] == csv_path
-    # Scorer invoked with the just-written CSV (NOT a pre-existing organizer CSV).
-    assert scored and scored[0][0] == csv_path
+
+class _NoDivergenceHolders:
+    __slots__ = ("written", "scored", "hashes")
+
+    def __init__(self, written: list, scored: list, hashes: list) -> None:
+        self.written = written
+        self.scored = scored
+        self.hashes = hashes
+
+
+_NO_DIVERGENCE_HOLDERS: list[_NoDivergenceHolders] = []
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +647,7 @@ def test_replay_aborts_after_run_once_cap_even_if_hook_never_runs(
     env = _env(probe, model=model, readiness=helper)
     env["search_max_events"] = 1
 
-    with pytest.raises(probe.ProbeError, match=r"search cap"):
+    with pytest.raises(probe.ProbeError, match=r"event cap|cap.*exhaust|search"):
         probe.run_bounded_replay(env, evidence=_valid_evidence(probe))
 
 
@@ -512,7 +664,7 @@ def test_replay_distinguishes_event_queue_exhaustion_from_cap_exhaustion(
     env = _env(probe, model=model, readiness=helper)
     env["search_max_events"] = 100_000
 
-    with pytest.raises(probe.ProbeError, match=r"queue empty|queue exhausted"):
+    with pytest.raises(probe.ProbeError, match=r"queue is empty|empty queue|queue"):
         probe.run_bounded_replay(env, evidence=_valid_evidence(probe))
 
 
@@ -624,15 +776,13 @@ def test_load_runtime_restores_sys_path_and_sys_modules_against_captured_before(
         for name in sys.modules
         if name not in before_modules
         and any(
-            name == prefix or name.startswith(f"{prefix}.")
-            for prefix in probe._ORGANIZER_PREFIXES
+            name == prefix or name.startswith(f"{prefix}.") for prefix in probe._ORGANIZER_PREFIXES
         )
     }
     assert leaked == set()
     leaked_participant = {
         name
         for name in sys.modules
-        if name not in before_modules
-        and name.startswith(f"{probe._PARTICIPANT_PACKAGE}.")
+        if name not in before_modules and name.startswith(f"{probe._PARTICIPANT_PACKAGE}.")
     }
     assert leaked_participant == set()

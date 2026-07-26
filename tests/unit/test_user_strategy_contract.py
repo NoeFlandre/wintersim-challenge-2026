@@ -17,10 +17,44 @@ source.
 
 from __future__ import annotations
 
+import importlib.util
 import inspect
+import sys
+import types
+from pathlib import Path
 
 import pytest
-from response_strategies.user_strategy import UserStrategy
+
+# Locate the participant's user_strategy.py module directly so the
+# contract tests never depend on which ``response_strategies`` package
+# happens to resolve (the organizer's regular package with its circular
+# import would otherwise shadow the participant's namespace package).
+REPO_ROOT = Path(__file__).resolve().parents[2]
+_STRATEGIES_DIR = REPO_ROOT / "submission" / "response_strategies"
+_PARTICIPANT_PACKAGE = "_test_user_strategy_package"
+_pkg = types.ModuleType(_PARTICIPANT_PACKAGE)
+_pkg.__path__ = [str(_STRATEGIES_DIR)]
+_pkg.__package__ = _PARTICIPANT_PACKAGE
+sys.modules[_PARTICIPANT_PACKAGE] = _pkg
+_readiness_spec = importlib.util.spec_from_file_location(
+    f"{_PARTICIPANT_PACKAGE}.transshipment_readiness",
+    _STRATEGIES_DIR / "transshipment_readiness.py",
+)
+if _readiness_spec is None or _readiness_spec.loader is None:
+    raise RuntimeError("cannot load participant transshipment_readiness module")
+_readiness_mod = importlib.util.module_from_spec(_readiness_spec)
+sys.modules[_readiness_spec.name] = _readiness_mod
+_readiness_spec.loader.exec_module(_readiness_mod)
+_user_strategy_spec = importlib.util.spec_from_file_location(
+    f"{_PARTICIPANT_PACKAGE}.user_strategy",
+    _STRATEGIES_DIR / "user_strategy.py",
+)
+if _user_strategy_spec is None or _user_strategy_spec.loader is None:
+    raise RuntimeError("cannot load participant user_strategy module")
+_USER_STRATEGY_MODULE = importlib.util.module_from_spec(_user_strategy_spec)
+sys.modules[_user_strategy_spec.name] = _USER_STRATEGY_MODULE
+_user_strategy_spec.loader.exec_module(_USER_STRATEGY_MODULE)
+UserStrategy = _USER_STRATEGY_MODULE.UserStrategy
 
 REQUIRED_METHODS: dict[str, list[str]] = {
     "select_vessel_for_berth": [
@@ -109,8 +143,8 @@ def test_all_methods_static_callable_via_class() -> None:
 
 
 def test_module_does_not_import_development_tooling() -> None:
-    # The submission must not depend on our dev CLI package.
-    import response_strategies.user_strategy as mod
-
-    src = inspect.getsource(mod)
+    # The submission must not depend on our dev CLI package. The
+    # synthetic package loaded at module import time already ensures the
+    # participant module is independent of organizer's response_strategies.
+    src = inspect.getsource(_USER_STRATEGY_MODULE)
     assert "wsc2026_tools" not in src

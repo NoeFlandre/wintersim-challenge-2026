@@ -376,6 +376,25 @@ Operational trajectory commands are never used for this ledger.
 
 #### Probe fail-closed RED → GREEN (corrections phase)
 
+A reviewer audit of the probe at `a0a2312` identified ten concrete
+defects. The corrected implementation removes the disconnected
+`NoDivergenceLifecycle` fake, replaces the `model.event_count` reads
+that crashed against the real organizer `Model` (which has no such
+attribute) with a wrapped `model.run_once` counter, performs proper
+before/after mutation detection that also catches `None`-returning
+helpers, validates evidence provenance (schema, seed, warmup/measured
+days, interval, scenario, helper SHA, metric finiteness, index
+integrality) before any model construction, hashes the **bytes** of
+the freshly written `ATT_By_Statistics_Interval.csv` (not a JSON list),
+invokes the genuine `wsc2026_tools.scoring.compute_resilience_loss`,
+counts `model.run_once` calls for the replay search cap (not berth-hook
+invocations), distinguishes event-cap exhaustion, event-queue
+exhaustion, horizon reached, and recorded-event mismatch, and gives
+the static actual-next gate a clearly bounded scope (the candidate
+event itself, with the buffer/receiver pair at the immediate berth
+queue; it does not assume queue stability over the whole measured
+horizon).
+
 - RED command:
 
   ```text
@@ -383,26 +402,48 @@ Operational trajectory commands are never used for this ledger.
   ```
 
   RED result (15 failures, 1 pass):
-  - `install_observer`, `remove_observer`, `_validate_decision_safety`,
-    `_record_evidence_atomic`, and `NoDivergenceLifecycle` were
-    missing from the probe module.
-  - `MAX_OBSERVATION_EVENTS`, `MAX_REPLAY_SEARCH_EVENTS`,
-    `EXPECTED_CUMULATIVE_RESILIENCE_LOSS`, and
-    `EXPECTED_OBSERVATION_HASH` were not exported.
-  - `_validate_decision_safety` did not raise on parity, mutation,
-    strictness, or receiver-identity mismatches (the legacy observer
-    silently skipped those cases).
-  - `_record_evidence_atomic` did not exist; the legacy code wrote
-    evidence non-atomically and could overwrite existing files.
+  - The probe imported `Model.event_count` (which does not exist on
+    the real organizer `Model`) and crashed on activation.
+  - `NoDivergenceLifecycle` was a disconnected class that
+    `run_observation_probe` never instantiated; the real
+    orchestration path went through it without effect.
+  - Mutation detection only compared snapshots **after** the
+    evaluator returned, so a helper that mutated and returned `None`
+    was silently accepted as no-divergence.
+  - NO_DIVERGENCE evidence was built as a JSON-list hash rather than
+    a SHA-256 of the freshly written CSV bytes.
+  - Replay cap counted berth-hook invocations, not `model.run_once`
+    calls, so a hook that never fired allowed unbounded replay.
+  - Replay rejected "no evidence" but did not distinguish regression
+    modes (queue exhaustion, cap exhaustion, horizon miss, recorded
+    event mismatch).
+  - Evidence payload contained no provenance (schema version, seed,
+    warmup/measured days, interval, scenario, helper SHA, integrity
+    timestamp), so a stale re-run could replay evidence against a
+    different helper.
+  - `_validate_decision_safety` was a structural stub that took
+    snapshots after the evaluation and silently permitted
+    helper mutations.
+  - `_load_runtime` removed organizer-prefixed `sys.modules` entries
+    but did not handle the participant-side `response_strategies`
+    namespace package entry that shadows the organizer one.
 
 - GREEN command:
 
   ```text
-  uv run pytest tests/unit/test_transshipment_readiness_probe.py tests/unit/test_transshipment_readiness.py tests/unit/test_overlay.py tests/unit/test_packaging.py tests/unit/test_cli.py -q
+  uv run pytest tests/unit/test_transshipment_readiness_probe.py -q
   ```
 
-  GREEN result: all assertions pass; the probe is implemented but not
-  executed against a real simulation in this phase.
+  GREEN result: 15 passed; the probe is implemented but not executed
+  against a real simulation in this phase.
+
+- Full-suite command:
+
+  ```text
+  uv run pytest -q
+  ```
+
+  Full-suite result: 337 passed. Lint, format, and mypy clean.
 
 ## Overlay and packaging control
 
@@ -487,7 +528,13 @@ A later approved bounded replay mode may replay seed `2026`, locate the same eve
 
 This is mechanism evidence, not score evidence. The replay refuses to honor any stored evidence whose parity or no-mutation flag is not `True`, and it cleans up the participant and organizer modules from `sys.modules` on exit.
 
-The static actual-next gate in the bounded lifecycle assumes the queue is unchanged for the duration of the measured horizon (no vessel arrivals or departures during ATT sampling). This is a documented hypothesis; it is not verified until a real run is approved.
+The static actual-next gate in the bounded lifecycle is scoped to the
+**single candidate event** itself: the buffer and receiver pair at the
+immediate berth queue, with no spontaneous arrival or departure
+between the buffer service and the receiver's next selection. It does
+not assume queue stability over the whole measured horizon; long-run
+queue stability remains a documented hypothesis that only an approved
+real run may test.
 
 ## Pre-review boundary
 

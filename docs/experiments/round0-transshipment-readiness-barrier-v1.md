@@ -483,6 +483,125 @@ implemented without running the public CLI. The corrections are:
   test, which is asserted in the integration suite).
   Lint, format, and mypy clean.
 
+#### Probe fail-closed RED → GREEN (control-flow correctness phase)
+
+An independent review at `0ff71c8` identified four further defects that
+were not exercised by the wiring suite:
+
+1. The replay search loop (`while target is None: ...`) exited only
+   via `ProbeError`. The downstream `if target is None: ... mismatch`
+   branch was therefore unreachable. The four search-phase abort
+   reasons (empty queue / horizon / cap / recorded-event mismatch)
+   were labeled but not behaviorally tested in distinct scenarios.
+2. The post-decision phase aborts (empty queue / deadline / cap) were
+   only labeled; no test genuinely entered the post-decision loop
+   before asserting one of them.
+3. The cleanup blocks used `assert ... is not observer`, which (a)
+   passes for any unrelated third callable and (b) vanishes under
+   `python -O`.
+4. `_serializable()` converted every primitive through `str()`, so the
+   CLI's JSON output reported `period_count`, `cumulative_loss`, and
+   other native JSON primitives as strings.
+
+The corrections are:
+
+1. **Bounded search loop**. `_execute_replay` runs
+   `for _executed_search_count in range(search_cap)` and checks
+   `head_event_time` (empty queue) and `head_event_time > horizon`
+   BEFORE the `run_once()` call so the cap is never exceeded for
+   empty-queue or horizon reasons. After the loop, terminal priority
+   is: candidate_seen -> recorded-event mismatch; head_event_time
+   None -> queue empty; head_event_time > horizon -> horizon
+   reached; otherwise -> cap exhausted. This makes all four
+   failure modes reachable in distinct scenarios.
+2. **In-loop mismatch escape**. When `candidate_seen` is True and the
+   queue empties (or the horizon advances) on a later iteration,
+   the loop breaks cleanly so the post-loop analysis can report
+   `recorded-event mismatch` rather than masking it with a
+   queue-empty or horizon abort.
+3. **Post-decision phase genuinely entered**. Tests construct a model
+   whose first `run_once()` fires the bound hook and matches the
+   recorded evidence; subsequent `run_once()` calls drive the queue
+   to empty / past-deadline / within-cap so each post-decision abort
+   is reached with the correct terminal reason.
+4. **Exact hook-identity check**. New helper `_enforce_hook_identity`
+   compares the post-cleanup hook attribute against `handle.original`
+   by IDENTITY and raises a fail-closed `ProbeError` naming both the
+   expected and actual callable. It does not use `assert`, so the
+   check survives `python -O`. The previous `assert ... is not
+   observer` is replaced in both `_execute_observation` and
+   `_execute_replay`.
+5. **JSON type preservation**. `_serializable` preserves `None`,
+   `bool`, `int`, `str`, and finite `float` as native JSON types;
+   `Path` becomes its string form; NaN/Inf become `None`; mappings
+   and sequences are recursed; other objects fall back to `repr()`.
+   The CLI's `json.dumps(... indent=2, sort_keys=True)` output now
+   reports numeric fields as numbers, not strings.
+
+RED command (control-flow):
+
+```text
+uv run pytest tests/unit/test_transshipment_probe_corrections_v2.py -q
+```
+
+RED result against `0ff71c8` (10 failed, 4 passed) — the search-phase
+mismatch branch was unreachable; post-decision aborts were asserted
+but never reached; cleanup asserted only "is not observer"; JSON
+primitives were stringified.
+
+GREEN command (control-flow):
+
+```text
+uv run pytest tests/unit/test_transshipment_probe_corrections_v2.py -q
+```
+
+GREEN result: 14 passed. Each test exercises the production control
+flow through `run_bounded_replay` / `_execute_replay` /
+`_execute_observation`, not mocks that short-circuit the body.
+
+Full-suite result at this commit:
+
+```text
+uv run pytest -q
+```
+
+`366 passed, 1 skipped`. Lint, format, and mypy clean.
+
+Test names proving every search and post-decision outcome (in
+`tests/unit/test_transshipment_probe_corrections_v2.py`):
+
+- `test_search_terminates_with_empty_queue_reason_when_queue_empty_before_search`
+- `test_search_terminates_with_horizon_reason_when_no_event_within_window`
+- `test_search_terminates_with_cap_reason_when_no_event_matches_within_cap`
+  (asserts `model.calls == 7` so the cap is not exceeded)
+- `test_search_terminates_with_mismatch_reason_after_one_nonmatching_candidate`
+- `test_search_with_matching_candidate_enters_post_decision_phase`
+- `test_post_decision_aborts_on_empty_queue_after_match`
+- `test_post_decision_aborts_on_deadline_overrun`
+- `test_post_decision_aborts_on_cap_exhaustion`
+- `test_observation_cleanup_restores_exact_original_callable_by_identity`
+- `test_replay_cleanup_restores_exact_original_callable_by_identity`
+- `test_observation_cleanup_recovers_when_hook_is_third_callable`
+- `test_observation_primary_error_plus_cleanup_error_surfaces_both`
+- `test_serializable_preserves_native_json_types`
+- `test_serializable_cli_output_preserves_native_types_via_json`
+
+Hook-restoration behavior (no `assert`, survives `-O`):
+
+- Every probe entry point installs the observer, captures
+  `handle.original` (a snapshot of the pre-installation hook value),
+  and on exit compares the post-cleanup hook attribute to
+  `handle.original` by IDENTITY inside `_enforce_hook_identity`.
+- If the comparison fails (any third callable, including the
+  observer, or `None`), the helper raises a fail-closed
+  `ProbeError` naming both the expected original and the actual
+  callable.
+- The cleanup block captures both `cleanup_error` (from
+  `remove_observer` or `_enforce_hook_identity`) and the
+  post-phase `ProbeError`, and surfaces both via
+  `raise ProbeError(f"{primary}: cleanup failed: {cleanup}")`
+  chained from the primary.
+
 ## Overlay and packaging control
 
 The submission surface is:
@@ -524,17 +643,17 @@ The probe is **FAIL-CLOSED** at every layer:
 - the observation observer aborts with `ProbeError` on any parity, mutation, strictness, or receiver-identity mismatch;
 - no valid-looking evidence is written after a safety violation;
 - the original hook is restored on every code path (success and failure);
-- the post-restoration hook identity is asserted on every probe run;
+- the post-restoration hook identity is verified by exact-identity comparison against `handle.original` (NOT `is not observer`); a third callable remaining installed is detected and raises a fail-closed `ProbeError` naming both the expected and actual callable. This verification uses an explicit `raise`, not `assert`, so it survives `python -O`;
 - evidence is written atomically (temp file + rename) and never overwrites existing evidence; the temp file is cleaned up on failure and the destination parent directory is created if missing;
 - the observation event cap (`MAX_OBSERVATION_EVENTS = 1_000_000`) aborts on exhaustion with a clear `ProbeError`;
 - the replay event caps (`MAX_REPLAY_SEARCH_EVENTS = 100_000`,
   `MAX_REPLAY_EVENTS_AFTER_DECISION = 100_000`) abort on exhaustion with a
   clear `ProbeError`;
-- the replay's search phase distinguishes empty event queue, horizon-reached, cap exhausted, and recorded-event mismatch with separate `ProbeError` messages — these four modes are behaviorally tested, not just labelled;
-- the replay's post-decision phase aborts with separate messages for empty queue, cap exhaustion, and deadline overrun — these three modes are behaviorally tested;
+- the replay's search phase distinguishes empty event queue, horizon-reached, cap exhausted, and recorded-event mismatch with separate `ProbeError` messages. All four modes are behaviorally tested in distinct scenarios (see the eight `test_search_*` and `test_post_decision_*` tests in `tests/unit/test_transshipment_probe_corrections_v2.py`);
+- the replay's post-decision phase aborts with separate messages for empty queue, cap exhaustion, and deadline overrun. All three modes are behaviorally tested after the search genuinely locates a matching candidate;
 - malformed, stale, incomplete, or safety-flag-false evidence is refused
   before any model is loaded;
-- the public CLI `main()` calls `run_observation_probe(output_path=...)` and `run_bounded_replay(evidence_path=...)` by keyword, prints one JSON document for success or failure, and uses rc=1 for `{"status": "FAILED"}` results, rc=2 for `ProbeError`, and rc=3 for unexpected `BaseException`;
+- the public CLI `main()` calls `run_observation_probe(output_path=...)` and `run_bounded_replay(evidence_path=...)` by keyword, prints one JSON document for success or failure, preserves native JSON primitive types through the serializer (numbers as numbers, booleans as booleans, strings as strings, paths as strings), and uses rc=1 for `{"status": "FAILED"}` results, rc=2 for `ProbeError`, and rc=3 for unexpected `BaseException`;
 - a NO_DIVERGENCE branch that would otherwise report success is refused with `ProbeError` when the SHA-256 of the freshly written CSV bytes does not equal the pinned `EXPECTED_OBSERVATION_HASH` — the hash is enforced, not advisory;
 - `_load_runtime` restores `sys.path` and removes every inserted package
   from `sys.modules` on every entry and exit path; this invariant is
@@ -585,7 +704,7 @@ real run may test.
 
 ## Pre-review boundary
 
-Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.22%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status. The coverage gate of 90% is a minimum; behavior is asserted directly by the wiring tests rather than relying on the percentage alone. Run each check via `uv run <command>` from the repo root; never embed absolute paths.
+Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, the canonical non-integration coverage command (measuring `src/wsc2026_tools` and `submission`, not the probe module), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status. The canonical coverage gate is at least 90%; the freshly measured value at HEAD is 91.16%. Probe behavior is asserted directly by the focused behavioral tests (`tests/unit/test_transshipment_probe_corrections_v2.py` and `tests/unit/test_transshipment_readiness_probe_wiring.py`), not by the coverage percentage. Run each check via `uv run <command>` from the repo root; never embed absolute paths.
 
 Before reviewer approval, do not run:
 

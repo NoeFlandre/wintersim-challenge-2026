@@ -825,6 +825,20 @@ The following run record is preserved from `8b62aaf716fe9da3c93dbf1c1e8dca734aff
 - Candidate mechanism behavior: candidate strategy executes through synthetic packaging import path and temporarily monkeypatches the organizer hook in-process for that focused test only; it does not remain active in ignored runtime afterward.
 - Earlier integration failure cause: stale ignored runtime candidate SHA; the candidate strategy had not actually been restored in ignored runtime.
 
+### Post-smoke fallback restoration audit (no sync-capable command after final restore)
+
+- The CLI smoke gate (`uv run wsc2026 smoke --round round0`) is known to invoke `_sync_for_round()` before execution, which reinstalls tracked candidate bytes into `.challenge/round0/source/response_strategies`; this can temporarily restore `74a922000f89cd5cb1f4a15f37361dcd79309ccda50889b53f838a791780e0e0`.
+- Final corrective step restored ignored runtime `user_strategy.py`/`README.md` again from `bd518be`, and preserved an `/tmp` snapshot at `/tmp/transshipment-post-smoke-audit`.
+- Helper removal remained enforced: `.challenge/round0/source/response_strategies/transshipment_readiness.py` absent.
+- Final no-op SHA is `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`.
+- Smoke verification used direct `run_smoke(source_root=Path('/Users/noeflandre/wintersim-challenge-2026-transshipment-readiness-v1/.challenge/round0/source'))` (not CLI `_cmd_smoke`); result:
+  - `returncode=0`, `timed_out=False`, `SMOKE_OK` in stdout.
+- Post-direct-smoke runtime/state checks:
+  - `transshipment_readiness.py` still absent.
+  - ignored runtime SHA unchanged at `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`.
+  - ATT SHA remains `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+  - Score remains `18.673577819840556`.
+
 ### Decision and restoration
 
 - Acceptance rule applied: `candidate_loss < 18.673577819840556 - 1e-9`.
@@ -834,3 +848,4 @@ The following run record is preserved from `8b62aaf716fe9da3c93dbf1c1e8dca734aff
 - Fallback ATT and score remain:
   - `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
   - `18.673577819840556`
+- No further runs are authorized in this branch/state.

@@ -2,12 +2,11 @@
 
 ## Status
 
-**OBSERVATION RETRY APPROVED**
+**REJECTED — COMPLETE**
 
-This document controls one candidate only. The first observation attempt
-failed closed at its event cap. A single retry with the corrected operational
-budget is authorized; replay and the full candidate run remain gated on the
-result.
+This document controls one candidate only. No further run is authorized.
+The experiment result is rejection by strict rule and the active runtime is now
+the corrected ignored-round0 no-op fallback.
 
 ## Hypothesis
 
@@ -769,6 +768,8 @@ No threshold changes, second candidate, parameter tuning, or additional full run
 
 ## Current round0 execution record (2026-07-26)
 
+The following run record is preserved from `8b62aaf716fe9da3c93dbf1c1e8dca734affa91f`.
+
 ### Full-run control (candidate 1)
 
 - Observation command: `uv run python experiments/probes/transshipment_readiness_barrier_v1.py observe --evidence experiments/results/transshipment_readiness_barrier_v1_probe.json`.
@@ -786,6 +787,20 @@ No threshold changes, second candidate, parameter tuning, or additional full run
 - Runtime: `00:18:03`.
 - Exit code: `0`.
 
+### Corrective restoration audit (runtime and acceptance state)
+
+- Incorrect active ignored runtime SHA was found after the first restoration attempt:
+  `74a922000f89cd5cb1f4a15f37361dcd79309ccda50889b53f838a791780e0e0`.
+- Corrected ignored runtime SHA is now:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`.
+- `transshipment_readiness.py` was removed from ignored organizer runtime.
+- `README.md` was restored from commit `bd518be` for organizer/runtime alignment.
+- `default_strategy.py` was not changed.
+- Fallback ATT restoration retained:
+  - SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
+  - Score: `18.673577819840556` (via `wsc2026 score`).
+- Tracked participant strategy under `submission/` remains the reproducible rejected implementation and was not modified by this correction.
+
 ### Candidate ATT snapshot and scoring
 
 - Snapshot path preserved before any cleanup:
@@ -801,14 +816,21 @@ No threshold changes, second candidate, parameter tuning, or additional full run
 - Relative change: `0.000000%`.
 - Historical score comparison target (`18.276620672293834`): not beaten (candidate is above).
 
+### Focused integration verification after restoration
+
+- Command:
+  `uv run pytest tests/integration/test_transshipment_readiness_activity_order.py::test_real_activity_order_receiver_misses_without_barrier_and_catches_with_barrier -q -vv`
+- Result: `1 passed` (rerun required after correction in this worktree).
+- No-barrier phase behavior: the ignored no-op organizer runtime delegates to organizer fallback and selects the fallback receiver.
+- Candidate mechanism behavior: candidate strategy executes through synthetic packaging import path and temporarily monkeypatches the organizer hook in-process for that focused test only; it does not remain active in ignored runtime afterward.
+- Earlier integration failure cause: stale ignored runtime candidate SHA; the candidate strategy had not actually been restored in ignored runtime.
+
 ### Decision and restoration
 
 - Acceptance rule applied: `candidate_loss < 18.673577819840556 - 1e-9`.
-- Result: **REJECTED** (equality with threshold is not strict lower).
+- Result: **REJECTED** (strict lower-than threshold required; equality is rejection).
 - Candidate snapshot retained at `.challenge/round0/results/transshipment_readiness_barrier_v1_2026/ATT_By_Statistics_Interval.csv`.
-- Runtime restored from pre-run backup:
-  - Backup root: `/tmp/round0_round0_pre_sync_20260726T072118Z`.
-  - Restored strategy runtime and fallback ATT via backup sync.
-- Restored ATT SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
-- Restored ATT score check command same as above on source output: cumulative loss `18.673577819840556`.
-- Restored runtime state: fallback `user_strategy.py` and `default_strategy.py` in `.challenge/round0/source/response_strategies/` from backup set.
+- Runtime state now restored from commit `bd518be` no-op runtime; candidate runtime is not active in ignored organizer tree.
+- Fallback ATT and score remain:
+  - `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
+  - `18.673577819840556`

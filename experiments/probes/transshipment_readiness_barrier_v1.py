@@ -107,9 +107,9 @@ WARMUP_DAYS = 140
 MEASURED_DAYS = 360
 ATT_PERIOD_DAYS = 5
 EXPECTED_PERIODS = MEASURED_DAYS // ATT_PERIOD_DAYS  # 72
-MAX_OBSERVATION_EVENTS = 1_000_000
+MAX_OBSERVATION_EVENTS = 20_000_000
 MAX_REPLAY_EVENTS_AFTER_DECISION = 100_000
-MAX_REPLAY_SEARCH_EVENTS = 100_000
+MAX_REPLAY_SEARCH_EVENTS = MAX_OBSERVATION_EVENTS
 
 # Documented invariants that must hold for the lifecycle to validate.
 EXPECTED_OBSERVATION_HASH = "10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658"
@@ -312,6 +312,30 @@ def _enforce_hook_identity(handle: ObserverHandle) -> None:
             f"hook restoration failed: expected the original callable "
             f"{handle.original!r}, found {current!r}"
         )
+
+
+def _cleanup_observer(
+    handle: ObserverHandle,
+    *,
+    primary_error: BaseException | None,
+) -> None:
+    """Restore an observer and surface every cleanup failure."""
+    cleanup_errors: list[BaseException] = []
+    try:
+        remove_observer(handle)
+    except BaseException as exc:  # noqa: BLE001
+        cleanup_errors.append(exc)
+    try:
+        _enforce_hook_identity(handle)
+    except BaseException as exc:  # noqa: BLE001
+        cleanup_errors.append(exc)
+
+    if not cleanup_errors:
+        return
+    details = "; ".join(f"{type(exc).__name__}: {exc}" for exc in cleanup_errors)
+    if primary_error is not None:
+        raise ProbeError(f"{primary_error}: cleanup failed: {details}") from primary_error
+    raise ProbeError(f"cleanup failed: {details}") from cleanup_errors[0]
 
 
 def _hook_snapshot(kwargs: dict[str, Any]) -> tuple[Any, ...]:
@@ -930,23 +954,7 @@ def _execute_observation(
         primary_error = exc
         raise
     finally:
-        cleanup_error: BaseException | None = None
-        try:
-            remove_observer(handle)
-        except BaseException as exc:  # noqa: BLE001
-            cleanup_error = exc
-        # Fail-closed hook-identity validation: the hook attribute must
-        # point at the exact ORIGINAL callable (compared by identity),
-        # not at the observer and not at any unrelated third callable.
-        # This must NOT use ``assert`` so it survives ``python -O``.
-        try:
-            _enforce_hook_identity(handle)
-        except BaseException as exc:  # noqa: BLE001
-            cleanup_error = cleanup_error or exc
-        if cleanup_error is not None and primary_error is not None:
-            raise ProbeError(f"{primary_error}: cleanup failed: {cleanup_error}") from primary_error
-        if cleanup_error is not None:
-            raise cleanup_error
+        _cleanup_observer(handle, primary_error=primary_error)
 
     if observer_state["found"] is not None:
         evidence = observer_state["found"]
@@ -1276,7 +1284,6 @@ def _execute_replay(
     def stop_search() -> bool:
         return target is not None
 
-    cleanup_error: BaseException | None = None
     post_phase_error: BaseException | None = None
     try:
         try:
@@ -1406,17 +1413,7 @@ def _execute_replay(
         post_phase_error = exc
         raise
     finally:
-        try:
-            remove_observer(handle)
-        except BaseException as exc:  # noqa: BLE001
-            cleanup_error = exc
-        _enforce_hook_identity(handle)
-        if cleanup_error is not None and post_phase_error is not None:
-            raise ProbeError(
-                f"{post_phase_error}: cleanup failed: {cleanup_error}"
-            ) from post_phase_error
-        if cleanup_error is not None:
-            raise cleanup_error
+        _cleanup_observer(handle, primary_error=post_phase_error)
 
     result = {
         "buffer_served": bool(buffer_served),

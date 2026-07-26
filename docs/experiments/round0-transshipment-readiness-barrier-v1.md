@@ -2,9 +2,12 @@
 
 ## Status
 
-**PRE_RUN_REVIEW**
+**OBSERVATION RETRY APPROVED**
 
-This document controls one candidate only. No operational execution is authorized by this status.
+This document controls one candidate only. The first observation attempt
+failed closed at its event cap. A single retry with the corrected operational
+budget is authorized; replay and the full candidate run remain gated on the
+result.
 
 ## Hypothesis
 
@@ -602,6 +605,38 @@ Hook-restoration behavior (no `assert`, survives `-O`):
   `raise ProbeError(f"{primary}: cleanup failed: {cleanup}")`
   chained from the primary.
 
+#### Observation-cap failure and operational-budget correction
+
+The first real observation was executed exactly once at `6e9fd33` on
+2026-07-26. It failed closed after 196 seconds with:
+
+```text
+observation aborted: event cap 1000000 exhausted before the measured horizon elapsed
+```
+
+No divergence evidence or ATT CSV was written. This was not a strategy
+result: the one-million-event budget ended well before the pinned 140-day
+warm-up plus 360-day measured trajectory. The same pinned trajectory takes
+about 28 minutes in the current checkout, so the observed event throughput
+implies that the complete run requires substantially more than one million
+events.
+
+The operational cap is corrected to `20_000_000`, retaining a finite
+fail-closed bound with more than twice the event budget implied by the
+historical complete-run runtime. `MAX_REPLAY_SEARCH_EVENTS` is set equal to
+`MAX_OBSERVATION_EVENTS`: because no divergence occurred in the first million
+events, the former 100,000-event replay cap could not possibly have reached a
+later observation. These are probe execution limits only. They do not change
+the participant policy, its thresholds, the simulation seed, or any scoring
+input.
+
+Cleanup is also centralized so observation and replay both report the primary
+error, any restoration error, and any exact-identity failure without one
+masking another. The RED tests
+`test_observation_and_replay_share_a_full_trajectory_event_budget` and
+`test_replay_primary_remove_and_identity_failures_are_all_visible` failed
+against `6e9fd33` and pass with this correction.
+
 ## Overlay and packaging control
 
 The submission surface is:
@@ -642,11 +677,13 @@ The probe is **FAIL-CLOSED** at every layer:
 
 - the observation observer aborts with `ProbeError` on any parity, mutation, strictness, or receiver-identity mismatch;
 - no valid-looking evidence is written after a safety violation;
-- the original hook is restored on every code path (success and failure);
+- the probe-owned observer is restored to the exact original hook on every
+  normal success or failure path; an unexpected third-party replacement is
+  not overwritten silently and instead fails closed;
 - the post-restoration hook identity is verified by exact-identity comparison against `handle.original` (NOT `is not observer`); a third callable remaining installed is detected and raises a fail-closed `ProbeError` naming both the expected and actual callable. This verification uses an explicit `raise`, not `assert`, so it survives `python -O`;
 - evidence is written atomically (temp file + rename) and never overwrites existing evidence; the temp file is cleaned up on failure and the destination parent directory is created if missing;
-- the observation event cap (`MAX_OBSERVATION_EVENTS = 1_000_000`) aborts on exhaustion with a clear `ProbeError`;
-- the replay event caps (`MAX_REPLAY_SEARCH_EVENTS = 100_000`,
+- the observation event cap (`MAX_OBSERVATION_EVENTS = 20_000_000`) aborts on exhaustion with a clear `ProbeError`;
+- the replay event caps (`MAX_REPLAY_SEARCH_EVENTS = 20_000_000`,
   `MAX_REPLAY_EVENTS_AFTER_DECISION = 100_000`) abort on exhaustion with a
   clear `ProbeError`;
 - the replay's search phase distinguishes empty event queue, horizon-reached, cap exhausted, and recorded-event mismatch with separate `ProbeError` messages. All four modes are behaviorally tested in distinct scenarios (see the eight `test_search_*` and `test_post_decision_*` tests in `tests/unit/test_transshipment_probe_corrections_v2.py`);

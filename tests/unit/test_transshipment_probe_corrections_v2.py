@@ -858,3 +858,53 @@ def test_serializable_cli_output_preserves_native_types_via_json(
     assert parsed["none_field"] is None
     assert parsed["path_field"] == str(tmp_path / "x.csv")
     assert parsed["list_field"] == [1, 2.0, "three"]
+
+
+# ===========================================================================
+# E. Operational budgets and replay cleanup composition
+# ===========================================================================
+
+
+def test_observation_and_replay_share_a_full_trajectory_event_budget(
+    probe: types.ModuleType,
+) -> None:
+    """Replay must be able to reach every event the observer can record.
+
+    The first real observation exhausted the old 1,000,000-event budget
+    after only 196 seconds, well before the pinned 500-day trajectory
+    completed. A later divergence would therefore also be unreachable by
+    the old 100,000-event replay search budget.
+    """
+    assert probe.MAX_OBSERVATION_EVENTS == 20_000_000
+    assert probe.MAX_REPLAY_SEARCH_EVENTS == probe.MAX_OBSERVATION_EVENTS
+
+
+def test_replay_primary_remove_and_identity_failures_are_all_visible(
+    probe: types.ModuleType,
+) -> None:
+    """Replay cleanup must not mask either the primary or cleanup causes."""
+    original = lambda **_k: _Obj(name="original")  # noqa: E731
+
+    class _StrategyClass:
+        select_vessel_for_berth = original
+
+    env = _env_with_fake_model(_SearchEmptyQueueModel(), _simple_helper(), probe)
+    env["user_strategy_class"] = _StrategyClass
+
+    def boom_remove_observer(_handle: Any) -> None:
+        raise RuntimeError("cleanup boom during replay restore")
+
+    with (
+        mock.patch.object(
+            probe,
+            "remove_observer",
+            side_effect=boom_remove_observer,
+        ),
+        pytest.raises(probe.ProbeError) as info,
+    ):
+        probe.run_bounded_replay(evidence=_evidence(probe), env=env)
+
+    message = str(info.value).lower()
+    assert "queue" in message
+    assert "cleanup boom during replay restore" in message
+    assert "hook restoration failed" in message

@@ -766,3 +766,49 @@ Rejection requires all of:
 6. Preserve the rejection decision and evidence references.
 
 No threshold changes, second candidate, parameter tuning, or additional full run may follow the observed result.
+
+## Current round0 execution record (2026-07-26)
+
+### Full-run control (candidate 1)
+
+- Observation command: `uv run python experiments/probes/transshipment_readiness_barrier_v1.py observe --evidence experiments/results/transshipment_readiness_barrier_v1_probe.json`.
+- Observation result: `status: NO_DIVERGENCE` (no evidence file created).
+- Replay/skipped reason: skipped due to no-divergence.
+- Candidate full run command: `uv run wsc2026 run --round round0 --full` (process confirmed complete with `UV_EXIT=0`).
+- Log path: `/tmp/round0_full_20260726T072130Z.log`.
+- Log SHA-256: `1b70bedd7e2ed968c14064b05adebb5437afe6915682e89dd450ce872790c11e`.
+- Run markers from log:
+  - `UTC_START=2026-07-26T07:21:30Z`.
+  - `Period 72 (Days 356-360)`.
+  - `Simulation completed.`
+- Full-run UTC start: `2026-07-26T07:21:30Z`.
+- Full-run UTC end (from `Simulation Running Time: 00:18:03`): `2026-07-26T07:39:33Z`.
+- Runtime: `00:18:03`.
+- Exit code: `0`.
+
+### Candidate ATT snapshot and scoring
+
+- Snapshot path preserved before any cleanup:
+  - `.challenge/round0/results/transshipment_readiness_barrier_v1_2026/ATT_By_Statistics_Interval.csv`
+- Snapshot SHA-256 (byte-identical to source output at copy time): `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+- Period count (numbered periods only): `72`.
+- Mean ATT across numbered period rows: `20.336944444444445` days.
+- Score command:
+  `uv run wsc2026 score --scenario-att .challenge/round0/results/transshipment_readiness_barrier_v1_2026/ATT_By_Statistics_Interval.csv --baseline-att .challenge/round0/source/Output/Baseline_ATT_By_Statistics_Interval.csv --json`
+- Candidate cumulative loss: `18.673577819840556`.
+- Fallback cumulative loss threshold: `18.673577819840556`.
+- Delta (candidate - fallback): `0.000000000000000`.
+- Relative change: `0.000000%`.
+- Historical score comparison target (`18.276620672293834`): not beaten (candidate is above).
+
+### Decision and restoration
+
+- Acceptance rule applied: `candidate_loss < 18.673577819840556 - 1e-9`.
+- Result: **REJECTED** (equality with threshold is not strict lower).
+- Candidate snapshot retained at `.challenge/round0/results/transshipment_readiness_barrier_v1_2026/ATT_By_Statistics_Interval.csv`.
+- Runtime restored from pre-run backup:
+  - Backup root: `/tmp/round0_round0_pre_sync_20260726T072118Z`.
+  - Restored strategy runtime and fallback ATT via backup sync.
+- Restored ATT SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
+- Restored ATT score check command same as above on source output: cumulative loss `18.673577819840556`.
+- Restored runtime state: fallback `user_strategy.py` and `default_strategy.py` in `.challenge/round0/source/response_strategies/` from backup set.

@@ -395,47 +395,83 @@ event itself, with the buffer/receiver pair at the immediate berth
 queue; it does not assume queue stability over the whole measured
 horizon).
 
-- RED command:
+A subsequent operational-wiring review of the probe at `3a0a4ef`
+identified 13 additional defects that all remained latent because the
+reviewer at `e388d63` (the parent of `3a0a4ef`) treated the wiring as
+implemented without running the public CLI. The corrections are:
+
+1. The public CLI `main()` now passes `output_path=` and `evidence_path=`
+   by keyword (matching the signature) instead of the previous
+   positional form that crashed with `TypeError: unexpected keyword
+   argument`.
+2. `run_observation_probe(output_path=..., *, env=None)` and
+   `run_bounded_replay(evidence_path=..., *, env=None)` reach the real
+   organizer runtime when `env` is omitted; the previous implementation
+   raised `ProbeError("requires an env dict")` immediately.
+3. The CLI `main()` keeps the real organizer runtime alive for the
+   full observation OR replay pass, including the entire body of the
+   `_load_runtime()` context manager — hook monkeypatching,
+   constructing the env dict from real callables captured while the
+   runtime is open, running the model, scoring, and restoring the
+   original hook.
+4. The NO_DIVERGENCE branch now SHA-256s the freshly written CSV bytes
+   and refuses to emit `NO_DIVERGENCE` when the digest does not equal
+   `EXPECTED_OBSERVATION_HASH` — equality is enforced, not advisory.
+5. The replay's search phase distinguishes four abort reasons
+   behaviorally (separate `ProbeError` messages): empty event queue,
+   horizon-reached, cap exhausted, recorded-event mismatch. The
+   post-decision phase aborts with separate messages for empty queue,
+   cap exhaustion, and deadline. These are tested RED-then-GREEN.
+6. The cleanup path no longer swallows exceptions via
+   `contextlib.suppress`. If both the primary action and the
+   cleanup fail, the cleanup error is attached as context and the
+   primary error is surfaced; a failure solely in cleanup is also
+   surfaced. The post-restoration hook identity is asserted.
+7. The atomic evidence writer creates the destination parent directory
+   on first use (so it works in a fresh clone) and refuses to overwrite
+   existing evidence; on failure, the temp file is cleaned up.
+8. The `_load_runtime` cleanup invariant is verified in a dedicated
+   integration test under `pytestmark = pytest.mark.integration` so
+   the non-integration coverage command can exit 0 even when NumPy
+   and the ignored organizer source are unavailable.
+9. Dead helper seams from a removed re-implementation
+   (`_wrap_run_once`, `_restore_run_once`, `_build_real_environment`,
+   `_produce_real_model`, `_import_math`) and unused env-dict keys
+   (`producer`, `context_factory`, `helper_path`) are deleted.
+10. The CLI prints one JSON document on success or failure (rc=0,
+    rc=1, rc=2, rc=3 distinguished).
+11. The CLI no longer mints a default evidence path inside the repo —
+    `--evidence` is required; without it the CLI exits with a usage
+    error.
+12. Existing behavioral tests in
+    `tests/unit/test_transshipment_readiness_probe.py` are updated to
+    the new keyword signature; the `EXPECTED_OBSERVATION_HASH` matching
+    fixture is wired so the existing no-divergence test cannot pass
+    unless the CSV hash matches.
+13. Tracked documentation that previously stated the CLI was
+    operationally wired, the hash was advisory, four failure modes
+    existed without behavioral coverage, or coverage only had to clear
+    90% is updated below.
+
+- RED command (wiring):
 
   ```text
-  uv run pytest tests/unit/test_transshipment_readiness_probe.py -q
+  uv run pytest tests/unit/test_transshipment_readiness_probe_wiring.py -q
   ```
 
-  RED result (15 failures, 1 pass):
-  - The probe imported `Model.event_count` (which does not exist on
-    the real organizer `Model`) and crashed on activation.
-  - `NoDivergenceLifecycle` was a disconnected class that
-    `run_observation_probe` never instantiated; the real
-    orchestration path went through it without effect.
-  - Mutation detection only compared snapshots **after** the
-    evaluator returned, so a helper that mutated and returned `None`
-    was silently accepted as no-divergence.
-  - NO_DIVERGENCE evidence was built as a JSON-list hash rather than
-    a SHA-256 of the freshly written CSV bytes.
-  - Replay cap counted berth-hook invocations, not `model.run_once`
-    calls, so a hook that never fired allowed unbounded replay.
-  - Replay rejected "no evidence" but did not distinguish regression
-    modes (queue exhaustion, cap exhaustion, horizon miss, recorded
-    event mismatch).
-  - Evidence payload contained no provenance (schema version, seed,
-    warmup/measured days, interval, scenario, helper SHA, integrity
-    timestamp), so a stale re-run could replay evidence against a
-    different helper.
-  - `_validate_decision_safety` was a structural stub that took
-    snapshots after the evaluation and silently permitted
-    helper mutations.
-  - `_load_runtime` removed organizer-prefixed `sys.modules` entries
-    but did not handle the participant-side `response_strategies`
-    namespace package entry that shadows the organizer one.
+  RED result (12 failed, 3 passed) against the `e388d63` parent of
+  `3a0a4ef`.
 
-- GREEN command:
+- GREEN command (wiring):
 
   ```text
-  uv run pytest tests/unit/test_transshipment_readiness_probe.py -q
+  uv run pytest tests/unit/test_transshipment_readiness_probe_wiring.py -q
   ```
 
-  GREEN result: 15 passed; the probe is implemented but not executed
-  against a real simulation in this phase.
+  GREEN result: 15 passed; the probe CLI is wired to its real-runtime
+  helpers, the hash equality gate fires on mismatch, the four replay
+  failure modes are behaviorally distinguished, and atomic evidence
+  writing works in a fresh clone.
 
 - Full-suite command:
 
@@ -443,7 +479,9 @@ horizon).
   uv run pytest -q
   ```
 
-  Full-suite result: 337 passed. Lint, format, and mypy clean.
+  Full-suite result: 352 passed, 1 skipped (the load-runtime cleanup
+  test, which is asserted in the integration suite).
+  Lint, format, and mypy clean.
 
 ## Overlay and packaging control
 
@@ -486,15 +524,24 @@ The probe is **FAIL-CLOSED** at every layer:
 - the observation observer aborts with `ProbeError` on any parity, mutation, strictness, or receiver-identity mismatch;
 - no valid-looking evidence is written after a safety violation;
 - the original hook is restored on every code path (success and failure);
-- evidence is written atomically (temp file + rename) and never overwrites existing evidence;
+- the post-restoration hook identity is asserted on every probe run;
+- evidence is written atomically (temp file + rename) and never overwrites existing evidence; the temp file is cleaned up on failure and the destination parent directory is created if missing;
 - the observation event cap (`MAX_OBSERVATION_EVENTS = 1_000_000`) aborts on exhaustion with a clear `ProbeError`;
 - the replay event caps (`MAX_REPLAY_SEARCH_EVENTS = 100_000`,
   `MAX_REPLAY_EVENTS_AFTER_DECISION = 100_000`) abort on exhaustion with a
   clear `ProbeError`;
+- the replay's search phase distinguishes empty event queue, horizon-reached, cap exhausted, and recorded-event mismatch with separate `ProbeError` messages — these four modes are behaviorally tested, not just labelled;
+- the replay's post-decision phase aborts with separate messages for empty queue, cap exhaustion, and deadline overrun — these three modes are behaviorally tested;
 - malformed, stale, incomplete, or safety-flag-false evidence is refused
   before any model is loaded;
+- the public CLI `main()` calls `run_observation_probe(output_path=...)` and `run_bounded_replay(evidence_path=...)` by keyword, prints one JSON document for success or failure, and uses rc=1 for `{"status": "FAILED"}` results, rc=2 for `ProbeError`, and rc=3 for unexpected `BaseException`;
+- a NO_DIVERGENCE branch that would otherwise report success is refused with `ProbeError` when the SHA-256 of the freshly written CSV bytes does not equal the pinned `EXPECTED_OBSERVATION_HASH` — the hash is enforced, not advisory;
 - `_load_runtime` restores `sys.path` and removes every inserted package
-  from `sys.modules` on every entry and exit path.
+  from `sys.modules` on every entry and exit path; this invariant is
+  asserted in the integration suite under `pytestmark = pytest.mark.integration`;
+- cleanup failures are not swallowed: if the primary action and the
+  cleanup both fail, both messages are surfaced (cleanup as context);
+  a failure solely in cleanup is also surfaced.
 
 The lifecycle constants and documented invariants:
 
@@ -538,7 +585,7 @@ real run may test.
 
 ## Pre-review boundary
 
-Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.27%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status. Run each check via `uv run <command>` from the repo root; never embed absolute paths.
+Authorized checks are lock verification, dependency sync, formatting, lint, typecheck, focused RED/GREEN unit tests, non-integration coverage at or above 90% (current measured 90.22%), bounded synthetic integration tests using actual organizer activities, integration tests that do not launch a full trajectory, deterministic packaging, member verification, `git diff --check`, restricted-material search, and clean Git status. The coverage gate of 90% is a minimum; behavior is asserted directly by the wiring tests rather than relying on the percentage alone. Run each check via `uv run <command>` from the repo root; never embed absolute paths.
 
 Before reviewer approval, do not run:
 

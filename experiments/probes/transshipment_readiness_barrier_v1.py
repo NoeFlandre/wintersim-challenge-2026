@@ -22,7 +22,9 @@ Two phases:
   writes the 72-row ``ATT_By_Statistics_Interval.csv`` into an isolated
   ignored private directory, hashes the file's *bytes* (not a JSON
   list), invokes :func:`wsc2026_tools.scoring.compute_resilience_loss`
-  with the just-written CSV as scenario path, and requires
+  with the just-written CSV as scenario path, enforces
+  ``att_csv_sha256 == EXPECTED_OBSERVATION_HASH`` (raising
+  :class:`ProbeError` on mismatch), and requires
   ``period_count == 72`` and ``cumulative_loss == EXPECTED_CUMULATIVE_RESILIENCE_LOSS``.
 * :func:`run_bounded_replay` consumes the saved provenance-safe evidence
   and verifies the buffer-then-receiver mechanism, counting every
@@ -33,9 +35,23 @@ organizer source on ``sys.path`` and exposes the participant helper
 as a synthetic package; on exit it always restores ``sys.path`` and
 removes every package it inserted from ``sys.modules``.
 
+Public function signatures (corrected in this round):
+
+* :func:`run_observation_probe` -- ``output_path`` is the FIRST
+  POSITIONAL parameter; ``env`` is keyword-only.
+* :func:`run_bounded_replay` -- ``evidence_path`` is the FIRST
+  POSITIONAL parameter; ``env`` is keyword-only.
+
+Both phases keep the real organizer runtime ALIVE across the entire
+operation (model construction + execution + cleanup happen inside a
+single ``_load_runtime`` enter/exit). This is required because
+``simulation_output_csv_writer.write_att_by_period`` is only available
+while the organizer source is on ``sys.path``.
+
 The probe is FAIL-CLOSED. Any safety violation, provenance mismatch,
 configuration mismatch, non-finite metric, non-integer index, unknown
-schema, or event-cap exhaustion aborts with a clear :class:`ProbeError`.
+schema, hash mismatch, or event-cap exhaustion aborts with a clear
+:class:`ProbeError`.
 """
 
 from __future__ import annotations
@@ -47,6 +63,7 @@ import hashlib
 import importlib
 import importlib.util
 import json
+import math
 import os
 import sys
 import tempfile
@@ -126,6 +143,8 @@ _ORGANIZER_PACKAGE_NAMES = frozenset(
 _OBSERVATION_HASH_PATH = (
     repo_root() / "experiments" / "results" / "transshipment_readiness_barrier_v1_probe.json"
 )
+DEFAULT_OBSERVATION_PATH = _OBSERVATION_HASH_PATH
+DEFAULT_REPLAY_PATH = _OBSERVATION_HASH_PATH
 
 
 # Private stop sentinel raised by the wrapped run_once after a valid
@@ -254,42 +273,6 @@ def _load_runtime() -> Iterator[_Runtime]:
             with contextlib.suppress(ValueError):
                 if path in sys.path:
                     sys.path.remove(path)
-
-
-def _build_real_environment(
-    *,
-    results_dir: Path,
-    max_events: int = MAX_OBSERVATION_EVENTS,
-) -> dict[str, Any]:
-    """Construct the production environment for :func:`run_observation_probe`.
-
-    Reads from the loaded runtime so all calls share the same imports.
-    """
-    with _load_runtime() as runtime:
-        context_factory = runtime.scenario_builders.create_with_disruption
-        return {
-            "model": _produce_real_model(runtime, context_factory),
-            "readiness": runtime.readiness,
-            "default_strategy": runtime.default_strategy,
-            "user_strategy_class": runtime.organizer_user_strategy,
-            "scenario_builders": runtime.scenario_builders,
-            "model_class": runtime.model_class,
-            "output_dir": runtime.output_dir,
-            "baseline_att_path": runtime.baseline_att_path,
-            "results_dir": results_dir,
-            "max_events": max_events,
-            "writer": _real_att_writer,
-            "scorer": _real_scorer,
-            "csv_hash": _real_csv_hash,
-            "helper_path": HELPER_SOURCE_PATH,
-            "context_factory": context_factory,
-        }
-
-
-def _produce_real_model(runtime: _Runtime, context_factory: Callable[..., Any]) -> Any:
-    """Create a real ``simulation_model.Model`` instance from the loaded runtime."""
-    context = context_factory()
-    return runtime.model_class(context, seed=SEED)
 
 
 # ---------------------------------------------------------------------------
@@ -532,9 +515,9 @@ def validate_evidence(evidence: dict[str, Any]) -> None:
             raise ProbeError(
                 f"replay aborted: metric {key!r} must be a number, got {type(value).__name__}"
             )
-        if isinstance(value, float) and _import_math().isnan(value):
+        if isinstance(value, float) and math.isnan(value):
             raise ProbeError(f"replay aborted: metric {key!r} is non-finite")
-        if isinstance(value, float) and _import_math().isinf(value):
+        if isinstance(value, float) and math.isinf(value):
             raise ProbeError(f"replay aborted: metric {key!r} is non-finite")
     for key in ("receiver_waiting_index", "buffer_waiting_index"):
         value = evidence.get(key)
@@ -575,34 +558,46 @@ def _require_strict_bool(evidence: dict[str, Any], key: str, expected: bool) -> 
         raise ProbeError(f"replay aborted: {key!r} must be {expected}")
 
 
-def _import_math():
-    import math
-
-    return math
-
-
 def _current_helper_sha256() -> str:
     """Return the SHA-256 of the active submission helper file."""
     return hashlib.sha256(HELPER_SOURCE_PATH.read_bytes()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
-# Real production defaults
+# Real production defaults (captured while the organizer runtime is alive)
 # ---------------------------------------------------------------------------
 
 
-def _real_att_writer(output_dir: Path, periods: list[tuple[int, int, float]]) -> Path:
-    """Write a fresh ``ATT_By_Statistics_Interval.csv`` using the organizer's writer."""
+def _capture_real_callables(runtime: _Runtime) -> dict[str, Any]:
+    """Pull organizer-side callables while the runtime context is open.
+
+    Called from inside ``_load_runtime``; the result is bound into the
+    environment dict so ``_run_observation_with_env`` and
+    ``_run_replay_with_env`` can call them without re-importing the
+    organizer-side modules (which would fail once the runtime context
+    has exited and removed the organizer source from ``sys.path``).
+    """
     from simulation_output_csv_writer import write_att_by_period
 
-    write_att_by_period(output_dir, periods)
-    return output_dir / "ATT_By_Statistics_Interval.csv"
-
-
-def _real_scorer(scenario_att_path: Path, baseline_att_path: Path) -> Any:
     from wsc2026_tools.scoring import compute_resilience_loss
 
-    return compute_resilience_loss(scenario_att_path, baseline_att_path)
+    return {
+        "writer": lambda output_dir, periods: _real_att_writer(
+            write_att_by_period, output_dir, periods
+        ),
+        "scorer": compute_resilience_loss,
+        "csv_hash": _real_csv_hash,
+    }
+
+
+def _real_att_writer(
+    write_att_by_period: Callable[..., Any],
+    output_dir: Path,
+    periods: list[tuple[int, int, float]],
+) -> Path:
+    """Write a fresh ``ATT_By_Statistics_Interval.csv`` using the captured writer."""
+    write_att_by_period(output_dir, periods)
+    return output_dir / "ATT_By_Statistics_Interval.csv"
 
 
 def _real_csv_hash(csv_path: Path) -> str:
@@ -612,63 +607,6 @@ def _real_csv_hash(csv_path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Wrapped run_once with bound counting + private stop sentinel
 # ---------------------------------------------------------------------------
-
-
-def _wrap_run_once(
-    model: Any,
-    *,
-    max_events: int,
-    stop_check: Callable[[], bool],
-) -> tuple[Callable[[], bool], Callable[[], int]]:
-    """Wrap ``model.run_once`` so every executed event is counted.
-
-    Returns ``(wrapped_run_once, executed_event_count_getter)``. The
-    wrapper:
-      1. Increments the local executed event counter.
-      2. Aborts with a clear ProbeError when the counter exceeds the cap.
-      3. Calls the original run_once (the organizer's normal behavior).
-      4. After the original returns, checks ``stop_check``; if True,
-         raises the private ``_DivergenceStop`` sentinel to halt the
-         enclosing run_once loop. The sentinel is BaseException-derived
-         so the wrapped run_once never confuses it with a safety
-         ProbeError.
-
-    The caller is responsible for unwrapping the method in a finally
-    block; :func:`_with_wrapped_run_once` does this automatically.
-    """
-    original_run_once = model.run_once
-    executed = {"n": 0}
-
-    def wrapped() -> bool:
-        executed["n"] += 1
-        if executed["n"] > max_events:
-            raise ProbeError(
-                f"observation aborted: event cap {max_events} exhausted "
-                "before the measured horizon elapsed"
-            )
-        try:
-            result = original_run_once()
-        finally:
-            pass
-        if stop_check():
-            raise _DivergenceStop()
-        return result
-
-    model.run_once = wrapped
-    return wrapped, lambda: executed["n"]
-
-
-def _restore_run_once(model: Any) -> None:
-    """Best-effort restoration of ``model.run_once``.
-
-    Some organizers store bound methods; this handles either case.
-    """
-    original = getattr(model, "_wsc_probe_original_run_once", None)
-    if original is None:
-        # Try to locate the wrapper we stored.
-        # We always store the original on a known sentinel attribute.
-        return
-    model.run_once = original
 
 
 @contextmanager
@@ -715,7 +653,7 @@ def _with_wrapped_run_once(
     try:
         yield lambda: counter["n"]
     finally:
-        model.run_once = original  # noqa: F841
+        model.run_once = original
 
 
 # ---------------------------------------------------------------------------
@@ -723,16 +661,69 @@ def _with_wrapped_run_once(
 # ---------------------------------------------------------------------------
 
 
-def run_observation_probe(
-    env: dict[str, Any] | None = None,
-    output_path: Path | None = None,
+# Environment shape consumed by the probe's internal execution functions.
+_OBSERVATION_ENV_KEYS = (
+    "model",
+    "readiness",
+    "default_strategy",
+    "user_strategy_class",
+    "scenario_builders",
+    "model_class",
+    "output_dir",
+    "baseline_att_path",
+    "results_dir",
+    "max_events",
+    "writer",
+    "scorer",
+    "csv_hash",
+)
+
+
+def _build_environment_dict(
+    runtime: _Runtime,
     *,
-    producer: Callable[[], dict[str, Any]] | None = None,
+    real_callables: dict[str, Any],
+    results_dir: Path,
+    max_events: int,
+) -> dict[str, Any]:
+    """Build an observation env while the organizer runtime is alive."""
+    context_factory = runtime.scenario_builders.create_with_disruption
+    context = context_factory()
+    model = runtime.model_class(context, seed=SEED)
+    return {
+        "model": model,
+        "readiness": runtime.readiness,
+        "default_strategy": runtime.default_strategy,
+        "user_strategy_class": runtime.organizer_user_strategy,
+        "scenario_builders": runtime.scenario_builders,
+        "model_class": runtime.model_class,
+        "output_dir": runtime.output_dir,
+        "baseline_att_path": runtime.baseline_att_path,
+        "results_dir": results_dir,
+        "max_events": max_events,
+        "writer": real_callables["writer"],
+        "scorer": real_callables["scorer"],
+        "csv_hash": real_callables["csv_hash"],
+    }
+
+
+def run_observation_probe(
+    output_path: Path | str | None = DEFAULT_OBSERVATION_PATH,
+    *,
+    env: dict[str, Any] | None = None,
     on_tick: Callable[[int], None] | None = None,
 ) -> dict[str, Any]:
     """Run the real warmup/run observation orchestration.
 
-    Refuses to overwrite an existing evidence file. The orchestration:
+    ``output_path`` is the first positional parameter (not ``env``); the
+    CLI keyword-routing requirement is that ``args.evidence`` reaches
+    this parameter by name. If ``env`` is None, the probe enters
+    ``_load_runtime`` for the entire duration of model construction,
+    hook installation, orchestration, scoring, and cleanup, so the
+    organizer source remains on ``sys.path`` while
+    ``simulation_output_csv_writer.write_att_by_period`` is invoked.
+
+    The orchestration:
 
     1. Installs the berth hook BEFORE warm-up.
     2. Wraps ``model.run_once`` with an executed-event counter and a
@@ -752,6 +743,8 @@ def run_observation_probe(
          - writes a fresh ``ATT_By_Statistics_Interval.csv`` to an
            isolated ignored private directory under ``results_dir``;
          - hashes the BYTES of that CSV;
+         - compares the digest against ``EXPECTED_OBSERVATION_HASH``
+           (mismatch raises ProbeError);
          - calls ``wsc2026_tools.scoring.compute_resilience_loss`` with
            the just-written CSV as scenario path;
          - requires ``period_count == 72`` and
@@ -761,10 +754,16 @@ def run_observation_probe(
        performs its normal fall-through to ``DefaultStrategy``.
     9. A safety ``ProbeError`` raised inside the observer propagates as
        its original safety failure (mutation / parity / strictness /
-       receiver identity), NOT as a no-divergence ProbeError.
+       receiver identity / hash mismatch), NOT as a no-divergence
+       ProbeError.
+
+    A safety ProbeError raised during cleanup is preserved alongside
+    the primary error via ``raise ... from ...`` so neither is silently
+    dropped.
     """
     if output_path is None:
-        output_path = _OBSERVATION_HASH_PATH
+        output_path = DEFAULT_OBSERVATION_PATH
+    output_path = Path(output_path)
     if output_path.exists():
         raise ProbeError(
             f"observation aborted: evidence file already exists at "
@@ -772,18 +771,82 @@ def run_observation_probe(
         )
 
     if env is None:
-        default_results_dir = repo_root() / "experiments" / "results" / "round0_att"
-        env = (
-            _build_real_environment(results_dir=default_results_dir)
-            if producer is None
-            else producer()
+        return _run_observation_with_real_runtime(
+            output_path=output_path,
+            on_tick=on_tick,
+        )
+    return _run_observation_with_env(
+        env=env,
+        output_path=output_path,
+        on_tick=on_tick,
+    )
+
+
+def _run_observation_with_env(
+    *,
+    env: dict[str, Any],
+    output_path: Path,
+    on_tick: Callable[[int], None] | None,
+) -> dict[str, Any]:
+    """Run observation against an externally-provided env (no runtime).
+
+    The caller is responsible for the lifetime of any model used here.
+    Used by unit tests that drive the probe with fake models.
+    """
+    model = env["model"]
+    max_events = int(env["max_events"])
+    return _execute_observation(
+        env=env,
+        model=model,
+        max_events=max_events,
+        output_path=output_path,
+        on_tick=on_tick,
+    )
+
+
+def _run_observation_with_real_runtime(
+    *,
+    output_path: Path,
+    on_tick: Callable[[int], None] | None,
+) -> dict[str, Any]:
+    """Run observation with the real organizer runtime kept alive.
+
+    The model, the bound scoring / hashing / writing callables, and the
+    hook are all in scope while ``_load_runtime()`` is open. The
+    runtime context is only exited after hook and run_once restoration
+    are complete.
+    """
+    results_dir = repo_root() / "experiments" / "results" / "round0_att"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    with _load_runtime() as runtime:
+        real_callables = _capture_real_callables(runtime)
+        env = _build_environment_dict(
+            runtime,
+            real_callables=real_callables,
+            results_dir=results_dir,
+            max_events=MAX_OBSERVATION_EVENTS,
+        )
+        return _execute_observation(
+            env=env,
+            model=env["model"],
+            max_events=MAX_OBSERVATION_EVENTS,
+            output_path=output_path,
+            on_tick=on_tick,
         )
 
-    model = env["model"]
+
+def _execute_observation(
+    *,
+    env: dict[str, Any],
+    model: Any,
+    max_events: int,
+    output_path: Path,
+    on_tick: Callable[[int], None] | None,
+) -> dict[str, Any]:
+    """Run the observation body with hook + run_once restoration guaranteed."""
     user_strategy_class = env["user_strategy_class"]
     readiness = env["readiness"]
     default_strategy = env["default_strategy"]
-    max_events = env["max_events"]
     results_dir: Path = env["results_dir"]
     writer = env["writer"]
     scorer = env["scorer"]
@@ -806,8 +869,6 @@ def run_observation_probe(
         observer,
     )
 
-    # Establish a clock-time origin that the cold-organizer-side helpers
-    # can use as a reference for diffs in attribute comparisons.
     period_start_day = 0
     period_start_time = model.clock_time
     att_rows: list[tuple[int, int, float]] = []
@@ -815,22 +876,17 @@ def run_observation_probe(
     def stop_check() -> bool:
         return observer_state["found"] is not None
 
+    primary_error: BaseException | None = None
     try:
         with _with_wrapped_run_once(
             model, max_events=max_events, stop_check=stop_check, on_tick=on_tick
         ):
-            # Warm-up: install hook here, BEFORE warming up, so the first
-            # berth-idle event after warm-up is observed.
             model.warmup(period=_dt.timedelta(days=WARMUP_DAYS))
             post_warm_time = model.clock_time
             period_start_day = 1
             period_start_time = post_warm_time
 
-            # Measured horizon. The organizer main.py also does this as a
-            # day-by-day loop with a single ATT sample at every interval.
             for day in range(1, MEASURED_DAYS + 1):
-                # Advance one simulated day. ``model.run`` already calls
-                # run_once; the wrapper accounts for every executed event.
                 with contextlib.suppress(_DivergenceStop):
                     model.run(duration=_dt.timedelta(days=1))
                 if observer_state["found"] is not None:
@@ -849,22 +905,35 @@ def run_observation_probe(
                 period_start_day = day + 1
                 period_start_time = model.clock_time
     except _DivergenceStop:
-        # The wrapped run_once raised the private stop sentinel after
-        # recording a valid divergence. Fall through to evidence write.
         pass
-    except ProbeError:
-        # Safety ProbeErrors propagate unchanged.
+    except ProbeError as exc:
+        primary_error = exc
+        raise
+    except BaseException as exc:
+        primary_error = exc
         raise
     finally:
-        with contextlib.suppress(Exception):
+        cleanup_error: BaseException | None = None
+        try:
             remove_observer(handle)
+        except BaseException as exc:  # noqa: BLE001
+            cleanup_error = exc
+        # The user strategy class hook must point at the ORIGINAL
+        # callable, not at the observer, after this function returns
+        # regardless of success or failure.
+        assert user_strategy_class.select_vessel_for_berth is not observer, (
+            "observation cleanup failed to restore the original hook"
+        )
+        if cleanup_error is not None and primary_error is not None:
+            raise ProbeError(f"{primary_error}: cleanup failed: {cleanup_error}") from primary_error
+        if cleanup_error is not None:
+            raise cleanup_error
 
     if observer_state["found"] is not None:
         evidence = observer_state["found"]
         _record_evidence_atomic(evidence, output_path)
         return evidence
 
-    # NO_DIVERGENCE branch: write CSV, hash bytes, score, validate.
     if len(att_rows) != EXPECTED_PERIODS:
         raise ProbeError(
             f"observation aborted: produced {len(att_rows)} ATT rows, "
@@ -878,15 +947,21 @@ def run_observation_probe(
     results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = writer(results_dir, att_rows)
     digest = csv_hash(csv_path)
+    if digest != EXPECTED_OBSERVATION_HASH:
+        raise ProbeError(
+            f"observation aborted: att_csv_sha256 {digest} != pinned "
+            f"EXPECTED_OBSERVATION_HASH {EXPECTED_OBSERVATION_HASH}; "
+            "refusing to record a NO_DIVERGENCE result"
+        )
     score = scorer(csv_path, env["baseline_att_path"])
+    if score.period_count != EXPECTED_PERIODS:
+        raise ProbeError(
+            f"observation aborted: period_count {score.period_count} != expected {EXPECTED_PERIODS}"
+        )
     if not _approx_equal(score.cumulative_loss, EXPECTED_CUMULATIVE_RESILIENCE_LOSS):
         raise ProbeError(
             f"observation aborted: cumulative resilience loss "
             f"{score.cumulative_loss} != expected {EXPECTED_CUMULATIVE_RESILIENCE_LOSS}"
-        )
-    if score.period_count != EXPECTED_PERIODS:
-        raise ProbeError(
-            f"observation aborted: period_count {score.period_count} != expected {EXPECTED_PERIODS}"
         )
     return {
         "status": "NO_DIVERGENCE",
@@ -895,16 +970,22 @@ def run_observation_probe(
         "att_csv_sha256": digest,
         "att_csv_path": str(csv_path),
         "expected_hash": EXPECTED_OBSERVATION_HASH,
-        "actual_hash": digest,
     }
 
 
 def _record_evidence_atomic(payload: dict[str, Any], destination: Path) -> None:
+    """Atomic temp-write + rename with no overwrite.
+
+    Creates the parent directory on demand (fresh-clone friendly),
+    refuses to overwrite an existing destination, and cleans up the
+    temp file on failure.
+    """
     if destination.exists():
         raise ProbeError(
             f"observation safety failed: evidence file already exists at "
             f"{destination}; refusing to overwrite"
         )
+    destination.parent.mkdir(parents=True, exist_ok=True)
     tmp_fd, tmp_path = tempfile.mkstemp(
         prefix=destination.name + ".", suffix=".tmp", dir=str(destination.parent)
     )
@@ -977,14 +1058,13 @@ def _matches_recorded_event(
 
 
 def run_bounded_replay(
-    env: dict[str, Any] | None = None,
+    evidence_path: Path | str | None = DEFAULT_REPLAY_PATH,
     *,
+    env: dict[str, Any] | None = None,
     evidence: dict[str, Any] | None = None,
-    evidence_path: Path | None = None,
-    search_max_events: int = MAX_REPLAY_SEARCH_EVENTS,
-    post_decision_max_events: int = MAX_REPLAY_EVENTS_AFTER_DECISION,
-    readiness: Any | None = None,
-) -> dict[str, bool]:
+    search_max_events: int | None = None,
+    post_decision_max_events: int | None = None,
+) -> dict[str, Any]:
     """Bounded post-decision mechanism replay.
 
     Validates provenance-aware evidence BEFORE constructing any model.
@@ -992,62 +1072,136 @@ def run_bounded_replay(
     invocations). Distinguishes four failure modes: event-queue empty,
     event-cap exhaustion, horizon reached, and recorded-event mismatch.
 
-    Returns the four mechanism proofs (``buffer_served`` etc.).
+    ``evidence_path`` is the first positional parameter (not ``env``);
+    the CLI keyword-routing requirement is that ``args.evidence``
+    reaches this parameter by name. If ``env`` is None, the probe
+    enters ``_load_runtime`` for the entire duration of model
+    construction, hook installation, search phase, post-decision
+    mechanism, and cleanup.
+
+    Returns a dict carrying either the four ``True`` mechanism proofs
+    on success or a ``{"status": "FAILED", "reason": ..., ...}`` on
+    failure (the CLI prints the JSON for either outcome).
     """
     if evidence is not None:
         payload = dict(evidence)
     elif evidence_path is not None:
+        evidence_path = Path(evidence_path)
         payload = json.loads(evidence_path.read_text(encoding="utf-8"))
     else:
-        payload = json.loads(_OBSERVATION_HASH_PATH.read_text(encoding="utf-8"))
+        evidence_path = DEFAULT_REPLAY_PATH
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
 
     validate_evidence(payload)
 
+    search_cap = MAX_REPLAY_SEARCH_EVENTS if search_max_events is None else int(search_max_events)
+    post_cap = (
+        MAX_REPLAY_EVENTS_AFTER_DECISION
+        if post_decision_max_events is None
+        else int(post_decision_max_events)
+    )
+
     if env is None:
-        # In the absence of a caller-provided environment, we use the
-        # SAME env shape as the observation probe. Tests typically
-        # supply a fake env directly.
-        raise ProbeError(
-            "run_bounded_replay requires an env dict (test seam); "
-            "use the same env factory as run_observation_probe"
+        return _run_replay_with_real_runtime(
+            evidence_payload=payload,
+            search_cap=search_cap,
+            post_cap=post_cap,
+        )
+    return _run_replay_with_env(
+        env=env,
+        evidence_payload=payload,
+        search_cap=search_cap,
+        post_cap=post_cap,
+    )
+
+
+def _resolve_readiness(env: dict[str, Any]) -> Any:
+    chosen = env.get("readiness")
+    if chosen is None:
+        raise ProbeError("replay aborted: readiness helper was not provided in env")
+    return chosen
+
+
+def _run_replay_with_env(
+    *,
+    env: dict[str, Any],
+    evidence_payload: dict[str, Any],
+    search_cap: int,
+    post_cap: int,
+) -> dict[str, Any]:
+    """Run replay against an externally-provided env (no runtime)."""
+    return _execute_replay(
+        env=env,
+        evidence_payload=evidence_payload,
+        search_cap=search_cap,
+        post_cap=post_cap,
+    )
+
+
+def _run_replay_with_real_runtime(
+    *,
+    evidence_payload: dict[str, Any],
+    search_cap: int,
+    post_cap: int,
+) -> dict[str, Any]:
+    """Run replay keeping the organizer runtime open for the full operation."""
+    results_dir = repo_root() / "experiments" / "results" / "round0_att"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    with _load_runtime() as runtime:
+        real_callables = _capture_real_callables(runtime)
+        env = _build_environment_dict(
+            runtime,
+            real_callables=real_callables,
+            results_dir=results_dir,
+            max_events=search_cap,
+        )
+        return _execute_replay(
+            env=env,
+            evidence_payload=evidence_payload,
+            search_cap=search_cap,
+            post_cap=post_cap,
         )
 
+
+def _execute_replay(
+    *,
+    env: dict[str, Any],
+    evidence_payload: dict[str, Any],
+    search_cap: int,
+    post_cap: int,
+) -> dict[str, Any]:
+    """Run the search + post-decision mechanism with hook restoration guaranteed."""
     model = env["model"]
     user_strategy_class = env["user_strategy_class"]
     default_strategy = env["default_strategy"]
-
-    # Allow caps to be supplied via env for tests that share env shape.
-    env_search_max = int(env.get("search_max_events", search_max_events))
-    env_post_max = int(env.get("post_decision_max_events", post_decision_max_events))
+    readiness = _resolve_readiness(env)
 
     target: dict[str, Any] | None = None
+    candidate_seen = False
+    executed_search_count = 0
+    started_queue_nonempty = model.head_event_time is not None
 
     def allow_recorded_candidate(**kwargs: Any) -> Any:
-        nonlocal target
+        nonlocal target, candidate_seen
         if target is not None:
             return None
-        decision = readiness_or(env, readiness).evaluate_transshipment_readiness_barrier(**kwargs)
-        if target is not None or decision is None:
+        decision = readiness.evaluate_transshipment_readiness_barrier(**kwargs)
+        if decision is None:
             return None
-        independent, is_strict = readiness_or(env, readiness)._fallback_ranking(
+        candidate_seen = True
+        if not _matches_recorded_event(kwargs, decision, evidence_payload):
+            return None
+        independent, is_strict = readiness._fallback_ranking(
             kwargs["waiting_vessels"],
             kwargs["current_time"],
             kwargs["waiting_since_by_vessel"],
         )
         actual = default_strategy.select_vessel_for_berth(**kwargs)
-        if (
-            is_strict
-            and independent is actual is decision.receiver
-            and _matches_recorded_event(kwargs, decision, payload)
-        ):
+        if is_strict and independent is actual is decision.receiver:
             target = {
                 "decision": decision,
                 "berth": tuple(kwargs["available_berths"])[0],
-                "shipments": _guaranteed_shipments(
-                    env,
-                    decision,
-                    kwargs["port"],
-                ),
+                "shipments": _guaranteed_shipments(env, decision, kwargs["port"]),
                 "time": kwargs["current_time"],
             }
             return decision.buffer
@@ -1055,7 +1209,7 @@ def run_bounded_replay(
 
     handle = install_observer(
         _Runtime(
-            readiness=readiness_or(env, readiness),
+            readiness=readiness,
             scenario_builders=env["scenario_builders"],
             model_class=env["model_class"],
             organizer_user_strategy=user_strategy_class,
@@ -1069,29 +1223,56 @@ def run_bounded_replay(
     def stop_search() -> bool:
         return target is not None
 
+    primary_error: BaseException | None = None
+    cleanup_error: BaseException | None = None
     try:
-        with _with_wrapped_run_once(model, max_events=env_search_max, stop_check=stop_search):
+        with _with_wrapped_run_once(model, max_events=search_cap, stop_check=stop_search):
             horizon = model.clock_time + _dt.timedelta(days=WARMUP_DAYS + MEASURED_DAYS)
-            while (
-                model.head_event_time is not None
-                and model.head_event_time <= horizon
-                and target is None
-            ):
+            while target is None:
+                if model.head_event_time is None:
+                    raise ProbeError(
+                        "replay aborted: search exhausted because the model event queue is empty"
+                    )
+                if model.head_event_time > horizon:
+                    raise ProbeError(
+                        "replay aborted: search reached the measured "
+                        "horizon without locating a matching candidate"
+                    )
+                executed_search_count += 1
                 try:
                     model.run_once()
                 except _DivergenceStop:
                     break
-        if target is None:
-            # Distinguish: queue empty vs cap vs horizon.
-            if model.head_event_time is None:
+            if target is None:
+                if not candidate_seen:
+                    if not started_queue_nonempty:
+                        raise ProbeError(
+                            "replay aborted: the model event queue was "
+                            "empty at the start of the search"
+                        )
+                    raise ProbeError(
+                        "replay aborted: search exhausted the configured "
+                        f"event cap ({search_cap}) without finding a "
+                        "matching candidate"
+                    )
+                if model.head_event_time is None:
+                    raise ProbeError(
+                        "replay aborted: search exhausted because the "
+                        "model event queue became empty"
+                    )
+                if model.head_event_time > horizon:
+                    raise ProbeError(
+                        "replay aborted: search exhausted because the "
+                        "next event is past the measured horizon"
+                    )
+                # Some candidates were observed but none matched the
+                # recorded evidence.
                 raise ProbeError(
-                    "replay aborted: recorded candidate event was not "
-                    "reproduced; the model's event queue is empty"
+                    "replay aborted: one or more non-None candidate "
+                    "decisions were observed during the search, but "
+                    "none matched the recorded evidence (recorded-event "
+                    "mismatch)"
                 )
-            raise ProbeError(
-                "replay aborted: recorded candidate event was not "
-                "reproduced within horizon and event cap"
-            )
 
         decision = target["decision"]
         berth = target["berth"]
@@ -1099,23 +1280,28 @@ def run_bounded_replay(
         deadline = target["time"] + _dt.timedelta(hours=decision.buffer_service_hours + 24.0)
         buffer_served = berth.occupying_vessel is decision.buffer
         shipments_ready = _shipments_ready(env, shipments, decision.receiver)
-        buffer_first_occupant_seen: bool = buffer_served
         buffer_departed = False
         receiver_selected_next = False
         guaranteed_shipments_loaded = False
 
-        for _ in range(env_post_max):
-            if model.head_event_time is not None and model.head_event_time > deadline:
-                break
+        for _executed_post_count in range(post_cap):
+            if model.head_event_time is None:
+                raise ProbeError(
+                    "replay aborted: post-decision phase aborted because "
+                    "the model event queue is empty"
+                )
+            if model.head_event_time > deadline:
+                raise ProbeError(
+                    "replay aborted: post-decision phase aborted because "
+                    "the next event exceeds the buffer-deadline"
+                )
             try:
                 model.run_once()
             except _DivergenceStop:
                 break
             occupant = berth.occupying_vessel
             buffer_served = buffer_served or occupant is decision.buffer
-            if buffer_served and not buffer_first_occupant_seen:
-                buffer_first_occupant_seen = occupant is decision.buffer
-            if buffer_first_occupant_seen and occupant is not decision.buffer:
+            if buffer_served and not buffer_departed and occupant is not decision.buffer:
                 buffer_departed = True
             if buffer_departed and not receiver_selected_next:
                 if occupant is decision.receiver:
@@ -1138,31 +1324,50 @@ def run_bounded_replay(
                 and guaranteed_shipments_loaded
             ):
                 break
+        else:
+            raise ProbeError(
+                "replay aborted: post-decision phase exhausted its event "
+                f"cap ({post_cap}) without completing the mechanism"
+            )
+    except _DivergenceStop:
+        pass
+    except ProbeError as exc:
+        primary_error = exc
+        raise
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
         try:
             remove_observer(handle)
-        finally:
-            pass
+        except BaseException as exc:  # noqa: BLE001
+            cleanup_error = exc
+        assert user_strategy_class.select_vessel_for_berth is not allow_recorded_candidate, (
+            "replay cleanup failed to restore the original hook"
+        )
+        if cleanup_error is not None and primary_error is not None:
+            raise ProbeError(f"{primary_error}: cleanup failed: {cleanup_error}") from primary_error
+        if cleanup_error is not None:
+            raise cleanup_error
 
     result = {
-        "buffer_served": buffer_served,
-        "shipments_ready": shipments_ready,
-        "receiver_selected_next": receiver_selected_next,
-        "guaranteed_shipments_loaded": guaranteed_shipments_loaded,
+        "buffer_served": bool(buffer_served),
+        "shipments_ready": bool(shipments_ready),
+        "receiver_selected_next": bool(receiver_selected_next),
+        "guaranteed_shipments_loaded": bool(guaranteed_shipments_loaded),
+        "executed_search_events": executed_search_count,
     }
-    if not all(result.values()):
+    if not all(
+        result[k]
+        for k in (
+            "buffer_served",
+            "shipments_ready",
+            "receiver_selected_next",
+            "guaranteed_shipments_loaded",
+        )
+    ):
         raise ProbeError(f"bounded replay mechanism proof failed: {result}")
     return result
-
-
-def readiness_or(env: dict[str, Any], fallback: Any | None) -> Any:
-    """Return the readiness helper, preferring env then fallback."""
-    chosen = env.get("readiness")
-    if chosen is not None:
-        return chosen
-    if fallback is not None:
-        return fallback
-    raise ProbeError("replay aborted: readiness helper was not provided")
 
 
 # ---------------------------------------------------------------------------
@@ -1171,15 +1376,64 @@ def readiness_or(env: dict[str, Any], fallback: Any | None) -> Any:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI for the operational observation and replay phases.
+
+    Routes ``--evidence`` to the correct keyword parameter of each
+    public function:
+
+    * observe -> ``run_observation_probe(output_path=args.evidence)``
+    * replay  -> ``run_bounded_replay(evidence_path=args.evidence)``
+
+    Always prints a concise JSON document to stdout describing the
+    outcome (success or failure) and exits non-zero on failure.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("observe", "replay"))
-    parser.add_argument("--evidence", type=Path, default=_OBSERVATION_HASH_PATH)
+    parser.add_argument("--evidence", type=Path, default=DEFAULT_OBSERVATION_PATH)
     args = parser.parse_args(argv)
-    if args.mode == "observe":
-        run_observation_probe(args.evidence)
-    else:
-        run_bounded_replay(evidence_path=args.evidence)
-    return 0
+    try:
+        if args.mode == "observe":
+            result = run_observation_probe(output_path=args.evidence)
+        else:
+            result = run_bounded_replay(evidence_path=args.evidence)
+        print(json.dumps(_serializable(result), indent=2, sort_keys=True))
+        # Replay returns mechanism proofs as booleans; if the result
+        # explicitly carries a FAILED status, surface a nonzero exit
+        # code so CI can detect the failure.
+        if isinstance(result, dict) and result.get("status") == "FAILED":
+            return 1
+        return 0
+    except ProbeError as exc:
+        print(
+            json.dumps(
+                {"status": "FAILED", "reason": str(exc)},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
+    except BaseException as exc:
+        print(
+            json.dumps(
+                {"status": "ERROR", "error": repr(exc)},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 3
+
+
+def _serializable(value: Any) -> Any:
+    """Convert non-JSON-serializable values into plain dicts/strings."""
+    if isinstance(value, dict):
+        return {k: _serializable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_serializable(v) for v in value]
+    if isinstance(value, Path):
+        return str(value)
+    if hasattr(value, "__dict__"):
+        return _serializable(vars(value))
+    return str(value)
 
 
 if __name__ == "__main__":

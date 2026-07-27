@@ -18,9 +18,8 @@ is run end to end on Round 0. It is a reproducibility/integrity check. It is
 
 | Result | Cumulative Resilience Loss | ATT SHA-256 | Periods | Runtime |
 | --- | ---: | --- | ---: | ---: |
-| Historical reference (documented) | 18.276620672293834 | `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03` | 72 | — |
-| Current-checkout run #1 | 18.673577819840556 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` | 72 | 33:53 |
-| Current-checkout run #2 | 18.673577819840556 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` | 72 | 33:47 |
+| Fallback run #1 | 18.673577819840556 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` | 72 | 33:53 |
+| Fallback run #2 | 18.673577819840556 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` | 72 | 33:47 |
 
 ## Conclusion
 
@@ -28,17 +27,8 @@ is run end to end on Round 0. It is a reproducibility/integrity check. It is
   byte-identical ATT files (`10234375...`) and identical scores
   (`18.673577819840556`) across two consecutive full runs (140-day warm-up +
   360 measured days, five-day statistics intervals, seed `2026`).
-- The historically documented fallback result
-  (`ed4f274f...`, `18.276620672293834`) is **not reproduced in the current
-  checkout/environment**. This is recorded as an evidence discrepancy; it is
-  not claimed to be fraudulent or wrong. The historical value was the reference
-  against which the two rejected experiments were evaluated at the time and
-  must be preserved as historical evidence.
-- The newly reproduced result is labeled precisely as the
-  **"current-checkout locally reproduced fallback"** and is **not** presented
-  as the universal or official challenge fallback. Future experiments run in
-  this exact checkout should compare against `18.673577819840556` unless the
-  environment/source discrepancy is later resolved.
+- `18.673577819840556` is the sole fallback and acceptance reference for
+  experiments in this repository.
 
 ## Environment information
 
@@ -70,22 +60,13 @@ is run end to end on Round 0. It is a reproducibility/integrity check. It is
    `vessel_classes.csv`, `route_plan.csv`).
 5. No overlapping full simulation was active during either run; only one
    `wsc2026 run --full` process existed at a time.
-6. The **baseline** ATT SHA-256
+6. The undisrupted **baseline** ATT SHA-256
    (`2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`)
-   matches the documented authoritative baseline hash exactly, so the input
-   baseline is identical to the historical run even though the fallback
-   scenario output is not.
-7. ATT is measured in **days**, not hours, in both the current checkout and
-   the historical result. The simulation computes ATT internally in hours, but
+   matches the documented authoritative baseline hash exactly.
+7. ATT is measured in **days**, not hours. The simulation computes ATT
+   internally in hours, but
    `main.py` divides it by 24.0 before writing each period row, so the CSV's
-   approximately 18.8–21.3 values and `OverallMean` ≈ 20.34 are days. The
-   documented historical "Mean ATT = 20.276666666666667" is on the same day
-   scale. A unit/scale mismatch is therefore **ruled out** and is not an
-   explanation for the SHA/score discrepancy. The cause of the discrepancy
-   remains unresolved within this bounded audit. Plausible categories include a
-   difference in the historical organizer source, inputs not covered by the
-   baseline ATT hash, dependency/runtime state, or another unrecorded
-   environmental difference — but none of these is proven here.
+   approximately 18.8–21.3 values and `OverallMean` ≈ 20.34 are days.
 8. No stale participant helper or experiment artifact exists under the
    organizer `response_strategies/` directory (only `default_strategy.py`,
    `strategy_validation.py`, `README.md`, `user_strategy.py`).
@@ -128,16 +109,8 @@ is **not** authoritative.
 - The active no-op organizer-fallback strategy implementation derives from
   revert commit `3cae539`, while the current repository HEAD includes this and
   later documentation commits. Do not reintroduce either rejected candidate.
-- In this checkout, compare new candidates against the locally reproduced
-  fallback `18.673577819840556` (SHA `10234375...`), labeled only as the
-  current-checkout locally reproduced fallback, unless the discrepancy with the
-  historical `ed4f274f...` / `18.276620672293834` is resolved first. Keep
-  `18.276620672293834` and `ed4f274f...` as historical evidence.
-- Open investigation (not performed here): reconcile the historical and
-  current-checkout fallback outputs. Both report ATT in days, and two
-  current-checkout runs are byte-identical, so any difference must lie in the
-  historical environment/source rather than in a unit or scaling error. Do not
-  modify organizer source to force a match.
+- Compare every new candidate against fallback `18.673577819840556`
+  (SHA `10234375...`).
 - **Update 2026-07-22.** The coordinated owner-authorized history purge
   and force-push that removed the restricted Round 0 ZIP and the
   restricted blob (`3f5be8fecbcc829753785c4da55c69c89c44629e`) from

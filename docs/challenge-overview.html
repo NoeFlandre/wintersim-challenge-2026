@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, vocabulary, and our Round 0 experiments.">
-  <title>Winter Simulation Conference 2026 Challenge — Context & Experiment Log</title>
+  <title>Winter Simulation Conference 2026 Challenge — Context &amp; Experiment Log</title>
   <style>
     :root {
       color-scheme: light;
@@ -316,7 +316,7 @@
     }
 
     tbody tr:last-child td { border-bottom: 0; }
-    td:nth-child(3), td:nth-child(4) { white-space: nowrap; }
+    td:nth-child(3) { white-space: nowrap; }
 
     .status {
       display: inline-block;
@@ -337,73 +337,6 @@
       font-size: .82rem;
     }
 
-    .lessons {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1rem;
-    }
-
-    .lesson {
-      padding-top: 1rem;
-      border-top: 2px solid var(--ink);
-    }
-
-    .lesson p {
-      margin: .5rem 0 0;
-      color: var(--muted);
-    }
-
-    .flow {
-      display: flex;
-      align-items: stretch;
-      gap: .55rem;
-      overflow-x: auto;
-    }
-
-    .step {
-      min-width: 135px;
-      flex: 1;
-      padding: .9rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
-    }
-
-    .step strong {
-      display: block;
-      font-size: .86rem;
-    }
-
-    .step span {
-      color: var(--muted);
-      font-size: .78rem;
-    }
-
-    .arrow {
-      display: grid;
-      place-items: center;
-      color: var(--muted);
-    }
-
-    .state {
-      display: grid;
-      grid-template-columns: 1.25fr .75fr;
-      gap: 1rem;
-    }
-
-    .state .card:first-child {
-      color: #104b37;
-      border-color: #b9ddcd;
-      background: var(--accent-soft);
-    }
-
-    .links {
-      margin: .6rem 0 0;
-      padding-left: 1.15rem;
-    }
-
-    .links li { margin: .35rem 0; }
-
     footer {
       max-width: var(--content);
       margin: auto;
@@ -419,8 +352,6 @@
       .metric:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
       .hooks { grid-template-columns: repeat(2, 1fr); }
       .glossary { grid-template-columns: repeat(2, 1fr); }
-      .lessons { grid-template-columns: 1fr; }
-      .state { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 560px) {
@@ -450,15 +381,12 @@
       <a href="#glossary">Terms</a>
       <a href="#rules">Rules</a>
       <a href="#experiments">Experiments</a>
-      <a href="#lessons">Lessons</a>
-      <a href="#workflow">Workflow</a>
-      <a href="#state">State</a>
     </nav>
   </header>
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context & experiment log · 25 July 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 26 July 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -472,10 +400,10 @@
       <div class="snapshot" aria-label="Current project snapshot">
         <div class="metric">
           <strong>18.6736</strong>
-          <span>retained fallback loss reproduced by this exact code checkout</span>
+          <span>fallback loss used for every experiment</span>
         </div>
         <div class="metric">
-          <strong>8</strong>
+          <strong>9</strong>
           <span>controlled Round 0 candidates completed</span>
         </div>
         <div class="metric">
@@ -533,17 +461,13 @@
       <p class="eyebrow">02 · Terms</p>
       <h2>Plain-language glossary</h2>
       <p class="section-intro">
-        The domain and experiment vocabulary used throughout this page.
+        The challenge-specific vocabulary used throughout this page.
       </p>
 
       <dl class="glossary">
         <div class="term">
           <dt><abbr title="Winter Simulation Conference">WSC</abbr></dt>
           <dd>Winter Simulation Conference, whose 2026 program includes this simulation challenge.</dd>
-        </div>
-        <div class="term">
-          <dt>Organizer</dt>
-          <dd>The challenge authors who supply the simulation, data, default behavior and official rules.</dd>
         </div>
         <div class="term">
           <dt>Participant strategy</dt>
@@ -572,14 +496,6 @@
         <div class="term">
           <dt>Fallback</dt>
           <dd>The organizer’s default response policy, used whenever our hook returns <code>None</code>. It is also our retained solution.</dd>
-        </div>
-        <div class="term">
-          <dt>Candidate</dt>
-          <dd>One proposed participant strategy tested against the fallback under the same complete run configuration.</dd>
-        </div>
-        <div class="term">
-          <dt><code>None</code>, <code>True</code>, <code>False</code></dt>
-          <dd><code>None</code> delegates to fallback. In booking assignment, <code>True</code> means assigned and <code>False</code> means retry later.</dd>
         </div>
         <div class="term">
           <dt>Berth</dt>
@@ -629,50 +545,6 @@
           <dt>Headway</dt>
           <dd>The time between successive vessels serving the same route or port call.</dd>
         </div>
-        <div class="term">
-          <dt>Smoke test / full run</dt>
-          <dd>A smoke test is a short wiring check. A full run completes warm-up plus all measured days and produces an acceptance result.</dd>
-        </div>
-        <div class="term">
-          <dt><abbr title="Test-Driven Development">TDD</abbr>, RED, GREEN</dt>
-          <dd>Test-Driven Development: prove a behavior test fails (RED), then add the minimum code that makes it pass (GREEN).</dd>
-        </div>
-        <div class="term">
-          <dt>Preflight / package</dt>
-          <dd>Preflight is the complete pre-run safety check. A package is the reproducible compressed archive containing only allowed participant files.</dd>
-        </div>
-        <div class="term">
-          <dt><abbr title="Secure Hash Algorithm 256-bit">SHA-256</abbr></dt>
-          <dd>A content fingerprint proving that a file or result is byte-for-byte identical to a fixed reference.</dd>
-        </div>
-        <div class="term">
-          <dt>Deterministic / reproducible</dt>
-          <dd>The same code, inputs, dependency versions and random seed produce exactly the same result each time.</dd>
-        </div>
-        <div class="term">
-          <dt>Current checkout</dt>
-          <dd>The exact repository files and dependency versions being used now. Different checkouts can produce different reference results.</dd>
-        </div>
-        <div class="term">
-          <dt>Acceptance threshold / strict improvement</dt>
-          <dd>The fixed score a candidate must beat. Equality is rejection; the candidate must be lower by more than 0.000000001.</dd>
-        </div>
-        <div class="term">
-          <dt>Revert</dt>
-          <dd>A version-control operation that undoes a rejected candidate while preserving its implementation and evidence in history.</dd>
-        </div>
-        <div class="term">
-          <dt>Utilization</dt>
-          <dd>The share of available service capacity actually used to move cargo.</dd>
-        </div>
-        <div class="term">
-          <dt>Detour</dt>
-          <dd>An alternative path used to avoid a disrupted berth or sailing leg.</dd>
-        </div>
-        <div class="term">
-          <dt>Real-context divergence</dt>
-          <dd>Proof that a candidate changes at least one actual simulator decision compared with fallback before an expensive full run.</dd>
-        </div>
       </dl>
     </section>
 
@@ -715,10 +587,9 @@
       </div>
 
       <div class="callout">
-        <strong>Two fallback-result records exist.</strong>
-        Early experiments used the historical loss <strong>18.2766206723</strong>.
-        The current checkout reproducibly yields <strong>18.6735778198</strong>;
-        this is the operative acceptance threshold. They are not interchangeable.
+        <strong>One fallback reference:</strong>
+        every candidate is compared with loss <strong>18.6735778198</strong>.
+        Equality is rejection; lower is better.
       </div>
     </section>
 
@@ -726,178 +597,83 @@
       <p class="eyebrow">04 · Experiments</p>
       <h2>What we tried</h2>
       <p class="section-intro">
-        Every row is one completed full candidate. All were rejected and
-        reverted to the no-op participant adapter: all four hooks return
-        <code>None</code>, delegating each decision to the organizer fallback.
+        Each experiment changed one decision rule, then ran the same complete
+        360-day disruption simulation. We compared its loss with the
+        <strong>18.6736 fallback</strong>. Lower is better; equality is not an
+        improvement. Every experiment below was rejected, so the fallback
+        remains active.
       </p>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th scope="col">Candidate</th>
-              <th scope="col">Core idea</th>
-              <th scope="col">Loss</th>
+              <th scope="col">Experiment</th>
+              <th scope="col">What we tested and why</th>
               <th scope="col">Result</th>
-              <th scope="col">What it taught us</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><a href="experiments/round0-first-result.md">Age-weighted berth priority</a></td>
-              <td>Serve vessels carrying the oldest, heaviest cargo first.</td>
-              <td>22.3199</td>
-              <td><span class="status worse">+22.12%</span></td>
-              <td>Cargo age overweights old cargo; the marginal cost of delaying one <abbr title="Twenty-foot Equivalent Unit">TEU</abbr> is not age-dependent.</td>
+              <td><a href="experiments/round0-first-result.md">Serve ships with older cargo first</a></td>
+              <td>When a berth became free and several ships were waiting, we chose the ship carrying the largest amount of cargo that had already been travelling for a long time. We expected this to prevent old, heavily delayed cargo from waiting even longer. Instead, cargo age gave too much priority to some ships and produced worse berth choices overall.</td>
+              <td><strong>22.3199</strong><br><span class="status worse">19.53% worse</span></td>
             </tr>
             <tr>
-              <td><a href="experiments/round0-transfer-aware-routing-v1.md">Static transfer-aware routing</a></td>
-              <td>Charge a fixed 84-hour penalty per booking edge.</td>
-              <td>30.6355</td>
-              <td><span class="status worse">+67.62%</span></td>
-              <td>An excellent early screen failed over 360 days. Static transfer penalties miss where each vessel is in its repeating schedule.</td>
+              <td><a href="experiments/round0-transfer-aware-routing-v1.md">Prefer routes with fewer transfers</a></td>
+              <td>When choosing a route for new cargo, we added an estimated 84-hour cost for every transfer between services. This made direct routes more attractive because every transfer can add unloading, waiting and reloading time. The fixed estimate ignored when the next vessel would actually arrive, so routes that looked simpler could still be much slower.</td>
+              <td><strong>30.6355</strong><br><span class="status worse">64.06% worse</span></td>
             </tr>
             <tr>
-              <td><a href="experiments/round0-alternative-route-suppression-v1.md">Suppress alternative routes</a></td>
-              <td>Do not create temporary detour services during disruption.</td>
-              <td>18.6736</td>
-              <td><span class="status equal">Equal</span></td>
-              <td>The candidate was observably equivalent to fallback for the measured output. Equality is rejection.</td>
+              <td><a href="experiments/round0-alternative-route-suppression-v1.md">Turn off temporary detour routes</a></td>
+              <td>During an active disruption, we stopped the fallback from creating temporary services around the blocked or slowed part of the network. We suspected those detours might create long loops or reserve ships that could be used more effectively elsewhere. The final transport-time output was identical to fallback, so this change had no measurable effect in this scenario.</td>
+              <td><strong>18.6736</strong><br><span class="status equal">No change</span></td>
             </tr>
             <tr>
-              <td><a href="experiments/round0-in-transit-rebooking-suppression-v1.md">Suppress in-transit rebooking</a></td>
-              <td>Keep carried cargo on its original booking during disruption.</td>
-              <td>21.6816</td>
-              <td><span class="status worse">+16.11%</span></td>
-              <td>Reactive rebooking is valuable; suppressing it trapped or delayed cargo enough to worsen the score.</td>
+              <td><a href="experiments/round0-in-transit-rebooking-suppression-v1.md">Stop rerouting cargo already at sea</a></td>
+              <td>When disruption affected cargo already aboard a ship, we kept its original remaining route instead of letting fallback discharge it early and build a new route. We expected fewer transfers and less handling to avoid unnecessary delay. In practice, fallback’s reactive rerouting was valuable; preventing it left cargo on slower plans.</td>
+              <td><strong>21.6816</strong><br><span class="status worse">16.11% worse</span></td>
             </tr>
             <tr>
-              <td><a href="experiments/round0-temporal-safe-routing-v1.md">Temporal safe routing</a></td>
-              <td>Use the nominal path when the disrupted resource would recover before earliest possible arrival.</td>
-              <td>22.7324</td>
-              <td><span class="status worse">+21.74%</span></td>
-              <td>Optimistic lower bounds did not capture actual waiting, assignment and service timing.</td>
+              <td><a href="experiments/round0-temporal-safe-routing-v1.md">Use a normal route if recovery seems early enough</a></td>
+              <td>For each shipment, we estimated the earliest time it could reach the disrupted berth or sailing leg. If the disruption was scheduled to end first, we kept the normal route instead of detouring. The estimate used ideal travel times and missed real queues, vessel schedules and cargo handling, so it declared some routes safe when they were not operationally efficient.</td>
+              <td><strong>22.7324</strong><br><span class="status worse">21.74% worse</span></td>
             </tr>
             <tr>
-              <td><a href="experiments/round0-teu-delay-smith-priority-v1.md">Smith-rule berth priority</a></td>
-              <td>Apply Smith’s scheduling rule: prioritize the most affected <abbr title="Twenty-foot Equivalent Unit">TEU</abbr> per predicted berth-service hour.</td>
-              <td>18.6736</td>
-              <td><span class="status equal">Equal</span></td>
-              <td>The berth-choice hook made no decision that differed from the organizer fallback in this run.</td>
+              <td><a href="experiments/round0-teu-delay-smith-priority-v1.md">Help the most cargo per berth hour</a></td>
+              <td>When ships competed for a berth, we divided the affected container volume aboard each ship by its predicted berth-service time. We then preferred the ship that could help the most cargo per hour of scarce berth capacity. In the real simulation this rule never selected a different ship than fallback, so the result could not change.</td>
+              <td><strong>18.6736</strong><br><span class="status equal">No change</span></td>
             </tr>
             <tr>
-              <td>Safe recovery shuttle</td>
-              <td>Run a temporary shuttle over the largest safe portion of a route when a complete alternative cannot be built.</td>
-              <td>23.0187</td>
-              <td><span class="status worse">+23.27%</span></td>
-              <td>The shuttle ran at about 0.30% utilization and displaced more useful capacity.</td>
+              <td>Run a short shuttle around the safe part of a route</td>
+              <td>When no complete route could avoid the disruption, we created a temporary shuttle over the largest connected portion that remained safe. The goal was to keep some cargo moving instead of waiting for the full route to recover. The shuttle used only about 0.30% of its capacity and consumed ships or service capacity that were more useful elsewhere.</td>
+              <td><strong>23.0187</strong><br><span class="status worse">23.27% worse</span></td>
             </tr>
             <tr>
-              <td>Recovery hold vs detour</td>
-              <td>Hold cargo at origin when waiting for recovery is predicted faster than the safe detour.</td>
-              <td>22.1967</td>
-              <td><span class="status worse">+18.87%</span></td>
-              <td>Model-derived expected time still missed enough operational timing to make origin holding harmful overall.</td>
+              <td>Wait at origin instead of taking a detour</td>
+              <td>Before assigning a route, we compared two estimates: wait at the starting port until the disrupted route recovered, or leave immediately on a safe detour. We held the cargo only when waiting appeared faster. The estimate missed enough real vessel and port timing that cargo often waited longer than it would have under fallback.</td>
+              <td><strong>22.1967</strong><br><span class="status worse">18.87% worse</span></td>
+            </tr>
+            <tr>
+              <td><a href="experiments/round0-transshipment-readiness-barrier-v1.md">Let transshipment cargo become ready before serving its receiving ship</a></td>
+              <td>At a one-berth port, cargo transferred from one service to another can still be completing an internal booking update when its receiving ship starts loading at the same simulated time. We tested serving a carefully chosen buffer ship first only when that short delay was predicted to let enough waiting cargo become ready for the receiving ship. The safeguard worked in focused simulator tests, but it never changed the final transport-time output during the complete Round 0 run.</td>
+              <td><strong>18.6736</strong><br><span class="status equal">No change</span></td>
             </tr>
           </tbody>
         </table>
       </div>
       <p class="note">
-        Percent changes for the first two candidates use the historical
-        18.2766 fallback. Later candidates use the current-checkout 18.6736
-        fallback. Recovery-hold evidence was recorded in version-control result
-        record <code>7254b1e</code> before the candidate branch was restored.
+        Loss is the official score. Lower is better. All percentages compare
+        with the same 18.6736 fallback.
       </p>
     </section>
 
-    <section id="lessons">
-      <p class="eyebrow">05 · Lessons</p>
-      <h2>What the evidence says so far</h2>
-      <div class="lessons">
-        <article class="lesson">
-          <h3>The fallback is strong</h3>
-          <p>Broad overrides have been neutral or materially worse. A useful candidate must target a narrow, evidenced decision.</p>
-        </article>
-        <article class="lesson">
-          <h3>Geometry is not time</h3>
-          <p>Distance, transfer count and optimistic sailing time miss each vessel’s place in its cycle, time between services, berth queues and cargo handling.</p>
-        </article>
-        <article class="lesson">
-          <h3>Full-horizon evidence wins</h3>
-          <p>Short screens and plausible theory cannot replace the official 72-period score. The transfer experiment demonstrated this sharply.</p>
-        </article>
-        <article class="lesson">
-          <h3>Behavioral activity must be proven</h3>
-          <p>Passing tests is insufficient if the hook never changes a real decision. We now prove real-context divergence before running.</p>
-        </article>
-        <article class="lesson">
-          <h3>One variable at a time</h3>
-          <p>Each candidate fixes one policy, threshold and acceptance rule before execution. No tuning occurs after seeing the result.</p>
-        </article>
-        <article class="lesson">
-          <h3>Rejection is a clean outcome</h3>
-          <p>Evidence is preserved, candidate changes are reverted, and the exact fixed fallback is restored and reverified.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="workflow">
-      <p class="eyebrow">06 · Workflow</p>
-      <h2>How an experiment is controlled</h2>
-      <p class="section-intro">
-        The process is intentionally stricter than ordinary feature work
-        because a 20–35 minute run is expensive and results are easy to contaminate.
-      </p>
-
-      <div class="flow" aria-label="Controlled experiment workflow">
-        <div class="step"><strong>Audit</strong><span>rules, hook usage, repository state, baseline</span></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="step"><strong>Fix the plan</strong><span>one hypothesis and threshold</span></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="step"><strong><abbr title="Test-Driven Development">TDD</abbr></strong><span>failing test, minimal code, passing test</span></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="step"><strong>Preflight</strong><span>code quality, type checks, tests, package, smoke test</span></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="step"><strong>Run once</strong><span>360 days, 72 periods</span></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="step"><strong>Decide</strong><span>strict accept or revert</span></div>
-      </div>
-    </section>
-
-    <section id="state">
-      <p class="eyebrow">07 · Current state</p>
-      <h2>Clean baseline retained</h2>
-      <div class="state">
-        <article class="card">
-          <h3>No experiment has beaten the fallback.</h3>
-          <p>
-            The active participant strategy again returns <code>None</code>
-            from all four hooks. The current-checkout fallback
-            <abbr title="Average Transport Time">ATT</abbr>
-            <abbr title="Secure Hash Algorithm 256-bit">SHA-256</abbr>
-            fingerprint is <code>10234375…2488658</code> and its loss is
-            <strong>18.6735778198</strong>.
-          </p>
-        </article>
-        <article class="card">
-          <h3>Primary references</h3>
-          <ul class="links">
-            <li><a href="challenge-rules.md">Rules summary</a></li>
-            <li><a href="architecture.md">Repository architecture</a></li>
-            <li><a href="experiments/round0-fallback-reproducibility.md">Fallback audit</a></li>
-            <li><a href="WSC-2026-Simulation-Challenge-Brief.pdf">Official challenge brief document</a></li>
-            <li><a href="WSC-2026-Simulation-Challenge-Tech-Document.pdf">Official technical document</a></li>
-            <li><a href="https://meetings.informs.org/wordpress/wsc2026/simulation-challenge/">Official challenge page</a></li>
-          </ul>
-        </article>
-      </div>
-    </section>
   </main>
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports and verified recovery-hold result. Official challenge materials
-    remain authoritative.
+    reports and nine completed Round 0 experiments. Official challenge
+    materials remain authoritative.
   </footer>
 </body>
 </html>

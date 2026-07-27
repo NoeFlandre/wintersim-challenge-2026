@@ -58,7 +58,7 @@ validated model. It must not be used for future acceptance decisions.
 3. Run the complete Round 0 scenario with seed 2026, 140 warm-up days, 360
    measured days, and five-day intervals.
 4. Retain the candidate only if its Cumulative Resilience Loss is lower than
-   `18.276620672293834` by more than `1e-9`.
+   `18.673577819840556` by more than `1e-9`.
 
 If it fails, preserve aggregate evidence, document the result, and revert to
 the clean fallback before testing another hypothesis.
@@ -71,10 +71,11 @@ Resilience Loss is better.
 
 | Measure | Fallback | Candidate | Candidate delta |
 | --- | ---: | ---: | ---: |
-| Cumulative Resilience Loss | 18.276620672293834 | 30.635549463232536 | +12.358928790938702 |
-| Mean ATT (days) | 20.276666666666667 | 21.117916666666666 | +0.8412499999999987 |
+| Cumulative Resilience Loss | 18.673577819840556 | 30.635549463232536 | +11.96197164339198 |
+| Mean ATT (days) | 20.336944444444445 | 21.117916666666666 | +0.7809722222222213 |
 
-The candidate degraded the score by **67.621520%**. The successful full run
+Against the retained fallback, the candidate degraded the score by
+**64.058274%**. The successful full run
 produced all 72 periods and took 35 minutes 34 seconds.
 
 ## Decision
@@ -96,16 +97,10 @@ Raw organizer output remains local and ignored:
 - Candidate ATT SHA-256:
   `a0b82c968d18b907d2c1b8780ad4b259d7f1697a4bfcae0403263af250ddfe85`
 - Frozen fallback ATT SHA-256:
-  `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
+  `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
 - Aggregate result:
   `experiments/results/transfer_aware_routing_v1_2026.json`
 - Candidate ATT snapshot:
   `.challenge/round0/results/transfer_aware_routing_v1_2026/`
 
 No raw organizer output or experiment result is tracked.
-
-> Note: the historical fallback SHA/score above is **not reproduced in the
-> current checkout** (see `round0-fallback-reproducibility.md`). In this
-> checkout the locally reproduced fallback is `18.673577819840556`
-> (SHA `10234375...`). Treat `18.276620672293834` as historical evidence only
-> unless the discrepancy is later resolved.

@@ -153,21 +153,12 @@ OverflowError)` and delegates with `None`. No broad `except Exception` or
 - Mean ATT across numbered period rows: about 20.336944444444445 days
 - 72 periods
 
-## Historical secondary reference
-
-- Score: `18.276620672293834`
-- ATT SHA-256: `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
-
-Report separately whether the candidate also beats this historical value. It
-does not affect the accept/reject decision in this checkout.
-
 ## Acceptance rule
 
 Retain the candidate only if the complete 72-period Cumulative Resilience
 Loss is strictly lower than `18.673577819840556` by more than `1e-9`.
-Equality is rejection. The historical `18.276620672293834` value is secondary
-reporting only. This rule was applied without alteration after seeing the
-result.
+Equality is rejection. This rule was applied without alteration after seeing
+the result.
 
 ## Full result
 
@@ -175,23 +166,22 @@ result.
 | --- | --- |
 | Candidate Cumulative Resilience Loss | `18.673577819840556` |
 | Candidate ATT SHA-256 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` |
-| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Fallback score threshold | `18.673577819840556` |
 | Delta vs baseline threshold | `0.0` |
 | Relative percentage change | `0.0%` |
 | Mean ATT across numbered period rows (days) | `20.336944444444445` |
 | Period count | `72` |
 | Simulation clock runtime | `00:28:23` |
-| Periods better than pinned fallback | `0` |
-| Periods equal to pinned fallback | `72` |
-| Periods worse than pinned fallback | `0` |
-| Beats historical `18.276620672293834`? | `No` |
-| Beats current-checkout `18.673577819840556`? | `No` (equal — rejection) |
+| Periods better than fallback | `0` |
+| Periods equal to fallback | `72` |
+| Periods worse than fallback | `0` |
+| Beats fallback `18.673577819840556`? | `No` (equal — rejection) |
 
 The candidate Cumulative Resilience Loss is byte-identical to the pinned
 fallback reproduction. Within this seed, warm-up, horizon, and scenario, the
 candidate made no selection that diverged from the organizer fallback's
 berth assignment; the produced `ATT_By_Statistics_Interval.csv` matches the
-locally reproduced fallback snapshot exactly
+fallback snapshot exactly
 (`10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`).
 
 ## Implementation / correction commits (the approved f04daad candidate)
@@ -229,9 +219,8 @@ Both ignored locations are untracked and contain no organizer source.
 
 ## Resume point
 
-- The current-checkout locally reproduced fallback (`18.673577819840556`,
-  SHA `10234375...`) is the authoritative comparable reference.
-- Treat `18.276620672293834` and `ed4f274f...` as historical evidence only.
+- The fallback (`18.673577819840556`, SHA `10234375...`) is the authoritative
+  comparable reference.
 - The coordinated owner-authorized history purge and force-push that
   removed the restricted Round 0 ZIP and the restricted blob
   (`3f5be8fecbcc829753785c4da55c69c89c44629e`) from reachable local

@@ -86,14 +86,6 @@ reproduced fallback:
 is lower than `18.673577819840556` by more than `1e-9`. A smoke run, partial
 run, or mean ATT alone can never satisfy acceptance.
 
-## Historical threshold (secondary reporting only)
-
-- Historical score: `18.276620672293834`
-- Historical ATT SHA: `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
-
-Report separately whether the candidate also beats this historical value. It
-does not affect the accept/reject decision in this checkout.
-
 ## Rejection/restoration procedure
 
 If the candidate score is equal to or above `18.673577819840556`:
@@ -106,7 +98,7 @@ If the candidate score is equal to or above `18.673577819840556`:
    recreate the no-op adapter.
 5. Synchronize the reverted no-op adapter into the organizer tree.
 6. Restore `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv`
-   from a verified current-checkout fallback snapshot.
+   from the verified fallback snapshot.
 7. Verify the restored SHA is exactly
    `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
 8. Verify its score is exactly `18.673577819840556`.
@@ -124,15 +116,14 @@ authorized candidate for this experiment.
 | --- | --- |
 | Candidate Cumulative Resilience Loss | `21.681637022046967` |
 | Candidate ATT SHA-256 | `da64a36f38aae32ca93993b09e7e88f53d59069474465c10d0585c0836040fe7` |
-| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Fallback score threshold | `18.673577819840556` |
 | Delta vs baseline threshold | `+3.008059202206411` (much worse, not lower by more than `1e-9`) |
 | Mean ATT across numbered period rows (days) | `20.525694444444444` |
 | Period count | `72` |
 | Runtime | `26:21` |
-| Beats historical `18.276620672293834`? | No |
-| Beats current-checkout `18.673577819840556`? | No (worse) |
+| Beats fallback `18.673577819840556`? | No (worse) |
 
-The candidate produced a different ATT output than the current-checkout
+The candidate produced a different ATT output than the
 fallback (different SHA, different per-period values). Therefore suppressing
 the organizer's in-transit rebooking hook caused a measurable scoring
 degradation in this Round 0 run (cumulative loss rose by ~3.01). The
@@ -141,13 +132,13 @@ establish whether the degradation came from new shipments that could not be
 rerouted away from the disruption, or from carried shipments that became
 trapped on disrupted legs when in-transit replanning was suppressed.
 
-The candidate score `21.681637022046967` is well above the current-checkout
+The candidate score `21.681637022046967` is well above the
 acceptance threshold of `18.673577819840556`, so the candidate is rejected
 on the acceptance rule alone.
 
 ## Decision
 
-Reject. The candidate score `21.681637022046967` is above the current-checkout
+Reject. The candidate score `21.681637022046967` is above the
 acceptance threshold of `18.673577819840556` by more than `1e-9`. The
 underlying cause of the degradation was not established by this experiment.
 
@@ -161,7 +152,7 @@ underlying cause of the degradation was not established by this experiment.
    adapter is restored automatically.
 5. The reverted no-op adapter synchronized into the organizer tree.
 6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` restored
-   from a verified current-checkout fallback snapshot (the bytes were
+   from the verified fallback snapshot (the bytes were
    preserved in
    `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
    and `_run2/`).
@@ -180,11 +171,11 @@ underlying cause of the degradation was not established by this experiment.
 
 - Candidate score: `21.681637022046967`.
 - Candidate ATT SHA-256: `da64a36f38aae32ca93993b09e7e88f53d59069474465c10d0585c0836040fe7`.
-- The candidate ATT output is **different** from the current-checkout
-  locally reproduced fallback (different SHA, different per-period values),
+- The candidate ATT output is **different** from the fallback (different SHA,
+  different per-period values),
   confirming the policy had a measurable scoring effect.
 - Rejection reason: the candidate score `21.681637022046967` is well above
-  the current-checkout acceptance threshold of `18.673577819840556` (delta
+  the acceptance threshold of `18.673577819840556` (delta
   `+3.008059202206411`).
 - Only one candidate was attempted for this experiment; no second strategy
   was tried.

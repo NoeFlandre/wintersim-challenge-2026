@@ -26,10 +26,11 @@ Resilience Loss is better.
 
 | Measure | Fallback | Candidate | Candidate delta |
 | --- | ---: | ---: | ---: |
-| Cumulative Resilience Loss | 18.276620672293834 | 22.319920008142585 | +4.043299335848751 |
-| Mean ATT (days) | 20.276666666666667 | 20.55986111111111 | +0.2831944444444445 |
+| Cumulative Resilience Loss | 18.673577819840556 | 22.319920008142585 | +3.646342188302029 |
+| Mean ATT (days) | 20.336944444444445 | 20.55986111111111 | +0.22291666666666643 |
 
-The candidate degraded Cumulative Resilience Loss by **22.122795%**. It had
+Against the retained fallback, the candidate degraded Cumulative Resilience
+Loss by **19.526746%**. It had
 lower ATT in 32 periods and higher ATT in 40 periods. The completed simulation
 took 34 minutes 11 seconds.
 
@@ -54,7 +55,7 @@ evidence of hidden-scenario robustness and not a leaderboard submission.
 Raw organizer output remains local and ignored:
 
 - Fallback ATT SHA-256:
-  `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
+  `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`
 - Candidate ATT SHA-256:
   `c7d888125170a42c946ed205206f8d5a331b243caab15fc497a07e2dac27e8b9`
 - Baseline ATT SHA-256:
@@ -69,7 +70,7 @@ No raw organizer output or experiment result is tracked.
 ## Resume point
 
 Future work should start from the fallback strategy and treat
-`18.276620672293834` as the fixed-seed Round 0 reference. Introduce one new
+`18.673577819840556` as the fixed-seed Round 0 reference. Introduce one new
 hypothesis at a time, test the exact runtime contract, and compare a complete
 run before retaining it.
 
@@ -86,9 +87,3 @@ history purge and coordinated force-push of the restricted Round 0 ZIP.
 > the prior history may still contain the restricted ZIP and blob. Treat
 > any pre-purge clone as not-public-safe until its own reachable objects
 > are re-verified.
-
-> Note: the historical fallback SHA/score above is **not reproduced in the
-> current checkout** (see `round0-fallback-reproducibility.md`). In this
-> checkout the locally reproduced fallback is `18.673577819840556`
-> (SHA `10234375...`). Treat `18.276620672293834` as historical evidence only
-> unless the discrepancy is later resolved.

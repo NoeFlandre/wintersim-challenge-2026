@@ -75,14 +75,6 @@ reproduced fallback:
 is lower than `18.673577819840556` by more than `1e-9`. A smoke run, partial
 run, or mean ATT alone can never satisfy acceptance.
 
-## Historical threshold (secondary reporting only)
-
-- Historical score: `18.276620672293834`
-- Historical ATT SHA: `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
-
-Report separately whether the candidate also beats this historical value. It
-does not affect the accept/reject decision in this checkout.
-
 ## Rejection/restoration procedure
 
 If the candidate score is equal to or above `18.673577819840556`:
@@ -95,7 +87,7 @@ If the candidate score is equal to or above `18.673577819840556`:
    recreate the no-op adapter.
 5. Synchronize the reverted no-op adapter into the organizer tree.
 6. Restore `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv`
-   from a verified current-checkout fallback snapshot.
+   from the verified fallback snapshot.
 7. Verify the restored SHA is exactly
    `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
 8. Verify its score is exactly `18.673577819840556`.
@@ -113,15 +105,14 @@ authorized candidate for this experiment.
 | --- | --- |
 | Candidate Cumulative Resilience Loss | `18.673577819840556` |
 | Candidate ATT SHA-256 | `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658` |
-| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Fallback score threshold | `18.673577819840556` |
 | Delta vs baseline threshold | `0.0` (equal, not lower by more than `1e-9`) |
 | Mean ATT across numbered period rows (days) | `20.336944444444445` |
 | Period count | `72` |
 | Runtime | `28:47` |
-| Beats historical `18.276620672293834`? | No |
-| Beats current-checkout `18.673577819840556`? | No (equal, not below) |
+| Beats fallback `18.673577819840556`? | No (equal, not below) |
 
-The candidate produced a byte-identical ATT output to the current-checkout
+The candidate produced a byte-identical ATT output to the
 fallback. Therefore suppressing the organizer's alternative-route hook
 caused no observable scoring difference in this Round 0 run. The experiment
 did not instrument route creation or usage, so it does not establish
@@ -135,9 +126,9 @@ alone: equal is not better.
 ## Decision
 
 Reject. The candidate score `18.673577819840556` is equal to the
-current-checkout locally reproduced fallback score, not strictly lower by
+fallback score, not strictly lower by
 more than `1e-9`. The candidate was rejected because it was not strictly
-better than the locally reproduced fallback; the underlying cause of the
+better than the fallback; the underlying cause of the
 byte-identical output was not established by this experiment.
 
 ## Rejection/restoration procedure (executed)
@@ -150,7 +141,7 @@ byte-identical output was not established by this experiment.
    adapter is restored automatically.
 5. The reverted no-op adapter synchronized into the organizer tree.
 6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` restored
-   from a verified current-checkout fallback snapshot (the bytes were
+   from the verified fallback snapshot (the bytes were
    preserved in
    `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
    and `_run2/`).
@@ -169,8 +160,8 @@ byte-identical output was not established by this experiment.
 
 - Candidate score: `18.673577819840556`.
 - Candidate ATT SHA-256: `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
-- The candidate ATT output is byte-identical to the current-checkout locally
-  reproduced fallback ATT (same SHA-256).
+- The candidate ATT output is byte-identical to the fallback ATT (same
+  SHA-256).
 - Rejection reason: the candidate was not strictly better than the locally
   reproduced fallback (`equal` does not satisfy the "lower by more than
   `1e-9`" acceptance rule).

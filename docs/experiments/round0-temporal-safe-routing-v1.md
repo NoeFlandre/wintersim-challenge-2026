@@ -186,14 +186,6 @@ branch). The new branch is `codex/round0-temporal-safe-routing-v1`.
 - 72 periods
 - Mean ATT across numbered period rows: about 20.336944444444445 days
 
-## Historical reference (secondary reporting only)
-
-- Score: `18.276620672293834`
-- ATT SHA-256: `ed4f274f827959ce4261303996bbde035aa784f7b7d070b9bbdf6bea1c7cbb03`
-
-Report separately whether the candidate also beats this historical value. It
-does not affect the accept/reject decision in this checkout.
-
 ## Acceptance rule
 
 Retain the candidate only if the complete 72-period Cumulative Resilience
@@ -213,7 +205,7 @@ If the candidate score is equal to or above `18.673577819840556`:
 5. Synchronize the reverted no-op adapter into the organizer tree.
 6. Restore
    `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` from a
-   verified current-checkout fallback snapshot.
+   verified fallback snapshot.
 7. Verify the restored SHA is exactly
    `10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658`.
 8. Verify its score is exactly `18.673577819840556`.
@@ -231,18 +223,17 @@ authorized candidate for this experiment.
 | --- | --- |
 | Candidate Cumulative Resilience Loss | `22.732416871465396` |
 | Candidate ATT SHA-256 | `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92` |
-| Baseline score threshold (current-checkout fallback) | `18.673577819840556` |
+| Fallback score threshold | `18.673577819840556` |
 | Delta vs baseline threshold | `+4.05883905162484` (much worse, not lower by more than `1e-9`) |
 | Relative change vs baseline | `+21.735733%` |
 | Mean ATT across numbered period rows (days) | `20.584444444444454` |
 | Period count | `72` |
 | Runtime | `21:17` |
-| Beats historical `18.276620672293834`? | No |
-| Beats current-checkout `18.673577819840556`? | No (much worse) |
+| Beats fallback `18.673577819840556`? | No (much worse) |
 
-The candidate produced a different ATT output than the current-checkout
+The candidate produced a different ATT output than the
 fallback (different SHA, different per-period values). The candidate score
-`22.732416871465396` is well above the current-checkout acceptance
+`22.732416871465396` is well above the acceptance
 threshold of `18.673577819840556` (delta `+4.058839`, `+21.74%` worse), so
 the candidate is rejected on the acceptance rule alone.
 
@@ -260,7 +251,7 @@ the organizer fallback on this Round 0 scenario.
 ## Decision
 
 Reject. The candidate score `22.732416871465396` is above the
-current-checkout acceptance threshold of `18.673577819840556` by more than
+acceptance threshold of `18.673577819840556` by more than
 `1e-9`. The underlying cause of the degradation was not established by
 this experiment.
 
@@ -274,7 +265,7 @@ this experiment.
    no-op adapter is restored automatically.
 5. The reverted no-op adapter synchronized into the organizer tree.
 6. `.challenge/round0/source/Output/ATT_By_Statistics_Interval.csv` was
-   restored from a verified current-checkout fallback snapshot (the
+   restored from the verified fallback snapshot (the
    bytes were preserved in
    `.challenge/round0/results/fallback_reproduction_current_checkout_run1/`
    and `_run2/`).
@@ -293,11 +284,11 @@ this experiment.
 
 - Candidate score: `22.732416871465396`.
 - Candidate ATT SHA-256: `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92`.
-- The candidate ATT output is **different** from the current-checkout
-  locally reproduced fallback (different SHA, different per-period
+- The candidate ATT output is **different** from the fallback (different SHA,
+  different per-period
   values), confirming the policy had a measurable scoring effect.
 - Rejection reason: the candidate score `22.732416871465396` is well
-  above the current-checkout acceptance threshold of
+  above the acceptance threshold of
   `18.673577819840556` (delta `+4.058839`).
 - Only one candidate was attempted for this experiment; no second
   strategy was tried.
@@ -360,7 +351,7 @@ is the only thing that ran on the simulation framework.
 `22.732416871465396` and the SHA
 `e6da21ae5bd1f4e24d3c26e8b9920d436b59bb058e2f68aff092ed4a59476c92` are
 evidence that *this exact implementation*, including the three deviations
-above, scores worse than the current-checkout fallback. They do **not**
+above, scores worse than the fallback. They do **not**
 cleanly validate every detail of the abstract policy described earlier in
 this document. Specifically: the deterministic tie-break claim, the
 "mutable cross-run global state" rule, and the atomic rollback guarantee
@@ -368,9 +359,8 @@ were not actually exercised by the experiment.
 
 ## Resume point
 
-- The current-checkout locally reproduced fallback (`18.673577819840556`,
-  SHA `10234375...`) is the authoritative comparable reference.
-- Treat `18.276620672293834` and `ed4f274f...` as historical evidence only.
+- The fallback (`18.673577819840556`, SHA `10234375...`) is the authoritative
+  comparable reference.
 - The coordinated owner-authorized history purge and force-push that
   removed the restricted Round 0 ZIP and the restricted blob
   (`3f5be8fecbcc829753785c4da55c69c89c44629e`) from reachable local

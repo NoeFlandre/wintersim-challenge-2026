@@ -67,6 +67,16 @@ def test_overlay_copies_participant_files_and_preserves_organizer(tmp_path: Path
     assert (dest / "strategy_validation.py").read_text() == "# organizer validation\n"
 
 
+def test_overlay_copies_modular_participant_helper(tmp_path: Path) -> None:
+    submission, dest = _setup(tmp_path)
+    (submission / "deferred_rebooking.py").write_text("# participant helper\n")
+
+    copied = overlay_response_strategies(submission, dest)
+
+    assert set(copied) == {"user_strategy.py", "README.md", "deferred_rebooking.py"}
+    assert (dest / "deferred_rebooking.py").read_text() == "# participant helper\n"
+
+
 def test_overlay_is_idempotent(tmp_path: Path) -> None:
     submission, dest = _setup(tmp_path)
 

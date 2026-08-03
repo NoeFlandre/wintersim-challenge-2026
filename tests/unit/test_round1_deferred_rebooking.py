@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import pytest
+
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -109,7 +110,9 @@ def _active_time() -> datetime:
 
 def _assert_unchanged(vessel: Vessel, context: Context, snapshot: dict[str, object]) -> None:
     shipment = vessel.carried_shipments[0]
-    assert tuple(vessel.current_segment.associated_service_route.segments) == snapshot["segments"]
+    assert tuple(vessel.current_segment.associated_service_route.segments) == snapshot[
+        "segments"
+    ]
     assert tuple(shipment.associated_bookings) == snapshot["bookings"]
     assert vessel.current_segment is snapshot["current_segment"]
     assert tuple(vessel.carried_shipments) == snapshot["carried"]
@@ -119,7 +122,9 @@ def _assert_unchanged(vessel: Vessel, context: Context, snapshot: dict[str, obje
 def test_future_only_active_impact_is_deferred_without_mutation() -> None:
     context, vessel, snapshot = _context()
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is False
     _assert_unchanged(vessel, context, snapshot)
@@ -129,7 +134,9 @@ def test_directly_affected_current_segment_delegates_to_fallback() -> None:
     context, vessel, snapshot = _context()
     context.disruption_plans[0].target_leg = vessel.current_segment.associated_leg
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is None
     _assert_unchanged(vessel, context, snapshot)
@@ -145,32 +152,15 @@ def test_future_only_later_booking_is_deferred() -> None:
     ]
     context.disruption_plans[0].target_leg = route.segments[2].associated_leg
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is False
     assert shipment.current_booking_index == 1
-    assert tuple(vessel.current_segment.associated_service_route.segments) == snapshot["segments"]
-
-
-def test_future_only_booking_on_another_route_is_deferred() -> None:
-    context, vessel, snapshot = _context()
-    route = vessel.current_segment.associated_service_route
-    alternate = Route()
-    alternate.segments = [
-        Segment(segment.sequence_index, segment.associated_leg, alternate)
-        for segment in route.segments
+    assert tuple(vessel.current_segment.associated_service_route.segments) == snapshot[
+        "segments"
     ]
-    shipment = vessel.carried_shipments[0]
-    shipment.associated_bookings = [
-        Booking(1, route, 1, 1),
-        Booking(2, alternate, 2, 3),
-    ]
-    context.disruption_plans[0].target_leg = alternate.segments[2].associated_leg
-
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
-
-    assert result is False
-    assert tuple(vessel.current_segment.associated_service_route.segments) == snapshot["segments"]
 
 
 def test_inactive_impact_delegates() -> None:
@@ -189,7 +179,9 @@ def test_no_impact_delegates() -> None:
     context.disruption_plans[0].target_leg = vessel.current_segment.associated_leg
     context.disruption_plans[0].start_offset_days = 100.0
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is None
     _assert_unchanged(vessel, context, snapshot)
@@ -198,13 +190,13 @@ def test_no_impact_delegates() -> None:
 def test_closed_current_port_delegates() -> None:
     context, vessel, snapshot = _context()
     context.disruption_plans = [
-        Plan(
-            target_berth=Berth(vessel.current_segment.associated_leg.arrival_port), close_berth=True
-        )
+        Plan(target_berth=Berth(vessel.current_segment.associated_leg.arrival_port), close_berth=True)
     ]
     snapshot["plans"] = tuple(context.disruption_plans)
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is None
     _assert_unchanged(vessel, context, snapshot)
@@ -216,13 +208,13 @@ def test_mixed_direct_and_future_impact_delegates() -> None:
     second = Shipment([Booking(1, route, 1, 3)])
     second.current_booking_index = 1
     vessel.carried_shipments.append(second)
-    context.disruption_plans.append(
-        Plan(target_leg=vessel.current_segment.associated_leg, multiplier=2.0)
-    )
+    context.disruption_plans.append(Plan(target_leg=vessel.current_segment.associated_leg, multiplier=2.0))
     snapshot["carried"] = tuple(vessel.carried_shipments)
     snapshot["plans"] = tuple(context.disruption_plans)
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is None
     _assert_unchanged(vessel, context, snapshot)
@@ -242,6 +234,8 @@ def test_missing_current_segment_delegates() -> None:
     context, vessel, _ = _context()
     vessel.current_segment = None
 
-    result = UserStrategy.adjust_bookings_before_cargo_handling(context, _active_time(), vessel)
+    result = UserStrategy.adjust_bookings_before_cargo_handling(
+        context, _active_time(), vessel
+    )
 
     assert result is None

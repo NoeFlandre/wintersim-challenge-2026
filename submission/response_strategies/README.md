@@ -8,8 +8,6 @@ directory are considered for evaluation.
 
 - `user_strategy.py` - the participant `UserStrategy` adapter that the
   organizer framework imports and calls during simulation events.
-- `deferred_rebooking.py` - a participant-owned, standard-library-only helper
-  for the Round 1 future-only in-transit rebooking policy.
 
 ## What is intentionally absent
 
@@ -18,19 +16,18 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: deferred future-only rebooking
+## Current strategy: organizer fallback
 
-Three methods in `UserStrategy` return `None`, delegating to the organizer
-fallback. The in-transit hook returns `False` only when all active disruption
-impacts are downstream of the vessel's current segment; direct impacts and
-invalid state still delegate. The helper never mutates organizer objects.
+Every method in `UserStrategy` currently returns `None`, which delegates to the
+organizer fallback strategy without mutating any input. This establishes a
+known, unmodified baseline. Optimization is deliberately deferred to later,
+separately reviewed work.
 
 ## Submission boundary
 
 Only files from this directory may enter a submission archive built by
-`wsc2026 package`. The packager allowlists the two participant Python modules
-and this README; it rejects organizer code, inputs, outputs, tests, caches, and
-development tooling.
+`wsc2026 package`. The packager rejects organizer code, inputs, outputs, tests,
+caches, and development tooling.
 
 ## Runtime restrictions
 

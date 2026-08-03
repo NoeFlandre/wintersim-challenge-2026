@@ -34,12 +34,10 @@ class OverlayError(Exception):
 
 
 # Participant-owned files that may be overlaid onto the organizer tree.
-# The deferred-rebooking helper is a reviewed participant module and must be
-# synchronized with user_strategy.py as one atomic allowlisted surface.
+# Adding to this set is a reviewed decision: it expands the submission surface.
 ALLOWED_OVERLAY_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
-        "deferred_rebooking.py",
         "README.md",
     }
 )

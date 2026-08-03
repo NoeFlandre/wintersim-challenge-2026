@@ -1,6 +1,6 @@
 # Round 1 deferred in-transit rebooking v1
 
-**Status:** rejected; candidate run complete, fallback restored, final gates in progress.
+**Status:** rejected; fallback restored and all final gates green.
 
 ## Hypothesis
 
@@ -150,6 +150,24 @@ verified control snapshot:
 - restored score: `20.436668751255972` across 72 periods
 - active strategy: the four-hook no-op adapter
 - candidate evidence remains under the ignored result directory above
+
+## Final verification
+
+After restoration, the worktree is clean and no simulation, probe, or replay
+process remains. The final gates passed:
+
+- `uv lock --check` and `uv sync --locked --all-groups`
+- Ruff format/check, `ty check src/wsc2026_tools submission`, and mypy
+- non-integration tests: `188 passed, 7 deselected`, coverage `90.93%`
+- integration tests: `1 passed, 6 expected Round-0-source skips`
+- Round 1 smoke: `SMOKE_OK`
+- synchronized submission/runtime `user_strategy.py` SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- two final package builds were byte-identical:
+  `5efe04447fcf268f3e692fd48a026d3f32ee0b374d63a77f5b0826e868256aa9`
+- final package members: `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` only
+- restricted-material history/path scans and `git diff --check`: clean
 
 ## One-candidate and publication rules
 

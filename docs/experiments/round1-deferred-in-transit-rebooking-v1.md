@@ -1,6 +1,6 @@
 # Round 1 deferred in-transit rebooking v1
 
-**Status:** pre-run contract. No Round 1 candidate run has started.
+**Status:** rejected; candidate run complete and fallback restoration in progress.
 
 ## Hypothesis
 
@@ -103,6 +103,39 @@ with `git revert`, synchronize the no-op adapter to the private Round 1 source,
 restore the pinned fallback ATT bytes, and re-score to exactly
 `20.436668751255972`. Do not recreate the adapter manually and do not attempt
 another candidate or tune any threshold.
+
+## Candidate result (2026-08-03)
+
+The one authorized candidate run completed end to end. No second candidate,
+rerun, tuning, or code change was made after it started.
+
+- command: `PYTHONHASHSEED=0 uv run wsc2026 run --round round1 --full`
+- scenario: `create_with_disruption`
+- seed: `2026`
+- runtime: `00:19:29`
+- completion: Period 72 (Days 356-360), `Simulation completed`, `UV_EXIT=0`
+- candidate ATT SHA-256:
+  `e8538b171a9ff34a8131ffaa1b09e1bb3cc964c85af2d7727d7f1c0b4af2eef3`
+- candidate ATT bytes: `1262`
+- candidate mean ATT: `20.63625` days across 72 numbered periods
+- candidate cumulative resilience loss: `23.38738245924171`
+- pinned fallback cumulative resilience loss: `20.436668751255972`
+- delta versus fallback: `+2.950713707985738` (`+14.438330159872%`)
+- candidate periods lower/equal/higher than fallback ATT: `20 / 21 / 31`
+- decision: **REJECTED**; the strict gate requires a score below
+  `20.436668751255972 - 1e-9`
+- candidate snapshot:
+  `.challenge/round1/results/deferred_in_transit_rebooking_v1_20260803/ATT_By_Statistics_Interval.csv`
+- candidate run log:
+  `.challenge/round1/results/deferred_in_transit_rebooking_v1_20260803/run.log`
+- run-log SHA-256:
+  `7dbb25638f9f33103157b96a8698ed0fcbb93956c0f26bc24be5a468c455391f`
+- scorer JSON:
+  `.challenge/round1/results/deferred_in_transit_rebooking_v1_20260803/score.json`
+
+The candidate was materially worse than the paired no-op control. The
+candidate snapshot and raw log are retained as ignored, private evidence; the
+implementation is not eligible for submission.
 
 ## One-candidate and publication rules
 

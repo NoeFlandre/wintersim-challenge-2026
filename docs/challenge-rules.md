@@ -1,6 +1,6 @@
 # Challenge rules and compliance
 
-> **Last verified:** 2026-07-20.
+> **Last verified:** 2026-08-03.
 >
 > This document paraphrases the official challenge materials for quick
 > reference. It is not the authoritative source. When anything here disagrees
@@ -24,6 +24,11 @@
 - **Hidden round** - October 1-23, 2026. Weight: **50%**.
 - Hidden scenarios and multiple random seeds are used for evaluation.
 - Only successfully running code is eligible for scoring.
+
+The organizers' Round 1 announcement opened the round on 2026-08-01, closes
+submissions on 2026-08-23, and requires all evaluated changes to be under
+`response_strategies`. It also asks participants to create a new submission
+email rather than replying to the announcement.
 
 ## Performance criterion
 
@@ -59,6 +64,10 @@ exploit the metric.
 - No network calls, subprocesses, environment-specific paths, current-working-
   directory assumptions, wall-clock time, unseeded randomness, or mutable
   cross-run global state in submission code.
+
+The announced submission address is `wsc2026simchallenge@gmail.com`. Confirm
+the final archive filename order with the organizers before sending it; the
+public website and technical PDF currently show different conventions.
 
 ## The four `UserStrategy` interfaces
 

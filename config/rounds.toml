@@ -23,10 +23,28 @@ extract_dir_name = "round0"
 practice_only = true
 # Structural marker paths (relative to the archive root) that bootstrap verifies.
 marker_relpaths = [
-    "main.py",
-    "requirements.txt",
-    "response_strategies/user_strategy.py",
-    "response_strategies/default_strategy.py",
-    "response_strategies/strategy_validation.py",
-    "o2despy/pyproject.toml",
+  "main.py",
+  "requirements.txt",
+  "response_strategies/user_strategy.py",
+  "response_strategies/default_strategy.py",
+  "response_strategies/strategy_validation.py",
+  "o2despy/pyproject.toml",
+]
+
+[[rounds]]
+round_id = "round1"
+# The local owner archive was normalized to this descriptive filename under
+# .challenge/downloads/. The original Drive download was named "Zip archive.zip".
+archive_filename = "SimulationChallenge2026_Py_Round1.zip"
+# SHA-256 of the owner-provided Round 1 archive received on 2026-08-03.
+expected_sha256 = "15a9f792fb0bac548b2f4af3d1f835c86b303f904899e8a3d39e03597820a2bb"
+extract_dir_name = "round1"
+practice_only = false
+marker_relpaths = [
+  "main.py",
+  "requirements.txt",
+  "response_strategies/user_strategy.py",
+  "response_strategies/default_strategy.py",
+  "response_strategies/strategy_validation.py",
+  "o2despy/pyproject.toml",
 ]

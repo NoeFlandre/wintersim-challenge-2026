@@ -173,6 +173,20 @@ def test_load_round_round0_has_expected_metadata() -> None:
         assert ".." not in marker
 
 
+def test_load_round_round1_has_expected_metadata() -> None:
+    config = load_round("round1")
+    assert isinstance(config, RoundConfig)
+    assert config.round_id == "round1"
+    assert config.archive_filename == "SimulationChallenge2026_Py_Round1.zip"
+    assert (
+        config.expected_sha256 == "15a9f792fb0bac548b2f4af3d1f835c86b303f904899e8a3d39e03597820a2bb"
+    )
+    assert config.extract_dir_name == "round1"
+    assert config.practice_only is False
+    assert "main.py" in config.marker_relpaths
+    assert "response_strategies/user_strategy.py" in config.marker_relpaths
+
+
 def test_load_round_unknown_round_fails_closed() -> None:
     with pytest.raises(RoundConfigError, match="(?i)unknown round"):
         load_round("round42")

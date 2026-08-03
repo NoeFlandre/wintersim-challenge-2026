@@ -53,9 +53,13 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
 ## Current status
 
 - **Round 0** (warm-up / practice): not scored. **Round 0 must never be packaged
-  or submitted.** This workspace currently targets Round 0 for local
-  bootstrapping, smoke testing, and baseline measurement only.
-- **Round 1:** August 1-23, 2026 (20% weight).
+  or submitted.** Its controlled experiments and evidence remain documented
+  under `docs/experiments/` as background only.
+- **Round 1:** the organizer archive is privately bootstrapped at
+  `.challenge/round1/source/`, the no-op adapter is synchronized, and the smoke
+  and deterministic package checks pass. No Round 1 strategy experiment has run
+  yet. See [`docs/round1-readiness.md`](docs/round1-readiness.md).
+- **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
@@ -80,19 +84,20 @@ From the repository root:
 # organizer's runtime requirements without tracking the organizer's package).
 uv sync --locked --group dev --group simulation
 
-# Bootstrap the local Round 0 source from your private copy of the archive.
-# The archive is verified against its published SHA-256 before extraction.
-uv run wsc2026 bootstrap --round round0 --archive /path/to/SimulationChallenge2026_Py_Round0.zip
+# Bootstrap a local round source from its private archive copy. The archive is
+# verified against the SHA-256 pinned in config/rounds.toml before extraction.
+uv run wsc2026 bootstrap --round round1 \
+  --archive .challenge/downloads/SimulationChallenge2026_Py_Round1.zip
 
-# Overlay participant response_strategies onto the bootstrapped source tree.
-uv run wsc2026 sync --round round0
+# Overlay participant response_strategies onto the selected round's source tree.
+uv run wsc2026 sync --round round1
 
 # Run a very short smoke simulation (a few days) to validate imports/wiring.
-uv run wsc2026 smoke --round round0
+uv run wsc2026 smoke --round round1
 ```
 
-Bootstrap extracts into the git-ignored `.challenge/round0/source/` tree and
-never modifies the source archive.
+Bootstrap extracts into the selected git-ignored `.challenge/<round>/source/`
+tree and never modifies the source archive.
 
 ## Day-to-day commands
 
@@ -142,15 +147,17 @@ its path, SHA-256, size, and member list, and never uploads anything.
 
 ## Full simulation runs
 
-Full runs (140-day warm-up plus the experiment) are **intentionally long** and
-are **excluded from CI**. They require an explicit confirmation flag so an
-hour-long run cannot start accidentally:
+Full runs (the configured warm-up plus the measured experiment) are
+**intentionally long** and are **excluded from CI**. They require a deliberate
+experiment contract and review before starting:
 
 ```bash
-uv run wsc2026 run --round round0 --full
+uv run wsc2026 run --round round1 --full
 ```
 
-Outputs are written inside the ignored extracted workspace / experiment area.
+Outputs are written inside the selected round's ignored extracted workspace.
+Never start a full run from an unreviewed strategy or use Round 0 as a
+submission.
 
 ## Submission boundary
 

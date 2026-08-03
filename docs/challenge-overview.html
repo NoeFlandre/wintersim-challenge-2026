@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, vocabulary, and our Round 0 experiments.">
+  <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, Round 1 setup, and Round 0 experiments.">
   <title>Winter Simulation Conference 2026 Challenge — Context &amp; Experiment Log</title>
   <style>
     :root {
@@ -376,7 +376,7 @@
 <body>
   <header class="topbar">
     <nav class="nav" aria-label="Page sections">
-      <a class="brand" href="#top">WSC 2026 / Round 0</a>
+      <a class="brand" href="#top">WSC 2026 / Round 1</a>
       <a href="#context">Context</a>
       <a href="#glossary">Terms</a>
       <a href="#rules">Rules</a>
@@ -386,7 +386,7 @@
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context &amp; experiment log · 26 July 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 3 August 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -395,12 +395,14 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
+        Round 1 is now privately bootstrapped and ready for its first reviewed
+        strategy experiment; the experiments listed below belong to Round 0.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
         <div class="metric">
           <strong>18.6736</strong>
-          <span>fallback loss used for every experiment</span>
+          <span>Round 0 fallback loss</span>
         </div>
         <div class="metric">
           <strong>9</strong>
@@ -431,7 +433,7 @@
         <article class="card">
           <span class="number">1</span>
           <h3>Run the network</h3>
-          <p>A 140-day warm-up stabilizes the model before scoring. It is followed by 360 measured days under one practice disruption scenario and one fixed random seed.</p>
+          <p>Round 0 used a 140-day warm-up followed by 360 measured days. Round 1 has its own private source tree and must be measured separately.</p>
         </article>
         <article class="card">
           <span class="number">2</span>
@@ -558,6 +560,7 @@
 
       <ul class="rules">
         <li><strong>Round 0 is practice only.</strong> It must never be submitted as an official entry.</li>
+        <li><strong>Round 1 is official.</strong> It closes on 23 August 2026 and carries 20% of the final weighting.</li>
         <li><strong>Lower loss wins.</strong> Mean <abbr title="Average Transport Time">ATT</abbr> alone cannot accept a candidate.</li>
         <li><strong>Only response strategies ship.</strong> Everything required must live in <code>response_strategies/</code>, the submission folder containing our hooks.</li>
         <li><strong>Organizer assets stay private.</strong> Source, inputs and outputs are ignored and never redistributed.</li>
@@ -589,7 +592,8 @@
       <div class="callout">
         <strong>One fallback reference:</strong>
         every candidate is compared with loss <strong>18.6735778198</strong>.
-        Equality is rejection; lower is better.
+        Equality is rejection; lower is better. The Round 1 no-op baseline is
+        ready, but no Round 1 candidate has run.
       </div>
     </section>
 
@@ -597,11 +601,11 @@
       <p class="eyebrow">04 · Experiments</p>
       <h2>What we tried</h2>
       <p class="section-intro">
-        Each experiment changed one decision rule, then ran the same complete
-        360-day disruption simulation. We compared its loss with the
+        Each Round 0 experiment changed one decision rule, then ran the same
+        complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 fallback</strong>. Lower is better; equality is not an
-        improvement. Every experiment below was rejected, so the fallback
-        remains active.
+        improvement. Every experiment below was rejected, so the no-op fallback
+        remains the starting point for Round 1.
       </p>
 
       <div class="table-wrap">
@@ -672,8 +676,9 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports and nine completed Round 0 experiments. Official challenge
-    materials remain authoritative.
+    reports, nine completed Round 0 experiments, and the Round 1 readiness
+    record. See the <a href="round1-readiness.md">Round 1 readiness record</a>.
+    Official challenge materials remain authoritative.
   </footer>
 </body>
 </html>

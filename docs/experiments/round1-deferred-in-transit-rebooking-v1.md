@@ -1,6 +1,6 @@
 # Round 1 deferred in-transit rebooking v1
 
-**Status:** rejected; candidate run complete and fallback restoration in progress.
+**Status:** rejected; candidate run complete, fallback restored, final gates in progress.
 
 ## Hypothesis
 
@@ -136,6 +136,20 @@ rerun, tuning, or code change was made after it started.
 The candidate was materially worse than the paired no-op control. The
 candidate snapshot and raw log are retained as ignored, private evidence; the
 implementation is not eligible for submission.
+
+## Post-rejection restoration
+
+The candidate implementation and its tests were reverted in reverse order.
+The experiment contract, result record, and `ty` development-tool dependency
+were retained. The private Round 1 runtime was synchronized from the restored
+no-op submission, and the active ATT was restored byte-for-byte from the
+verified control snapshot:
+
+- restored ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- restored score: `20.436668751255972` across 72 periods
+- active strategy: the four-hook no-op adapter
+- candidate evidence remains under the ignored result directory above
 
 ## One-candidate and publication rules
 

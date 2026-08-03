@@ -395,8 +395,8 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 is now privately bootstrapped and ready for its first reviewed
-        strategy experiment; the experiments listed below belong to Round 0.
+        Round 1 has its own private source tree; one reviewed Round 1 strategy
+        experiment is now recorded below alongside the Round 0 history.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
@@ -590,10 +590,12 @@
       </div>
 
       <div class="callout">
-        <strong>One fallback reference:</strong>
-        every candidate is compared with loss <strong>18.6735778198</strong>.
-        Equality is rejection; lower is better. The Round 1 no-op baseline is
-        ready, but no Round 1 candidate has run.
+        <strong>Round-specific fallback references:</strong>
+        candidates are compared with the fallback for their own round.
+        Equality is rejection; lower is better. Round 0 uses the
+        <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
+        fallback is <strong>20.4366687513</strong>. The first Round 1 candidate
+        was worse and was rejected.
       </div>
     </section>
 
@@ -603,9 +605,10 @@
       <p class="section-intro">
         Each Round 0 experiment changed one decision rule, then ran the same
         complete 360-day disruption simulation. We compared its loss with the
-        <strong>18.6736 fallback</strong>. Lower is better; equality is not an
-        improvement. Every experiment below was rejected, so the no-op fallback
-        remains the starting point for Round 1.
+        <strong>18.6736 Round 0 fallback</strong>. The first Round 1 trial used
+        its own complete simulation and <strong>20.4367 Round 1 fallback</strong>.
+        Lower is better; equality is not an improvement. Both rounds currently
+        retain their no-op fallback.
       </p>
 
       <div class="table-wrap">
@@ -667,17 +670,38 @@
         </table>
       </div>
       <p class="note">
-        Loss is the official score. Lower is better. All percentages compare
-        with the same 18.6736 fallback.
+        Loss is the official score. Lower is better. Round 0 percentages compare
+        with 18.6736; the Round 1 percentage compares with 20.4367.
       </p>
+
+      <h3>Round 1 · first controlled trial</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Experiment</th>
+              <th scope="col">What we tested and why</th>
+              <th scope="col">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="experiments/round1-deferred-in-transit-rebooking-v1.md">Defer future-only rebooking</a></td>
+              <td>For cargo already on a vessel, we kept the current booking when a disruption affected only a later leg or port. We let the organizer fallback re-plan when the vessel's current segment or port was directly affected, so the experiment changed only premature future-only rerouting.</td>
+              <td><strong>23.3874</strong><br><span class="status worse">14.44% worse than the 20.4367 Round 1 fallback</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
   </main>
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, and the Round 1 readiness
-    record. See the <a href="round1-readiness.md">Round 1 readiness record</a>.
+    reports, nine completed Round 0 experiments, and the first completed Round 1
+    experiment. See the <a href="round1-readiness.md">Round 1 readiness record</a>
+    and <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

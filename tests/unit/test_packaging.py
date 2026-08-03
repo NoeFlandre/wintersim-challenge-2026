@@ -254,6 +254,22 @@ def test_relative_import_to_existing_participant_module_allowed(tmp_path: Path) 
     assert archive.exists()
 
 
+def test_modular_participant_helper_is_allowlisted(tmp_path: Path) -> None:
+    sub = _submission_dir(tmp_path)
+    (sub / "deferred_rebooking.py").write_text(
+        "from typing import Any\ndef helper(value: Any) -> Any:\n    return value\n"
+    )
+    (sub / "user_strategy.py").write_text(
+        "from .deferred_rebooking import helper\nclass UserStrategy:\n    value = helper(None)\n"
+    )
+
+    archive = package_submission(sub, team="ValidTeam", round_id="1", dist_dir=tmp_path / "out")
+
+    with zipfile.ZipFile(archive) as zipped:
+        names = set(zipped.namelist())
+    assert any(name.endswith("/response_strategies/deferred_rebooking.py") for name in names)
+
+
 def test_relative_import_level_above_package_depth_rejected(tmp_path: Path) -> None:
     """`from .. import x` from a top-level submission file escapes the package."""
     sub = _submission_dir(tmp_path)

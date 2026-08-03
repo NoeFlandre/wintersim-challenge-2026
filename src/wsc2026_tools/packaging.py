@@ -49,10 +49,13 @@ _ROUND_AFFIXES: dict[str, tuple[str, str]] = {
 }
 
 # Participant-owned files that may appear in the archive's response_strategies.
-# Adding to this set is a reviewed decision that expands the submission surface.
+# The deferred-rebooking helper is participant code, not organizer code, and is
+# explicitly included so the strategy remains modular without importing files
+# outside the evaluated response_strategies directory.
 _ALLOWED_SUBMISSION_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
+        "deferred_rebooking.py",
         "README.md",
     }
 )

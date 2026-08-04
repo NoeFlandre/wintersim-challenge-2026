@@ -28,6 +28,7 @@ def _make_tree(root: Path, files: dict[str, str]) -> None:
 SUBMISSION_FILES: dict[str, str] = {
     "user_strategy.py": "# participant user_strategy\n",
     "README.md": "# participant readme\n",
+    "progress_first_berth.py": "# participant helper\n",
 }
 
 # Files that are organizer-owned and must be preserved untouched, never copied
@@ -57,7 +58,7 @@ def test_overlay_copies_participant_files_and_preserves_organizer(tmp_path: Path
 
     copied = overlay_response_strategies(submission, dest)
 
-    assert set(copied) == {"user_strategy.py", "README.md"}
+    assert set(copied) == set(SUBMISSION_FILES)
     # Participant files updated.
     assert (dest / "user_strategy.py").read_text() == "# participant user_strategy\n"
     assert (dest / "README.md").read_text() == "# participant readme\n"
@@ -104,7 +105,7 @@ def test_overlay_skips_caches_and_hidden_files_without_failing(tmp_path: Path) -
     copied = overlay_response_strategies(submission, dest)
 
     # Only allowlisted participant files synchronized.
-    assert set(copied) == {"user_strategy.py", "README.md"}
+    assert set(copied) == set(SUBMISSION_FILES)
     # Cruft never landed in dest.
     assert not (dest / "__pycache__").exists()
     assert not (dest / "user_strategy.pyc").exists()

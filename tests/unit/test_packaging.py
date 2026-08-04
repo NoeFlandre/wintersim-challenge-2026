@@ -31,6 +31,7 @@ def _submission_dir(tmp_path: Path) -> Path:
         "    def select_vessel_for_berth(a, b, c, d, e, f=None) -> Any: return None\n"
     )
     (sub / "README.md").write_text("# participant\n")
+    (sub / "progress_first_berth.py").write_text("# participant helper\n")
     return sub
 
 
@@ -81,6 +82,9 @@ def test_archive_naming_and_top_level_dir(
     assert archive.parent == dist
 
     members = _read_members(archive)
+    assert {
+        member.rsplit("/", 1)[-1] for member in members if "/response_strategies/" in member
+    } == {"user_strategy.py", "README.md", "progress_first_berth.py"}
     # Exactly one top-level directory.
     tops = {m.split("/")[0] for m in members}
     assert len(tops) == 1

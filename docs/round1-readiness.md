@@ -1,7 +1,7 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; no Round 1 strategy experiment has
-run yet.
+**Status:** bootstrapped and smoke-tested; two controlled Round 1 experiments
+have run and both were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
 
@@ -29,13 +29,19 @@ tracked, copied into the public repository, or included in a submission.
   `simulation_model`, `scenario_builders`, `Input`, `Output`, and `o2despy`
   components.
 - The participant `response_strategies/user_strategy.py` and `README.md` are
-  synchronized byte-for-byte into the Round 1 source.
+  synchronized byte-for-byte into the Round 1 source; the active adapter is the
+  no-op fallback.
 - The one-day Round 1 smoke run completed with `SMOKE_OK`.
-- Two validation packages were byte-identical. Each contained only
+- Final validation packages were byte-identical. Each contained only
   `response_strategies/README.md` and `response_strategies/user_strategy.py`.
 - The active strategy is still the no-op adapter: all four hooks return `None`
   and delegate to the organizer fallback.
-- No Round 1 full run, optimization, candidate, or submission has been made.
+- The pinned fallback ATT SHA-256 is
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43` and its
+  rescored cumulative loss is `20.436668751255972` over 72 periods.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-progress-first-berth-v1.md`](experiments/round1-progress-first-berth-v1.md),
+  ran exactly once and tied that fallback byte-for-byte, so it was rejected.
 
 ## Round 1 commands
 

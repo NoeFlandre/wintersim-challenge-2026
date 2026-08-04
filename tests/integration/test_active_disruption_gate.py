@@ -93,23 +93,12 @@ def _load_participant_user_strategy() -> type:
     participant_file = submission_strategies_dir() / "user_strategy.py"
     if not participant_file.is_file():
         pytest.fail(f"participant user_strategy.py missing at {participant_file}")
-    package_name = "wsc_participant_response_strategies"
-    for module_name in list(sys.modules):
-        if module_name == package_name or module_name.startswith(f"{package_name}."):
-            sys.modules.pop(module_name, None)
-    package_spec = importlib.util.spec_from_loader(package_name, loader=None, is_package=True)
-    if package_spec is None:
-        pytest.fail(f"could not create participant package spec for {participant_file}")
-    package = importlib.util.module_from_spec(package_spec)
-    package.__path__ = [str(participant_file.parent)]  # type: ignore[attr-defined]
-    sys.modules[package_name] = package
     spec = importlib.util.spec_from_file_location(
-        f"{package_name}.user_strategy", str(participant_file)
+        "wsc_participant_user_strategy", str(participant_file)
     )
     if spec is None or spec.loader is None:
         pytest.fail(f"could not build import spec for {participant_file}")
     module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module.UserStrategy
 

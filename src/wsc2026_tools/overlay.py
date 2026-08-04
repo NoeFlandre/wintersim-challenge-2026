@@ -39,6 +39,7 @@ ALLOWED_OVERLAY_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
         "README.md",
+        "progress_first_berth.py",
     }
 )
 

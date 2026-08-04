@@ -54,6 +54,7 @@ _ALLOWED_SUBMISSION_FILES: frozenset[str] = frozenset(
     {
         "user_strategy.py",
         "README.md",
+        "progress_first_berth.py",
     }
 )
 

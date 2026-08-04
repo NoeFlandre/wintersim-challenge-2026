@@ -26,12 +26,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from .progress_first_berth import choose_progress_capable_vessel
+
 
 class UserStrategy:
-    """Behavior-neutral participant adapter.
+    """Participant adapter with one narrow berth-priority policy.
 
-    Every method returns ``None`` to delegate to the organizer fallback without
-    mutating any argument. This preserves the baseline simulation behavior.
+    The berth hook may return an original progress-capable vessel during a
+    mixed active disruption queue. All other cases delegate to the organizer
+    fallback without mutating any argument.
     """
 
     @staticmethod
@@ -45,9 +48,15 @@ class UserStrategy:
     ) -> Any:
         """Choose a waiting vessel to assign to a free berth.
 
-        Returns ``None`` to use the organizer fallback; no input is mutated.
+        Returns an original waiting vessel only for the approved mixed-queue
+        policy; ``None`` delegates to the organizer fallback.
         """
-        return None
+        return choose_progress_capable_vessel(
+            maritime_data_context,
+            waiting_vessels,
+            current_time,
+            waiting_since_by_vessel,
+        )
 
     @staticmethod
     def create_alternative_service_routes(context: Any, now: Any, vessel: Any = None) -> Any:

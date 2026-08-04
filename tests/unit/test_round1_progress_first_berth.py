@@ -212,6 +212,7 @@ def test_exact_tie_preserves_queue_order_and_identity() -> None:
         plans=[_plan(target_leg=blocked_leg, multiplier=3.0)],
         now=now,
     )
+    waits[first] = waits[second]
     result = UserStrategy.select_vessel_for_berth(
         context, port, waiting, [SimpleNamespace(port=port)], now, waits
     )

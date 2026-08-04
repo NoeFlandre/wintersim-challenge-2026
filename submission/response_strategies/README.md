@@ -8,7 +8,6 @@ directory are considered for evaluation.
 
 - `user_strategy.py` - the participant `UserStrategy` adapter that the
   organizer framework imports and calls during simulation events.
-- `progress_first_berth.py` - a read-only helper used by the berth hook.
 
 ## What is intentionally absent
 
@@ -17,14 +16,12 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: progress-first berth selection
+## Current strategy: organizer fallback
 
-During an active disruption, the berth hook returns a progress-capable vessel
-only when the waiting queue contains both progress-capable and blocked vessels.
-It preserves the organizer fallback's ranking among the progress-capable
-vessels. In every other case, including all other hooks, it returns `None` so
-the organizer fallback handles the decision. The helper is packaged explicitly
-with the adapter and uses only standard-library, read-only calculations.
+Every method in `UserStrategy` currently returns `None`, which delegates to the
+organizer fallback strategy without mutating any input. This establishes a
+known, unmodified baseline. Optimization is deliberately deferred to later,
+separately reviewed work.
 
 ## Submission boundary
 

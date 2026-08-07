@@ -58,8 +58,7 @@ def test_real_round1_exact_congested_od_gets_one_direct_booking() -> None:
     plan = next(
         plan
         for plan in context.disruption_plans
-        if plan.target_leg is not None
-        and plan.multiplier > 1
+        if plan.target_leg is not None and plan.multiplier > 1
         and plan.target_leg.departure_port.name == "New Jersey"
         and plan.target_leg.arrival_port.name == "Cartagena"
     )
@@ -67,8 +66,7 @@ def test_real_round1_exact_congested_od_gets_one_direct_booking() -> None:
     assert not any(
         active.target_berth is not None
         and active.close_berth
-        and active.start_offset_days
-        <= (now - dt.datetime.min).total_seconds() / 86400.0
+        and active.start_offset_days <= (now - dt.datetime.min).total_seconds() / 86400.0
         < active.start_offset_days + active.duration_days
         for active in context.disruption_plans
     )
@@ -96,3 +94,4 @@ def test_real_round1_exact_congested_od_gets_one_direct_booking() -> None:
     assert booking.departure_segment_index == segment.sequence_index
     assert booking.arrival_segment_index == segment.sequence_index
     assert booking in booking.service_route.associated_bookings
+

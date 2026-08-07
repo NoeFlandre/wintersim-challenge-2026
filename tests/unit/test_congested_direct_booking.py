@@ -8,6 +8,7 @@ import types
 from types import SimpleNamespace
 
 import pytest
+
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -122,20 +123,12 @@ def test_any_active_berth_closure_delegates_without_mutation(
 ) -> None:
     _install_booking_module(monkeypatch)
     context, route, _leg, shipment, start = _case(close_berth=True)
-    before = (
-        list(shipment.associated_bookings),
-        shipment.current_booking_index,
-        list(route.associated_bookings),
-    )
+    before = (list(shipment.associated_bookings), shipment.current_booking_index, list(route.associated_bookings))
 
     result = UserStrategy.assign_associated_bookings(context, start, shipment)
 
     assert result is None
-    assert (
-        shipment.associated_bookings,
-        shipment.current_booking_index,
-        route.associated_bookings,
-    ) == before
+    assert (shipment.associated_bookings, shipment.current_booking_index, route.associated_bookings) == before
 
 
 @pytest.mark.parametrize(
@@ -144,9 +137,7 @@ def test_any_active_berth_closure_delegates_without_mutation(
         lambda context, route, leg, shipment: setattr(
             shipment.demand, "destination_port", SimpleNamespace(name="Other")
         ),
-        lambda context, route, leg, shipment: setattr(
-            context.disruption_plans[0], "start_offset_days", "bad"
-        ),
+        lambda context, route, leg, shipment: setattr(context.disruption_plans[0], "start_offset_days", "bad"),
         lambda context, route, leg, shipment: setattr(route, "deployed_vessels", []),
         lambda context, route, leg, shipment: setattr(route, "source_service_route", object()),
     ],
@@ -157,18 +148,10 @@ def test_nonmatching_or_malformed_state_delegates_without_mutation(
     _install_booking_module(monkeypatch)
     context, route, _leg, shipment, start = _case()
     mutate(context, route, _leg, shipment)
-    before = (
-        list(shipment.associated_bookings),
-        shipment.current_booking_index,
-        list(route.associated_bookings),
-    )
+    before = (list(shipment.associated_bookings), shipment.current_booking_index, list(route.associated_bookings))
 
     assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
-    assert (
-        shipment.associated_bookings,
-        shipment.current_booking_index,
-        route.associated_bookings,
-    ) == before
+    assert (shipment.associated_bookings, shipment.current_booking_index, route.associated_bookings) == before
 
 
 def test_installation_failure_restores_shipment_and_reverse_references(
@@ -193,3 +176,4 @@ def test_installation_failure_restores_shipment_and_reverse_references(
     assert route.associated_bookings == [old]
     assert old.service_route is route
     assert leg is route.segments[0].associated_leg
+

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
+import pytest
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -202,3 +204,192 @@ def test_exposure_inspection_does_not_mutate_runtime_objects() -> None:
     _call(context, waiting, _clock(11.0), {waiting[0]: _clock(10.0)})
 
     assert [vessel.carried_shipments for vessel in waiting] == before
+
+
+@pytest.mark.parametrize(
+    ("start", "duration"),
+    [
+        (True, 1.0),
+        (-1.0, 1.0),
+        (float("nan"), 1.0),
+        (10.0, False),
+        (10.0, 0.0),
+        (10.0, float("nan")),
+    ],
+)
+def test_invalid_plan_timing_fails_closed(start: object, duration: object) -> None:
+    _, _, _, exposed_leg, _ = _network()
+    plan = Plan(start, duration, target_leg=exposed_leg)  # type: ignore[arg-type]
+    assert _call(Context([plan]), [_vessel(1, exposed_leg)], _clock(11.0), {}) is None
+
+
+def test_invalid_plan_shape_and_targets_fail_closed() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    waiting = [_vessel(1, exposed_leg)]
+    malformed = [
+        SimpleNamespace(start_offset_days=10.0, duration_days=1.0),
+        SimpleNamespace(
+            start_offset_days=10.0,
+            duration_days=1.0,
+            target_leg=exposed_leg,
+            target_berth=Berth(Port("both")),
+        ),
+        SimpleNamespace(
+            start_offset_days=10.0,
+            duration_days=1.0,
+            target_leg=SimpleNamespace(departure_port=None, arrival_port=Port("x")),
+        ),
+        SimpleNamespace(
+            start_offset_days=10.0,
+            duration_days=1.0,
+            target_berth=SimpleNamespace(port=None),
+        ),
+    ]
+    for plan in malformed:
+        assert _call(Context([plan]), waiting, _clock(11.0), {}) is None
+
+
+def test_missing_context_plan_container_and_bad_waiting_input_delegate() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    vessel = _vessel(1, exposed_leg)
+    assert _call(SimpleNamespace(), [vessel], _clock(11.0), {}) is None
+    assert _call(SimpleNamespace(disruption_plans=1), [vessel], _clock(11.0), {}) is None
+    assert (
+        UserStrategy.select_vessel_for_berth(Context([]), object(), None, [], _clock(11.0), {})
+        is None
+    )
+    assert (
+        UserStrategy.select_vessel_for_berth(Context([]), object(), [], [], _clock(11.0), {})
+        is None
+    )
+    assert UserStrategy.select_vessel_for_berth(Context([]), object(), [vessel], [], 0, {}) is None
+
+
+def test_plan_overflow_and_target_deduplication_delegate_or_continue() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    waiting = [_vessel(1, exposed_leg), _vessel(2, exposed_leg)]
+    overflow = Plan(1e300, 1.0, target_leg=exposed_leg)
+    assert _call(Context([overflow]), waiting, _clock(11.0), {}) is None
+    duplicate_plans = [
+        Plan(10.0, 3.0, target_leg=exposed_leg),
+        Plan(10.0, 3.0, target_leg=exposed_leg),
+    ]
+    result = _call(
+        Context(duplicate_plans),
+        waiting,
+        _clock(11.0),
+        {waiting[0]: _clock(10.0)},
+    )
+    assert result is waiting[0]
+
+
+def test_route_and_booking_shape_errors_delegate() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    malformed_routes = [
+        None,
+        SimpleNamespace(segments=None),
+        SimpleNamespace(segments=[]),
+        SimpleNamespace(segments=1),
+        SimpleNamespace(segments=[SimpleNamespace(sequence_index="bad")]),
+    ]
+    for route in malformed_routes:
+        shipment = SimpleNamespace(
+            teu_size=1,
+            associated_bookings=[SimpleNamespace(service_route=route)],
+        )
+        vessel = SimpleNamespace(carried_shipments=[shipment])
+        assert _call(context, [vessel], _clock(11.0), {}) is None
+
+
+def test_missing_segment_indices_use_full_route_and_bad_indices_delegate() -> None:
+    _, _, _, exposed_leg, safe_leg = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    route = Route([Segment(exposed_leg), Segment(safe_leg)])
+    full_route_booking = SimpleNamespace(service_route=route)
+    full_route_shipment = SimpleNamespace(
+        teu_size=5,
+        associated_bookings=[full_route_booking],
+    )
+    full_route_vessel = SimpleNamespace(carried_shipments=[full_route_shipment])
+    assert _call(context, [full_route_vessel], _clock(11.0), {}) is None
+
+    bad_indices = SimpleNamespace(
+        service_route=route,
+        departure_segment_index=99,
+        arrival_segment_index=1,
+    )
+    bad_shipment = SimpleNamespace(teu_size=5, associated_bookings=[bad_indices])
+    assert (
+        _call(context, [SimpleNamespace(carried_shipments=[bad_shipment])], _clock(11.0), {})
+        is None
+    )
+
+
+def test_cyclic_booking_slice_and_past_booking_are_safe() -> None:
+    _, _, _, exposed_leg, safe_leg = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    route = Route([Segment(safe_leg), Segment(exposed_leg)])
+    past = SimpleNamespace(
+        sequence_index=1,
+        service_route=route,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+    )
+    current = SimpleNamespace(
+        sequence_index=2,
+        service_route=route,
+        departure_segment_index=2,
+        arrival_segment_index=1,
+    )
+    shipment = SimpleNamespace(
+        teu_size=5,
+        current_booking_index=2,
+        associated_bookings=[past, current],
+    )
+    vessel = SimpleNamespace(carried_shipments=[shipment])
+    assert _call(context, [vessel], _clock(11.0), {}) is None
+
+
+@pytest.mark.parametrize("teu", [True, -1, float("nan"), "10"])
+def test_invalid_teu_fails_closed(teu: object) -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    shipment = SimpleNamespace(teu_size=teu, associated_bookings=[])
+    vessel = SimpleNamespace(carried_shipments=[shipment])
+    assert _call(context, [vessel], _clock(11.0), {}) is None
+
+
+def test_malformed_shipment_collection_and_segment_ports_delegate() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    for shipments in (None, 1):
+        assert (
+            _call(context, [SimpleNamespace(carried_shipments=shipments)], _clock(11.0), {}) is None
+        )
+    for bookings in (None, 1):
+        shipment = SimpleNamespace(teu_size=1, associated_bookings=bookings)
+        assert (
+            _call(context, [SimpleNamespace(carried_shipments=[shipment])], _clock(11.0), {})
+            is None
+        )
+    for leg in (None, SimpleNamespace(departure_port=None, arrival_port=Port("x"))):
+        segment = SimpleNamespace(sequence_index=1, associated_leg=leg)
+        booking = SimpleNamespace(
+            service_route=SimpleNamespace(segments=[segment]),
+        )
+        shipment = SimpleNamespace(teu_size=1, associated_bookings=[booking])
+        assert (
+            _call(context, [SimpleNamespace(carried_shipments=[shipment])], _clock(11.0), {})
+            is None
+        )
+
+
+def test_waiting_map_and_datetime_arithmetic_fail_closed() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    vessel = _vessel(1, exposed_leg)
+    for waiting_map in (object(), {vessel: None}):
+        assert _call(context, [vessel], _clock(11.0), waiting_map) is None
+    aware_time = datetime(2026, 1, 1, tzinfo=UTC)
+    assert _call(context, [vessel], _clock(11.0), {vessel: aware_time}) is None

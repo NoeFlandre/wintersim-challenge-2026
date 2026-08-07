@@ -8,6 +8,7 @@ import types
 from types import SimpleNamespace
 
 import pytest
+from response_strategies import user_strategy as strategy_module
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -65,14 +66,28 @@ def _route(
         sailing_distance=distance,
         segments=[],
     )
+    return_leg = SimpleNamespace(
+        departure_port=destination,
+        arrival_port=origin,
+        sailing_distance=distance,
+        segments=[],
+    )
     segment = SimpleNamespace(
         sequence_index=1,
         associated_leg=leg,
         associated_service_route=route,
         current_vessels=[],
     )
+    return_segment = SimpleNamespace(
+        sequence_index=2,
+        associated_leg=return_leg,
+        associated_service_route=route,
+        current_vessels=[],
+    )
     leg.segments.append(segment)
+    return_leg.segments.append(return_segment)
     route.segments.append(segment)
+    route.segments.append(return_segment)
     return route, leg
 
 
@@ -244,3 +259,145 @@ def test_other_hooks_delegate() -> None:
     assert UserStrategy.select_vessel_for_berth(None, None, [], [], None) is None
     assert UserStrategy.create_alternative_service_routes(None, None) is None
     assert UserStrategy.adjust_bookings_before_cargo_handling(None, None, None) is None
+
+
+def test_invalid_context_and_clock_fail_closed() -> None:
+    context, _route, _leg, shipment, start, _plan = _case()
+
+    assert UserStrategy.assign_associated_bookings(None, start, shipment) is None
+    assert UserStrategy.assign_associated_bookings(context, "not-a-time", shipment) is None
+    assert UserStrategy.assign_associated_bookings(context, start, None) is None
+    assert UserStrategy.assign_associated_bookings(context, start, object()) is None
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda _context, _route, _leg, _shipment, plan: setattr(plan, "duration_days", 0.0),
+        lambda _context, _route, _leg, _shipment, plan: setattr(
+            plan, "start_offset_days", float("nan")
+        ),
+        lambda _context, _route, _leg, _shipment, plan: setattr(plan, "target_leg", None),
+    ],
+)
+def test_invalid_active_plan_data_delegates_without_mutation(mutate) -> None:
+    context, route, _leg, shipment, start, plan = _case()
+    mutate(context, route, _leg, shipment, plan)
+    before = (list(shipment.associated_bookings), shipment.current_booking_index)
+
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+    assert (shipment.associated_bookings, shipment.current_booking_index) == before
+
+
+def test_active_state_handles_duplicate_congestion_and_inactive_closure() -> None:
+    context, _route, _leg, _shipment, start, plan = _case()
+    context.disruption_plans.append(plan)
+    inactive_closure = SimpleNamespace(
+        target_leg=None,
+        target_berth=SimpleNamespace(port=_port("Closed")),
+        start_offset_days=100.0,
+        duration_days=2.0,
+        multiplier=1.0,
+        close_berth=True,
+    )
+    context.disruption_plans.append(inactive_closure)
+
+    state = strategy_module._active_state(context, start)  # noqa: SLF001
+
+    assert state is not None
+    assert state.congested_legs == (plan.target_leg,)
+    assert state.closed_names == ()
+
+
+def test_malformed_active_closure_fails_closed() -> None:
+    context, _route, _leg, shipment, start, plan = _case()
+    plan.close_berth = True
+    plan.target_berth = SimpleNamespace(port=None)
+    plan.target_leg = None
+    plan.multiplier = 1.0
+
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_graph_helpers_reject_malformed_routes_and_edges() -> None:
+    context, route, leg, _shipment, start, _plan = _case()
+    state = strategy_module._active_state(context, start)  # noqa: SLF001
+    assert state is not None
+
+    assert strategy_module._ordered_segments(SimpleNamespace(segments=None)) is None  # noqa: SLF001
+    assert strategy_module._ordered_segments(SimpleNamespace(segments=[object()])) is None  # noqa: SLF001
+    assert strategy_module._safe_edges(SimpleNamespace(segments=None), state) == []  # noqa: SLF001
+
+    route.segments[0].associated_leg.sailing_distance = 0.0
+    assert strategy_module._edge(route, route.segments, 0, 1) is None  # noqa: SLF001
+    route.segments[0].associated_leg.sailing_distance = 100.0
+    route.segments[0].associated_leg.arrival_port = route.segments[0].associated_leg.departure_port
+    assert strategy_module._edge(route, route.segments, 0, 1) is None  # noqa: SLF001
+    assert leg is route.segments[0].associated_leg
+
+
+def test_alternative_routes_must_match_active_key_and_have_vessels() -> None:
+    context, route, _leg, _shipment, start, _plan = _case()
+    state = strategy_module._active_state(context, start)  # noqa: SLF001
+    assert state is not None
+
+    alternative = SimpleNamespace(
+        source_service_route=route,
+        disruption_key=(("other",), (("origin", "destination"),)),
+        deployed_vessels=[object()],
+        segments=route.segments,
+    )
+    assert strategy_module._safe_edges(alternative, state) == []  # noqa: SLF001
+    alternative.disruption_key = state.disruption_key
+    alternative.deployed_vessels = []
+    assert strategy_module._safe_edges(alternative, state) == []  # noqa: SLF001
+
+
+def test_path_search_rejects_missing_ports_and_unreachable_graph() -> None:
+    context, _route, _leg, _shipment, start, _plan = _case()
+    state = strategy_module._active_state(context, start)  # noqa: SLF001
+    assert state is not None
+    origin, destination = context.ports
+
+    assert strategy_module._has_safe_path(context, origin, _port("Other"), state) is False  # noqa: SLF001
+    assert (
+        strategy_module._has_safe_path(SimpleNamespace(ports=None), origin, destination, state)
+        is False
+    )  # noqa: SLF001
+    assert strategy_module._has_safe_path(context, origin, destination, state) is False  # noqa: SLF001
+
+
+def test_direct_segment_and_installation_reject_bad_shapes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, leg, _shipment, start, _plan = _case()
+
+    route.deployed_vessels = []
+    assert strategy_module._find_direct_segment(context, leg) is None  # noqa: SLF001
+    route.deployed_vessels = [object()]
+    route.associated_bookings = None
+    assert strategy_module._find_direct_segment(context, leg) is None  # noqa: SLF001
+
+    malformed_shipment = SimpleNamespace(associated_bookings=None)
+    assert strategy_module._install_direct_booking(malformed_shipment, route, 1) is None  # noqa: SLF001
+    assert strategy_module._decision(context, start, object()) is None  # noqa: SLF001
+
+
+def test_installation_rejects_old_booking_with_invalid_reverse_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, _leg, shipment, start, _plan = _case()
+    old_route = SimpleNamespace(associated_bookings=None)
+    old = _Booking(
+        sequence_index=1,
+        shipment=shipment,
+        service_route=old_route,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+    )
+    shipment.associated_bookings = [old]
+
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+    assert shipment.associated_bookings == [old]

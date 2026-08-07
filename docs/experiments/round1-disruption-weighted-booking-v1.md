@@ -129,3 +129,37 @@ Verified gates before authorization:
 The one-candidate full-run authorization is now satisfied. The exact command
 is `PYTHONHASHSEED=0 uv run wsc2026 run --round round1 --full`; after it starts,
 no code, threshold, or process changes are permitted.
+
+## Candidate run result (2026-08-07)
+
+The single authorized run completed successfully from candidate HEAD
+`28e34d87a0cb45661fa633e3d582a27e8d2694d5`, with no code or configuration
+changes during execution. The log contains period 72 at day 360, a
+`Simulation completed.` marker, and the CSV-output marker. The simulator
+reported a runtime of `00:24:57`.
+
+Evidence was preserved before scoring or restoration under:
+
+`.challenge/round1/results/disruption_weighted_booking_v1_20260807/`
+
+- Candidate ATT CSV: 1,262 bytes, SHA-256
+  `3e156e67be60346179b5184fd723ce4099b5b36aa918f8b0d5cdf227f4830c9e`;
+  72 numbered periods; mean ATT `20.877222222222223` days.
+- Raw run log SHA-256:
+  `9f58c3beee04deae8d33fe93d0c05e54e2cc29a353473c6337e6993645478a78`.
+- Full scorer JSON is retained as `score.json` in the same evidence directory.
+- The pre-run deterministic package SHA was
+  `b8d4ff810acfa525e72ec0f43d37c1c14fda2d32908fca46228bfdbdbabb0bc6`;
+  its only members were `response_strategies/README.md` and
+  `response_strategies/user_strategy.py`.
+
+The candidate cumulative resilience loss is
+`27.025393118568292`. Against the pinned fallback loss
+`20.436668751255972`, the exact delta is `+6.588724367312320` (`+32.239717967%`),
+so the strict acceptance condition is not met. Comparing the 72 numbered ATT
+rows with the pinned fallback snapshot, 10 were better, 16 equal, and 46
+worse; candidate mean ATT was `20.877222222222223` days versus fallback mean
+`20.450972222222223` days. Decision: **REJECTED**.
+
+The candidate and raw evidence remain preserved for audit. Restoration is
+deliberately recorded separately below and will not rerun the simulator.

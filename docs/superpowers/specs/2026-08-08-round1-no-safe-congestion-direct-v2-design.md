@@ -58,7 +58,8 @@ exact endpoint case. GREEN tests must cover:
 - deterministic original-route selection and no alternative-route misuse;
 - transactional rollback when installation fails;
 - all four public signatures and untouched-hook delegation;
-- a real Round 1 context check with no context/shipment mutation.
+- a real Round 1 context check with no service-route-list mutation and only the
+  intended shipment/reverse-route booking relation added.
 
 ## Fixed run contract
 

@@ -91,3 +91,41 @@ and integration checks pass, lock/sync, Ruff, `ty`, mypy, coverage (minimum
 90%), packaging twice, sync/cmp, smoke, restricted-material, diff, and process
 checks all pass, and the candidate identity/fallback identity are pinned in a
 review update to this file.
+
+## Pre-run review (2026-08-07)
+
+No full simulation, replay, or candidate output has been launched from this
+branch. The candidate commits are:
+
+- `ae6f26f` — RED behavior tests (five active-policy failures, collection
+  successful);
+- `5549168` — minimal weighted-booking implementation;
+- `6776e8c` — reject invalid zero disruption multipliers;
+- `82cb2cc` — behavior-focused fail-closed/rollback coverage tests.
+
+The candidate HEAD is `82cb2cc1f50c3c2e6154aa0476f52099f3445230`, and both the
+tracked submission and synchronized Round 1 runtime strategy have SHA-256
+`e14952f60c152c3d9ef540dd2420c4ef907d9ad497931aeed0ca41b3f1a33b38`. The
+pre-run Output ATT is the pinned fallback SHA
+`c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`; its
+fresh re-score has 72 periods and cumulative loss
+`20.436668751255972`.
+
+Verified gates before authorization:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, `ty check src/wsc2026_tools submission`, and mypy passed;
+- non-integration suite: 200 passed, 8 integration deselected, 90.96% total
+  coverage (minimum 90%);
+- integration suite: 8 passed;
+- `wsc2026 sync --round round1`, byte comparisons, and Round 1 smoke passed
+  with `SMOKE_OK`;
+- two validation packages are byte-identical, SHA-256
+  `b8d4ff810acfa525e72ec0f43d37c1c14fda2d32908fca46228bfdbdbabb0bc6`, size
+  5747 bytes, containing only `README.md` and `user_strategy.py`;
+- `git diff --check`, tracked/reachable restricted-material scans, and the
+  no-overlapping-simulator process check passed.
+
+The one-candidate full-run authorization is now satisfied. The exact command
+is `PYTHONHASHSEED=0 uv run wsc2026 run --round round1 --full`; after it starts,
+no code, threshold, or process changes are permitted.

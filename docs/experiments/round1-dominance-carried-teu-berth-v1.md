@@ -118,6 +118,32 @@ This is a review stop point.  Exactly one monitored full run is authorized only
 after this record is reviewed.  No tuning, second candidate, or threshold
 change is permitted.
 
+## Full-run result (2026-08-08)
+
+The single authorized run was executed once from the reviewed candidate HEAD
+`07bb6ba` with `PYTHONHASHSEED=0`.  The raw log is preserved in the ignored
+evidence directory as `full-run.log` (SHA-256
+`a969f87962966123d0a6dfd49fc0b34ee545ce1cfd1d8a8e42b0829d24a9d471`).  It
+contains all 72 period markers, `Output Simulation Day: 360`,
+`Simulation completed.`, and exit code 0.  The fresh candidate ATT was copied
+before any scoring or restoration to
+`.challenge/round1/results/dominance_carried_teu_berth_v1_20260807/` (1,262
+bytes; SHA-256
+`c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`).
+
+The scorer reported 72 periods and cumulative resilience loss
+`20.436668751255972`.  The candidate ATT is byte-identical to the pinned
+fallback ATT, so all 72 periods are equal and none are better or worse.  The
+strict acceptance rule is `candidate_loss < 20.436668751255972 - 1e-9`;
+equality is therefore a rejection.  The machine-readable scorer output is
+preserved in the same ignored evidence directory and in
+`experiments/results/round1_dominance_carried_teu_berth_v1_20260807.json`.
+
+**Decision: REJECTED (equality).**  The carried-TEU WSPT policy produced no
+observable change under the fixed Round 1 scenario and seed.  Candidate code
+and tests must be reverted, the no-op adapter and pinned fallback restored, and
+all final gates rerun before this branch is considered complete.
+
 ## One-candidate rejection procedure
 
 Exactly one monitored full run is allowed after pre-run review.  Preserve the

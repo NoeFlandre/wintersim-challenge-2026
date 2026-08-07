@@ -107,3 +107,42 @@ reverse order with `git revert`, the no-op adapter synchronized, the pinned
 fallback ATT restored and re-scored exactly, and all final gates rerun. No
 organizer source, inputs, outputs, archives, or private evidence may enter Git
 history or a submission archive.
+
+## Candidate result (one run, 2026-08-07)
+
+The authorized candidate command completed exactly once after the initial
+pre-simulation uv-cache permission failure. The actual simulator process exited
+`0` and the raw log contains `Simulation Progress: Day 360 / 360`, Period 72
+(`Days 356-360`), `Simulation completed`, and `CSV written`. The organizer
+reported simulation-clock runtime `00:42:45`.
+
+The fresh output and raw log were preserved before scoring or restoration at
+`.challenge/round1/results/exposed_cargo_berth_v1_20260807/`.
+
+- candidate ATT SHA-256: `1d602005736ef7e1c0f85316a28aebbcff794aa1d81371ba84f4fa978f06345f`
+- candidate ATT bytes: `1262`
+- candidate periods: `72`
+- candidate mean ATT: `20.545972222222222` days
+- pinned fallback ATT SHA-256: `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- pinned fallback mean ATT: `20.450972222222223` days
+- candidate cumulative resilience loss: `21.95177745845056`
+- pinned fallback cumulative resilience loss: `20.436668751255972`
+- delta: `+1.5151087071945888` (`+7.413677471782064%`)
+- periods better/equal/worse than fallback: `17 / 20 / 35`
+- raw-log SHA-256: `352cf272e066844f5eea57408c8e425e388e54e769d8bb2a155ead06d5a17802`
+
+The strict acceptance expression is not met. The candidate is **REJECTED —
+worse than fallback**. The machine-readable scorer output and aggregate remain
+ignored/private alongside the ATT and raw log. The first launch attempt is
+recorded only as an environment permission failure before any simulator
+process; it is not a second candidate run.
+
+## Rejection and restoration
+
+The candidate result is committed before restoration. The candidate
+implementation and candidate-only tests will be reverted in reverse order with
+`git revert`; the design, pre-run review, result, and aggregate audit records
+remain. The participant adapter will then be synchronized back to the no-op
+fallback, the pinned fallback ATT bytes restored and re-scored exactly, and all
+final gates rerun. No tuning, second candidate, submission, publication, or
+history rewrite is permitted.

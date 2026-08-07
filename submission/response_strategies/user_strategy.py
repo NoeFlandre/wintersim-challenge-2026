@@ -9,9 +9,10 @@ signals "not handled; use the organizer fallback", leaving the maritime data
 context, routes, bookings, and vessel state exactly as the framework built
 them.
 
-The current experiment overrides only berth selection when an active
-disruption exposes carried cargo; all other decisions delegate to the
-organizer fallback. The policy is intentionally small and fail-closed.
+This baseline intentionally delegates every decision to the organizer fallback
+so the repository starts from a known, unmodified baseline. No optimization is
+performed here; future strategy work will be added only as approved, tested
+modules.
 
 Runtime constraints (enforced by the challenge rules):
 - Standard-library imports only.
@@ -29,9 +30,7 @@ import numbers
 from typing import Any
 
 
-def _active_disruption_targets(
-    context: Any, now: dt.datetime
-) -> tuple[list[Any], list[Any]] | None:
+def _active_disruption_targets(context: Any, now: dt.datetime) -> tuple[list[Any], list[Any]] | None:
     """Return active target legs and closed-berth ports, or fail closed."""
     plans = getattr(context, "disruption_plans", None)
     if plans is None:
@@ -81,7 +80,9 @@ def _active_disruption_targets(
         port = getattr(target_berth, "port", None)
         if port is None:
             return None
-        if start_time <= now < end_time and not any(target is port for target in active_ports):
+        if start_time <= now < end_time and not any(
+            target is port for target in active_ports
+        ):
             active_ports.append(port)
 
     if not active_legs and not active_ports:
@@ -99,7 +100,7 @@ def _segment_slice(booking: Any) -> list[Any] | None:
         return None
     try:
         segments = sorted(
-            raw_segments,
+            list(raw_segments),
             key=lambda segment: getattr(segment, "sequence_index", 0),
         )
     except (TypeError, ValueError):
@@ -156,7 +157,10 @@ def _shipment_is_exposed(
     current_index = getattr(shipment, "current_booking_index", None)
     for booking in booking_values:
         sequence_index = getattr(booking, "sequence_index", None)
-        if current_index is not None and sequence_index is not None:
+        if (
+            current_index is not None
+            and sequence_index is not None
+        ):
             try:
                 if sequence_index < current_index:
                     continue
@@ -255,10 +259,10 @@ def _exposed_cargo_berth_choice(
 
 
 class UserStrategy:
-    """Participant adapter with a narrowly scoped berth policy.
+    """Behavior-neutral participant adapter.
 
-    The berth hook may return a waiting vessel for an active exposed-cargo
-    queue; the other hooks always return ``None``. No hook mutates its inputs.
+    Every method returns ``None`` to delegate to the organizer fallback without
+    mutating any argument. This preserves the baseline simulation behavior.
     """
 
     @staticmethod

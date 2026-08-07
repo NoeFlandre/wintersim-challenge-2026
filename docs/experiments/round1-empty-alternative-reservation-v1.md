@@ -1,6 +1,6 @@
 # Round 1 empty alternative-route reservation v1
 
-**Status:** PRE-RUN REVIEW COMPLETE — FULL RUN AUTHORIZED
+**Status:** REJECTED — FALLBACK RESTORED
 
 ## Review checkpoint
 
@@ -152,9 +152,38 @@ transcript.
 
 ## Rejection and restoration
 
-The candidate implementation and candidate-only tests are now to be reverted
-in reverse order with `git revert`, while this design/result report and the
-private ignored evidence remain. The no-op participant adapter must then be
-synchronized back into the private Round 1 source, the pinned fallback ATT
-restored and re-scored exactly, and all final gates rerun. No second candidate,
-tuning, or duplicate full run is authorized by this experiment.
+The candidate implementation and candidate-only tests were reverted in reverse
+order with `git revert`; this design/result report and the private ignored
+evidence remain. Restoration commits are:
+
+- `8e7bf28` — revert candidate implementation
+- `817df8d` — revert boundary/integration tests
+- `77a2e5b` — revert RED policy tests
+
+The no-op participant adapter was synchronized back into the private Round 1
+source, and the pinned fallback ATT was restored and re-scored exactly.
+
+Post-restoration state:
+
+- participant/runtime `user_strategy.py` SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- active ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- active fallback score: `20.436668751255972`, `period_count=72`
+- no active Round 1 simulation or probe process
+
+Final gates passed with the no-op fallback active:
+
+- `uv lock --check` and locked all-group offline sync
+- Ruff format/check, Ty, and mypy
+- 188 non-integration tests, 90.93% coverage (minimum 90%)
+- 7 integration tests
+- Round 1 smoke: `SMOKE_OK`
+- two deterministic participant-only packages, both SHA-256
+  `a0b0db0871fee15dc540ed72f70cad8e72fee0263a54b9edc6d16f11c0d5dfcc`
+- package members only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py`
+- restricted-material scans, diff hygiene, and clean process checks
+
+No second candidate, tuning, submission archive retention, publication, or
+history rewrite was performed.

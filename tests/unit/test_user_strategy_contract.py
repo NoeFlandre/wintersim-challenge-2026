@@ -7,9 +7,9 @@ These tests pin the public surface that the organizer framework calls:
   argument signature (the organizer's documented parameter names must be
   accepted positionally or by keyword).
 * Each method is static and callable without instantiation.
-* Berth selection returns an original pending-route vessel only under the
-  narrow active-disruption policy; all other calls delegate with ``None``.
-  The remaining hooks always delegate and no method mutates its arguments.
+* For this baseline milestone every method returns ``None`` (delegating to the
+  organizer fallback) and never mutates any of its arguments, even sentinel
+  mutable inputs.
 
 The tests use only sentinel objects defined here; they never import organizer
 source.
@@ -60,7 +60,7 @@ def test_required_static_methods_have_compatible_signature(
     )
 
 
-def test_select_vessel_for_berth_delegates_and_does_not_mutate() -> None:
+def test_select_vessel_for_berth_returns_none_and_does_not_mutate() -> None:
     waiting = ["vessel_a", "vessel_b"]
     berths = ["berth_1"]
     snapshot = list(waiting)

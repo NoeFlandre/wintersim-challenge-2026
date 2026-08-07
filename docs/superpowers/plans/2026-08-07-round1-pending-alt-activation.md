@@ -25,12 +25,12 @@ and one full-run validation.
 
 - [x] Create `docs/superpowers/specs/2026-08-07-round1-pending-alt-activation-design.md` with the hypothesis, exact policy, pinned fallback, strict acceptance expression, evidence paths, and rejection/restore rules.
 - [x] Create this implementation plan with concrete commands and review stops.
-- [ ] Inspect the diff and run a temporary-marker search over the new documents. Remove every ambiguity and run `git diff --check`.
-- [ ] Commit only the spec and plan as `docs: define Round 1 pending alternative activation experiment`.
+- [x] Inspect the diff and run a temporary-marker search over the new documents. Remove every ambiguity and run `git diff --check`.
+- [x] Commit only the spec and plan as `docs: define Round 1 pending alternative activation experiment`.
 
 ## 2. RED: specify observable behavior
 
-- [ ] Add `tests/unit/test_pending_alt_activation.py` using small local fakes for plans, ports, legs, ordered segments, routes, and vessels. The tests must assert:
+- [x] Add `tests/unit/test_pending_alt_activation.py` using small local fakes for plans, ports, legs, ordered segments, routes, and vessels. The tests must assert:
   - an active matching vessel returns the exact original object;
   - queue order wins when multiple vessels match;
   - the start boundary is active and the end boundary is inactive;
@@ -38,33 +38,33 @@ and one full-run validation.
   - carried vessels, missing routes, empty routes, wrong departure ports, missing sequence/leg fields, malformed plans, and malformed queues fail closed;
   - input lists, route segments, vessel fields, and context plans are unchanged;
   - the other three hooks still return `None` and all required signatures remain exact.
-- [ ] Run the focused tests against the untouched no-op adapter. Capture genuine RED failures caused by the expected matching case, not fixture/import errors.
-- [ ] Commit the RED tests as `test: specify pending alternative activation policy`.
+- [x] Run the focused tests against the untouched no-op adapter. Capture genuine RED failures caused by the expected matching case, not fixture/import errors.
+- [x] Commit the RED tests as `test: specify pending alternative activation policy`.
 
 ## 3. GREEN: implement the smallest valid strategy
 
-- [ ] In `submission/response_strategies/user_strategy.py`, update the module/class documentation and add only standard-library imports needed for `datetime` and `Any`.
-- [ ] Implement `_has_active_disruption(context, now)` with `datetime.min` anchoring, inclusive-start/exclusive-end comparisons, and fail-closed handling of malformed numeric/overflow input.
-- [ ] Implement `_pending_route_starts_at_port(vessel, port)` with empty-carried check, lowest `sequence_index`, associated-leg lookup, identity comparison, and fail-closed handling. Do not sort or mutate the route's segment collection.
-- [ ] Make `select_vessel_for_berth` return the first eligible original waiting-vessel object only when the active gate is true; otherwise return `None`. Do not inspect or modify available berths or waiting-time scores.
-- [ ] Keep the three remaining hooks unconditional `None` and do not add new files to the package allowlist.
-- [ ] Run focused tests, then Ruff format/lint, `ty`, and mypy. Fix only behavior or typing defects required by the contract.
-- [ ] Commit the implementation as `feat: activate pending alternative route vessels`.
+- [x] In `submission/response_strategies/user_strategy.py`, update the module/class documentation and add only standard-library imports needed for `datetime` and `Any`.
+- [x] Implement `_has_active_disruption(context, now)` with `datetime.min` anchoring, inclusive-start/exclusive-end comparisons, and fail-closed handling of malformed numeric/overflow input.
+- [x] Implement `_pending_route_starts_at_port(vessel, port)` with empty-carried check, lowest `sequence_index`, associated-leg lookup, identity comparison, and fail-closed handling. Do not sort or mutate the route's segment collection.
+- [x] Make `select_vessel_for_berth` return the first eligible original waiting-vessel object only when the active gate is true; otherwise return `None`. Do not inspect or modify available berths or waiting-time scores.
+- [x] Keep the three remaining hooks unconditional `None` and do not add new files to the package allowlist.
+- [x] Run focused tests, then Ruff format/lint, `ty`, and mypy. Fix only behavior or typing defects required by the contract.
+- [x] Commit the implementation as `feat: activate pending alternative route vessels`.
 
 ## 4. Real integration and coverage
 
-- [ ] Add `tests/integration/test_round1_pending_alt_activation.py`, marked `integration`, that skips clearly if `.challenge/round1/source` is absent. Load the participant module by absolute file path, construct the real `scenario_builders.create_with_disruption()` context, choose a timestamp inside an actual disruption plan using `datetime.min`, and exercise a real port/route/vessel-shaped pending alternative without importing the participant package into the organizer namespace.
-- [ ] Assert returned identity, active/inactive boundary behavior, carried-vessel delegation, and a before/after snapshot of context, routes, vessels, and plans.
-- [ ] Run focused unit+integration tests and the complete non-integration coverage command with `--cov-fail-under=90`; add only meaningful branch tests if needed.
-- [ ] Commit integration/coverage corrections as `test: verify pending alternative activation in Round 1 context`.
+- [x] Add `tests/integration/test_round1_pending_alt_activation.py`, marked `integration`, that skips clearly if `.challenge/round1/source` is absent. Load the participant module by absolute file path, construct the real `scenario_builders.create_with_disruption()` context, choose a timestamp inside an actual disruption plan using `datetime.min`, and exercise a real port/route/vessel-shaped pending alternative without importing the participant package into the organizer namespace.
+- [x] Assert returned identity, active/inactive boundary behavior, carried-vessel delegation, and a before/after snapshot of context, routes, vessels, and plans.
+- [x] Run focused unit+integration tests and the complete non-integration coverage command with `--cov-fail-under=90`; add only meaningful branch tests if needed.
+- [x] Commit integration/coverage corrections as `test: verify pending alternative activation in Round 1 context`.
 
 ## 5. Pre-run review and gates (no simulation yet)
 
-- [ ] Write `docs/experiments/round1-pending-alt-activation-v1.md` with status `PRE-RUN REVIEW`, the fixed hypothesis/policy, prior evidence, run identity, pinned fallback score/hash, evidence locations, and the exact acceptance/rejection rule.
-- [ ] Review source, tests, docs, and the complete diff. Verify no scenario constants, organizer imports, I/O, mutable globals, random/time/environment access, package-surface expansion, or untracked organizer files.
-- [ ] Run all preflight commands from the spec: `uv lock --check`; locked `uv sync --all-groups`; Ruff format/check; `ty`; mypy; non-integration coverage; integration tests; `uv run wsc2026 sync --round round1`; `cmp` for strategy and README; Round 1 smoke; deterministic package twice; restricted-material scans; `git diff --check`; and a no-process check.
-- [ ] Verify the active fallback ATT hash and score exactly match the pinned control, record the strategy SHA, package SHA/member list, and test outputs in the report.
-- [ ] Commit the reviewed PRE-RUN report. Stop and inspect this commit before launching the full run.
+- [x] Write `docs/experiments/round1-pending-alt-activation-v1.md` with status `PRE-RUN REVIEW`, the fixed hypothesis/policy, prior evidence, run identity, pinned fallback score/hash, evidence locations, and the exact acceptance/rejection rule.
+- [x] Review source, tests, docs, and the complete diff. Verify no scenario constants, organizer imports, I/O, mutable globals, random/time/environment access, package-surface expansion, or untracked organizer files.
+- [x] Run all preflight commands from the spec: `uv lock --check`; locked `uv sync --all-groups`; Ruff format/check; `ty`; mypy; non-integration coverage; integration tests; `uv run wsc2026 sync --round round1`; `cmp` for strategy and README; Round 1 smoke; deterministic package twice; restricted-material scans; `git diff --check`; and a no-process check.
+- [x] Verify the active fallback ATT hash and score exactly match the pinned control, record the strategy SHA, package SHA/member list, and test outputs in the report.
+- [x] Commit the reviewed PRE-RUN report. Stop and inspect this commit before launching the full run.
 
 ## 6. Exactly one candidate run and evidence preservation
 

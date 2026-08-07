@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from response_strategies.user_strategy import UserStrategy
 
+
 _ORIGIN = dt.datetime.min
 
 
@@ -35,14 +36,12 @@ def _vessel(
     vessel.vessel_class = SimpleNamespace(loa=loa, teu_capacity=capacity)
     vessel.assigned_service_route = object()
     vessel.current_segment = None
-    vessel.carried_shipments = (
-        [SimpleNamespace(teu_size=carried_teu, get_current_booking=lambda: object())]
-        if carried_teu
-        else []
-    )
-    vessel.get_discharging_shipments_at_current_segment = lambda: (
-        [SimpleNamespace(teu_size=handled_teu)] if handled_teu else []
-    )
+    vessel.carried_shipments = [
+        SimpleNamespace(teu_size=carried_teu, get_current_booking=lambda: object())
+    ] if carried_teu else []
+    vessel.get_discharging_shipments_at_current_segment = lambda: [
+        SimpleNamespace(teu_size=handled_teu)
+    ] if handled_teu else []
     vessel.get_loading_shipments_at_next_segment = lambda: []
     return vessel
 
@@ -72,22 +71,18 @@ def test_inactive_and_end_boundary_delegate() -> None:
     start = _ORIGIN + dt.timedelta(days=10)
     plan = _plan(start=10.0, duration=5.0)
     vessel = _vessel(carried_teu=100)
-    kwargs = {
-        "maritime_data_context": SimpleNamespace(disruption_plans=[plan]),
-        "port": object(),
-        "waiting_vessels": [vessel],
-        "available_berths": [object()],
-        "waiting_since_by_vessel": {vessel: start},
-    }
+    kwargs = dict(
+        maritime_data_context=SimpleNamespace(disruption_plans=[plan]),
+        port=object(),
+        waiting_vessels=[vessel],
+        available_berths=[object()],
+        waiting_since_by_vessel={vessel: start},
+    )
 
-    assert (
-        UserStrategy.select_vessel_for_berth(current_time=start - dt.timedelta(seconds=1), **kwargs)
-        is None
-    )
-    assert (
-        UserStrategy.select_vessel_for_berth(current_time=start + dt.timedelta(days=5), **kwargs)
-        is None
-    )
+    assert UserStrategy.select_vessel_for_berth(current_time=start - dt.timedelta(seconds=1), **kwargs) is None
+    assert UserStrategy.select_vessel_for_berth(
+        current_time=start + dt.timedelta(days=5), **kwargs
+    ) is None
 
 
 def test_exact_start_boundary_is_active() -> None:
@@ -138,17 +133,14 @@ def test_malformed_state_fails_closed_without_mutation() -> None:
     waiting = [vessel]
     plans = [SimpleNamespace(start_offset_days=float("nan"), duration_days=5.0)]
 
-    assert (
-        UserStrategy.select_vessel_for_berth(
-            SimpleNamespace(disruption_plans=plans),
-            object(),
-            waiting,
-            [object()],
-            now,
-            {vessel: now},
-        )
-        is None
-    )
+    assert UserStrategy.select_vessel_for_berth(
+        SimpleNamespace(disruption_plans=plans),
+        object(),
+        waiting,
+        [object()],
+        now,
+        {vessel: now},
+    ) is None
     assert waiting == [vessel]
 
 

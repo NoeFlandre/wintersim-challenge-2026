@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; seven controlled Round 1 experiments
+**Status:** bootstrapped and smoke-tested; eight controlled Round 1 experiments
 have run and all were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
@@ -73,6 +73,14 @@ tracked, copied into the public repository, or included in a submission.
   fallback, so it was rejected. Its fresh ATT and log remain in the ignored
   evidence directory; the active no-op fallback is restored and rescored at
   `20.436668751255972`.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-no-safe-congestion-direct-v2.md`](experiments/round1-no-safe-congestion-direct-v2.md),
+  ran exactly once with the fixed Round 1 configuration and completed all 72
+  periods. Its no-safe-path congestion-tail direct-booking policy scored
+  `25.80681018404835`, which was `26.27699014039333%` worse than the pinned
+  fallback, so it was rejected. Its fresh ATT SHA is
+  `6134e12aec44c54a282bc39bb6291a24626cf458c3b88a8020c883e554da2a20`; the
+  active no-op fallback is restored and rescored at `20.436668751255972`.
 
 ## Round 1 commands
 

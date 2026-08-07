@@ -56,12 +56,12 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`, and seven controlled strategy experiments have
-  completed. All seven were rejected: four were worse and three tied the
+  `.challenge/round1/source/`, and eight controlled strategy experiments have
+  completed. All eight were rejected: five were worse and three tied the
   fallback exactly. The no-op adapter and pinned fallback are restored; smoke,
   scoring, and deterministic package checks pass. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 immediate direct-next-leg report`](docs/experiments/round1-immediate-direct-next-leg-v1.md).
+  [`Round 1 no-safe congestion-tail report`](docs/experiments/round1-no-safe-congestion-direct-v2.md).
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
@@ -70,9 +70,9 @@ The current `UserStrategy` delegates every decision to the organizer fallback.
 This is the retained baseline. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
-Round 1's latest immediate direct-next-leg booking experiment produced a
-`24.13140853958694` loss against the `20.436668751255972` fallback, worse by
-`18.078972817445592%`, and was rejected under the strict improvement rule; its
+Round 1's latest no-safe congestion-tail booking experiment produced a
+`25.80681018404835` loss against the `20.436668751255972` fallback, worse by
+`26.27699014039333%`, and was rejected under the strict improvement rule; its
 candidate evidence remains preserved in the ignored results directory.
 
 ## Prerequisites

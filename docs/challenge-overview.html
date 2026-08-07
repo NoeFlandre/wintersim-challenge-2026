@@ -386,7 +386,7 @@
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context &amp; experiment log · 7 August 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 8 August 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -395,7 +395,7 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; seven scored and one incomplete
+        Round 1 has its own private source tree; eight scored and one incomplete
         controlled Round 1 strategy experiments are recorded below alongside
         the Round 0 history.
       </p>
@@ -595,7 +595,7 @@
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Seven Round 1 candidates were
+        fallback is <strong>20.4366687513</strong>. Eight Round 1 candidates were
         scored and rejected; one additional run was interrupted before any
         measured output and was also rejected without a score.
       </div>
@@ -609,7 +609,7 @@
         complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. All seven scored Round 1
+        Lower is better; equality is not an improvement. All eight scored Round 1
         trials were rejected, and one additional trial was incomplete, so the
         no-op fallback remains active.
       </p>
@@ -725,6 +725,11 @@
               <td><strong>24.1314</strong><br><span class="status worse">18.08% worse than the 20.4367 Round 1 fallback</span></td>
             </tr>
             <tr>
+              <td><a href="experiments/round1-no-safe-congestion-direct-v2.md">Book the congested leg only when no safe path exists</a></td>
+              <td>We narrowed the earlier direct-booking idea. During congestion without a berth closure, we checked the same safe booking graph used by the fallback. Only an exact affected origin-to-destination pair with no complete safe path could use its original slowed leg; every pair with a safe route, every closure, and every malformed case delegated unchanged. The goal was to prevent cargo from waiting forever when the fallback had no valid path, while avoiding broad detours. It still increased the total loss substantially.</td>
+              <td><strong>25.8068</strong><br><span class="status worse">26.28% worse than the 20.4367 Round 1 fallback</span></td>
+            </tr>
+            <tr>
               <td><a href="experiments/round1-recovery-aware-origin-hold-v1.md">Wait at origin when recovery beats a detour</a></td>
               <td>For new cargo during an active disruption, we compared waiting for the nominal route to recover with taking the currently safe detour. The policy would hold only when its runtime estimate said waiting was faster. The pre-run tests and real-context gate passed, but the single full run was interrupted during warm-up before any measured period was produced; the fallback was restored and no score was claimed.</td>
               <td><strong>—</strong><br><span class="status equal">Incomplete; rejected without a valid score</span></td>
@@ -738,10 +743,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, seven scored Round 1
+    reports, nine completed Round 0 experiments, eight scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-immediate-direct-next-leg-v1.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-no-safe-congestion-direct-v2.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

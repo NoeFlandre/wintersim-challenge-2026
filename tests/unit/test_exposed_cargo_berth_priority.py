@@ -169,6 +169,24 @@ def test_malformed_disruption_fails_closed_without_mutation() -> None:
     assert waiting == snapshot
 
 
+def test_malformed_waiting_timestamp_delegates() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    waiting = [_vessel(20, exposed_leg)]
+
+    assert _call(context, waiting, _clock(11.0), {waiting[0]: "not-a-time"}) is None
+
+
+def test_malformed_booking_sequence_delegates() -> None:
+    _, _, _, exposed_leg, _ = _network()
+    context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])
+    vessel = _vessel(20, exposed_leg)
+    vessel.carried_shipments[0].current_booking_index = 1
+    vessel.carried_shipments[0].associated_bookings[0].sequence_index = "bad"
+
+    assert _call(context, [vessel], _clock(11.0), {}) is None
+
+
 def test_exposure_inspection_does_not_mutate_runtime_objects() -> None:
     _, _, _, exposed_leg, safe_leg = _network()
     context = Context([Plan(10.0, 3.0, target_leg=exposed_leg)])

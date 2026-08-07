@@ -122,10 +122,44 @@ The complete preflight passed on this candidate before the full run:
   `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`, and
   the fallback scorer returned `20.436668751255972` over 72 periods.
 
-The synchronized candidate is now authorized for exactly one managed full run.
-It must be monitored to explicit Day 360 / Period 72 /
-`Simulation completed` markers. Fresh ATT and raw log evidence must be copied
-and hashed before any scoring or restoration can overwrite `Output/`.
+The synchronized candidate was authorized for exactly one managed full run.
+The run completed to explicit Day 360 / Period 72 /
+`Simulation completed` markers. Fresh ATT and raw log evidence were copied and
+hashed before scoring or restoration.
+
+## Full-run result
+
+The single authorized run used the fixed command and `PYTHONHASHSEED=0`. Its
+log contains all 72 period markers, `Output Simulation Day: 360`,
+`Simulation completed.`, `CSV output written`, and `UV_EXIT=0`. The simulator
+reported a runtime of `00:41:29`.
+
+Private evidence was preserved under
+`.challenge/round1/results/no_safe_congestion_direct_v2_20260808/`:
+
+- candidate ATT SHA-256:
+  `6134e12aec44c54a282bc39bb6291a24626cf458c3b88a8020c883e554da2a20`;
+- raw log SHA-256:
+  `49988961b71c3ca598b2afcbb9d3f41f98af121ebe488e19494fb880eeaf3d98`;
+- scorer JSON: `score.json`;
+- aggregate metrics remain ignored at
+  `experiments/results/round1_no_safe_congestion_direct_v2_20260808.json`.
+
+The candidate cumulative resilience loss was `25.80681018404835` over exactly
+72 periods. The pinned fallback loss was `20.436668751255972`; delta was
+`+5.370141432792376` (`+26.27699014039333%`). Candidate mean ATT was
+`20.797361111111112` days versus fallback `20.450972222222223` days. Compared
+with the pinned fallback ATT, 7 periods improved, 19 were equal, and 46 were
+worse.
+
+The strict gate was not met. **Decision: REJECTED.** The narrower no-safe-path
+direct booking policy still materially worsened the official loss. The score
+and decision were applied without tuning, rounding, or a second candidate.
+
+The candidate package was deterministic across two runs, SHA-256
+`e8bed9c7d4d80e099143470faa43a1b987039169c9f714dfdde4b1c1107a24dc`, and
+contained only the two allowlisted participant files. The candidate result is
+committed here before the required code/test reverts and fallback restoration.
 
 ## Rejection and restoration procedure
 
@@ -136,3 +170,9 @@ candidate implementation and candidate-only tests in reverse order with
 from the pre-run backup; rescore it to `20.436668751255972` with 72 periods;
 and rerun every final gate. The design and result audit remain tracked; raw
 organizer-derived evidence stays ignored and private.
+
+## Restoration status
+
+Candidate restoration is the next mandatory step. No candidate code will be
+kept after this rejected result; the final section will record the revert
+commits, synchronized no-op SHA, restored ATT SHA/score, and all final gates.

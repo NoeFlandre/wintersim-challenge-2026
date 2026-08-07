@@ -163,7 +163,7 @@ def _plan_window(plan: Any) -> tuple[dt.datetime, dt.datetime, float] | None:
     try:
         start_offset = float(start_raw)
         duration = float(duration_raw)
-        multiplier = float(multiplier_raw or 1.0)
+        multiplier = float(multiplier_raw)
     except (TypeError, ValueError, OverflowError):
         return None
     if not all(math.isfinite(value) for value in (start_offset, duration, multiplier)):

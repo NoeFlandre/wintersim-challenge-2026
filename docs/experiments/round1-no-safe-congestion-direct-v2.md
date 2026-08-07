@@ -1,6 +1,6 @@
 # Round 1 no-safe congestion-tail direct booking v2
 
-**Status: PRE-RUN REVIEW — no operational run authorized yet**
+**Status: PRE-RUN REVIEW COMPLETE — one full run authorized**
 
 ## Review checkpoint
 
@@ -19,8 +19,7 @@ in `d0084b3`. The candidate strategy SHA-256 is
 
 Focused unit and real-context checks are green: `23 passed`. The broader
 non-integration coverage gate is `210 passed, 8 deselected, 90.74%` (minimum
-90%). Ruff and mypy are clean; the complete preflight below remains a required
-review gate before synchronization or a full run.
+90%).
 
 ## Hypothesis
 
@@ -98,10 +97,35 @@ part of this experiment.
 - fresh verification of the fallback ATT SHA and exact fallback score;
 - a pre-run backup of the no-op runtime and pinned fallback ATT before sync.
 
-Only after those checks are reviewed will one managed full run be launched and
-monitored to explicit Day 360 / Period 72 / `Simulation completed` markers.
-Fresh ATT and raw log evidence will be copied and hashed before any scoring or
-restoration can overwrite the runtime output.
+## Pre-run gates passed
+
+The complete preflight passed on this candidate before the full run:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, Ty, and mypy passed;
+- non-integration coverage passed: `210 passed, 8 deselected, 90.74%`;
+- integration suite passed: `8 passed`;
+- Round 1 `wsc2026 sync` passed and `cmp` confirmed the participant/runtime
+  strategy bytes are identical;
+- Round 1 smoke returned `SMOKE_OK`;
+- two packages were byte-identical, each SHA-256
+  `e8bed9c7d4d80e099143470faa43a1b987039169c9f714dfdde4b1c1107a24dc`, with
+  only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` members;
+- restricted-material history/path scans and `git diff --check` were clean;
+- no WSC simulation process was running;
+- pre-run backup was captured at
+  `/private/tmp/wsc2026-round1-no-safe-congestion-direct-v2-backup/pre_run/`;
+  its no-op runtime SHA is
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`, its
+  pinned fallback ATT SHA is
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`, and
+  the fallback scorer returned `20.436668751255972` over 72 periods.
+
+The synchronized candidate is now authorized for exactly one managed full run.
+It must be monitored to explicit Day 360 / Period 72 /
+`Simulation completed` markers. Fresh ATT and raw log evidence must be copied
+and hashed before any scoring or restoration can overwrite `Output/`.
 
 ## Rejection and restoration procedure
 

@@ -68,9 +68,7 @@ def test_real_pending_carried_vessel_is_replaced_by_empty_source_vessel() -> Non
     DefaultStrategy.create_alternative_service_routes(context, now, None)
 
     old = next(
-        vessel
-        for vessel in context.vessels
-        if vessel.pending_assigned_service_route is not None
+        vessel for vessel in context.vessels if vessel.pending_assigned_service_route is not None
     )
     alternative = old.pending_assigned_service_route
     assert alternative is not None
@@ -91,9 +89,7 @@ def test_real_pending_carried_vessel_is_replaced_by_empty_source_vessel() -> Non
         "vessels": tuple(context.vessels),
         "routes": tuple(context.service_routes),
         "legs": tuple(context.legs),
-        "assigned": tuple(
-            (vessel, vessel.assigned_service_route) for vessel in context.vessels
-        ),
+        "assigned": tuple((vessel, vessel.assigned_service_route) for vessel in context.vessels),
     }
 
     UserStrategy = _load_participant()
@@ -105,6 +101,7 @@ def test_real_pending_carried_vessel_is_replaced_by_empty_source_vessel() -> Non
     assert tuple(context.vessels) == before["vessels"]
     assert tuple(context.service_routes) == before["routes"]
     assert tuple(context.legs) == before["legs"]
-    assert tuple(
-        (vessel, vessel.assigned_service_route) for vessel in context.vessels
-    ) == before["assigned"]
+    assert (
+        tuple((vessel, vessel.assigned_service_route) for vessel in context.vessels)
+        == before["assigned"]
+    )

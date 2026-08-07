@@ -68,16 +68,16 @@ and one full-run validation.
 
 ## 6. Exactly one candidate run and evidence preservation
 
-- [ ] Start exactly one fixed run with `PYTHONHASHSEED=0`, redirecting stdout/stderr to `/tmp/wsc_round1_pending_alt_activation_v1_20260807.log`. Poll at most every 30 seconds; do not edit code, tune parameters, or start another process while it runs.
-- [ ] Require exit 0 and log markers for Period 72, Day 360, simulation completion, and CSV output. If any is absent, reject without inventing a score.
-- [ ] Immediately copy the candidate ATT CSV and run log into `.challenge/round1/results/pending_alt_activation_v1_20260807/` and hash them before invoking the scorer.
-- [ ] Score only the preserved candidate against the pinned Round 1 baseline, compute period count/mean and better/equal/worse counts, and write the ignored aggregate JSON. Commit the tracked report with exact outcome before restoration.
+- [x] Start exactly one fixed run with `PYTHONHASHSEED=0`, redirecting stdout/stderr to `/tmp/wsc_round1_pending_alt_activation_v1_20260807.log`. Poll at most every 30 seconds; do not edit code, tune parameters, or start another process while it runs.
+- [x] Require exit 0 and log markers for Period 72, Day 360, simulation completion, and CSV output. If any is absent, reject without inventing a score.
+- [x] Immediately copy the candidate ATT CSV and run log into `.challenge/round1/results/pending_alt_activation_v1_20260807/` and hash them before invoking the scorer.
+- [x] Score only the preserved candidate against the pinned Round 1 baseline, compute period count/mean and better/equal/worse counts, and write the ignored aggregate JSON. Commit the tracked report with exact outcome before restoration.
 
 ## 7. Apply the strict decision and finish cleanly
 
-- [ ] Accept only a strict improvement below `20.436668751255972 - 1e-9`; otherwise label `REJECTED` and state equality/worsening precisely.
-- [ ] For rejection, `git revert` candidate-only implementation/test commits in reverse order, synchronize the no-op adapter, restore the pinned fallback ATT from the ignored control snapshot, re-score exact equality, and rerun every final gate. Keep the experiment report and ignored evidence; do not run a second candidate.
-- [ ] For acceptance, retain the implementation and run every final gate without a second simulation.
-- [ ] Update `README.md`, `docs/round1-readiness.md`, and `docs/challenge-overview.html` only after the result, adding the fourth Round 1 experiment with plain-language outcome and link. Do not publish private evidence or organizer files.
+- [x] Accept only a strict improvement below `20.436668751255972 - 1e-9`; otherwise label `REJECTED` and state equality/worsening precisely.
+- [x] For rejection, `git revert` candidate-only implementation/test commits in reverse order, synchronize the no-op adapter, restore the pinned fallback ATT from the ignored control snapshot, re-score exact equality, and rerun every final gate. Keep the experiment report and ignored evidence; do not run a second candidate.
+- [x] For acceptance, retain the implementation and run every final gate without a second simulation.
+- [x] Update `README.md`, `docs/round1-readiness.md`, and `docs/challenge-overview.html` only after the result, adding the fourth Round 1 experiment with plain-language outcome and link. Do not publish private evidence or organizer files.
 - [ ] Commit final documentation with a Conventional Commit message, verify `git status`, branch history, restricted scans, active runtime SHA, ATT SHA, and score.
 - [ ] Copy ignored evidence/aggregate from this worktree into the root checkout before removing the worktree. Reconcile the final result onto the single `main` checkout, rerun the final verification there, and leave a clean, resumable state. Push only if the user explicitly requests publication; otherwise report the exact local branch/commit and safe handoff boundary.

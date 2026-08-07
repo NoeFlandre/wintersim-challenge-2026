@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; three controlled Round 1 experiments
+**Status:** bootstrapped and smoke-tested; four controlled Round 1 experiments
 have run and all were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
@@ -40,6 +40,12 @@ tracked, copied into the public repository, or included in a submission.
   `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43` and its
   rescored cumulative loss is `20.436668751255972` over 72 periods.
 - The latest controlled experiment, documented in
+  [`docs/experiments/round1-pending-alt-activation-v1.md`](experiments/round1-pending-alt-activation-v1.md),
+  ran exactly once, produced the same ATT SHA and score as the fallback
+  (`20.436668751255972`), and was rejected by strict equality. Its candidate
+  ATT and log remain in the ignored evidence directory; the active fallback is
+  restored.
+- The preceding controlled experiment, documented in
   [`docs/experiments/round1-disruption-weighted-booking-v1.md`](experiments/round1-disruption-weighted-booking-v1.md),
   ran exactly once, scored `27.025393118568292` against the fallback
   `20.436668751255972`, and was rejected. Its candidate ATT and log remain in

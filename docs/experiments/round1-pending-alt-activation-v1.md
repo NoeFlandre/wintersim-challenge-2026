@@ -1,6 +1,6 @@
 # Round 1 pending alternative-route vessel activation v1
 
-Status: CANDIDATE REJECTED — RESTORATION IN PROGRESS
+Status: CANDIDATE REJECTED — FALLBACK RESTORED
 
 ## Hypothesis
 
@@ -131,7 +131,38 @@ Decision: **REJECTED — equality**. The strict acceptance expression was not
 met because the candidate was not lower than the fallback by more than
 `1e-9`. The candidate made no measurable selection change in this fixed run.
 
-The candidate implementation and candidate-only tests will now be reverted;
-the pinned no-op strategy and fallback ATT will be restored and every final
-gate will be repeated. No second candidate, tuning, threshold change, or
-organizer-material publication is authorized.
+The candidate implementation and candidate-only tests were reverted in reverse
+order with `git revert`: `76fce3a` (integration test), `d79af01` (strategy and
+unit contract), and `4d8eec9` (RED tests). The specification, plan, and this
+result report were retained as the audit trail. No second candidate, tuning,
+threshold change, or organizer-material publication occurred.
+
+## Restoration and final verification
+
+The Round 1 runtime was synchronized from the restored participant adapter,
+and the pinned fallback ATT snapshot was copied back before re-scoring. The
+final active state is:
+
+- Participant and synchronized runtime strategy SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- Active ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- Re-scored active fallback: `20.436668751255972`, 72 periods
+- No WSC simulator process remains active
+
+Post-restoration gates all passed:
+
+- `uv lock --check`; locked `uv sync --all-groups`; Ruff format/check;
+  `ty`; mypy
+- Non-integration coverage: 188 passed, 7 integration deselected, 90.93%
+- Integration suite: 7 passed
+- Round 1 sync and participant/runtime byte comparisons
+- Round 1 smoke: `SMOKE_OK`
+- Two deterministic `ValidationTeam` packages, both SHA-256
+  `a0b0db0871fee15dc540ed72f70cad8e72fee0263a54b9edc6d16f11c0d5dfcc`,
+  containing only `README.md` and `user_strategy.py`
+- Restricted-material history/tracked-file scans and `git diff --check`
+
+The branch is clean after these checks. Private candidate evidence remains
+ignored under `.challenge/round1/results/pending_alt_activation_v1_20260807/`
+and is not part of any package or public history.

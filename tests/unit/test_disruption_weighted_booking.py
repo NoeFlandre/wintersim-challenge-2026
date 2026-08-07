@@ -8,6 +8,7 @@ import types
 from types import SimpleNamespace
 
 import pytest
+from response_strategies import user_strategy as strategy
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -304,3 +305,304 @@ def test_no_path_delegates_without_clearing_old_bookings(monkeypatch: pytest.Mon
     assert UserStrategy.assign_associated_bookings(context, _active_now(), shipment) is None
     assert shipment.associated_bookings == [old_booking]
     assert route.associated_bookings == [old_booking]
+
+
+def test_active_state_and_plan_parser_fail_closed() -> None:
+    assert (
+        strategy._collect_active_state(SimpleNamespace(disruption_plans=None), _active_now())
+        is None
+    )
+    assert (
+        strategy._collect_active_state(SimpleNamespace(disruption_plans=object()), _active_now())
+        is None
+    )
+    assert strategy._plan_window(SimpleNamespace()) is None
+    assert (
+        strategy._plan_window(
+            SimpleNamespace(start_offset_days="bad", duration_days=1, multiplier=2)
+        )
+        is None
+    )
+    assert (
+        strategy._plan_window(
+            SimpleNamespace(start_offset_days=0, duration_days=float("nan"), multiplier=2)
+        )
+        is None
+    )
+    assert (
+        strategy._plan_window(SimpleNamespace(start_offset_days=0, duration_days=0, multiplier=2))
+        is None
+    )
+    assert (
+        strategy._plan_window(SimpleNamespace(start_offset_days=0, duration_days=1, multiplier=0))
+        is None
+    )
+
+    ports = {name: _port(name) for name in ("Origin", "Destination")}
+    route, legs = _route(
+        "route",
+        [("Origin", "Destination", 100.0), ("Destination", "Origin", 100.0)],
+        ports,
+    )
+    future = _leg_plan(legs[0], multiplier=2.0)
+    future.start_offset_days = 3.0
+    neutral = _leg_plan(legs[0], multiplier=1.0)
+    assert strategy._collect_active_state(
+        _context([route], legs, ports, [future, neutral]), _active_now()
+    ) == strategy._ActiveState((), ((), ()), ())
+
+    malformed_close = _closed_port_plan(ports["Origin"])
+    malformed_close.target_berth = None
+    assert (
+        strategy._collect_active_state(
+            _context([route], legs, ports, [malformed_close]), _active_now()
+        )
+        is None
+    )
+    malformed_leg = _leg_plan(SimpleNamespace(), multiplier=2.0)
+    assert (
+        strategy._collect_active_state(
+            _context([route], legs, ports, [malformed_leg]), _active_now()
+        )
+        is None
+    )
+
+
+def test_speed_availability_and_edge_builder_are_defensive() -> None:
+    assert strategy._route_speed(SimpleNamespace(deployed_vessels=object())) is None
+    route = SimpleNamespace(deployed_vessels=[None, SimpleNamespace(vessel_class=None)])
+    assert strategy._route_speed(route) is None
+
+    ports = {name: _port(name) for name in ("Origin", "Destination")}
+    valid_route, legs = _route(
+        "valid",
+        [("Origin", "Destination", 100.0), ("Destination", "Origin", 100.0)],
+        ports,
+    )
+    valid_state = strategy._ActiveState((), ((), ()), ())
+    assert strategy._route_is_available(valid_route, valid_state) is True
+    alternative = SimpleNamespace(
+        source_service_route=valid_route,
+        disruption_key=valid_state.disruption_key,
+        deployed_vessels=[],
+    )
+    assert strategy._route_is_available(alternative, valid_state) is False
+    alternative.deployed_vessels = [object()]
+    assert strategy._route_is_available(alternative, valid_state) is True
+    alternative.disruption_key = (("stale",), ())
+    assert strategy._route_is_available(alternative, valid_state) is False
+
+    assert strategy._build_booking_edges(SimpleNamespace(service_routes=None), valid_state) is None
+    assert (
+        strategy._build_booking_edges(SimpleNamespace(service_routes=object()), valid_state) is None
+    )
+    one_segment = SimpleNamespace(
+        source_service_route=None,
+        deployed_vessels=valid_route.deployed_vessels,
+        segments=valid_route.segments[:1],
+    )
+    assert (
+        strategy._build_booking_edges(SimpleNamespace(service_routes=[one_segment]), valid_state)
+        == ()
+    )
+    malformed_segment_route = SimpleNamespace(
+        source_service_route=None,
+        deployed_vessels=valid_route.deployed_vessels,
+        segments=[object(), object()],
+    )
+    assert (
+        strategy._build_booking_edges(
+            SimpleNamespace(service_routes=[malformed_segment_route]), valid_state
+        )
+        == ()
+    )
+    assert strategy._port_name(SimpleNamespace(name=4)) is None
+    assert strategy._leg_key(SimpleNamespace(departure_port=ports["Origin"])) is None
+    assert strategy._is_closed(ports["Origin"], (ports["Destination"],)) is False
+
+
+def test_duration_and_path_planner_fail_closed() -> None:
+    state = strategy._ActiveState((), ((), ()), ())
+    assert (
+        strategy._find_fastest_path(
+            SimpleNamespace(ports=[SimpleNamespace(name="unhashable")]),
+            object(),
+            object(),
+            _active_now(),
+            (),
+            state,
+        )
+        is None
+    )
+    assert strategy._leg_duration_hours(None, _active_now(), 20.0, ()) is None
+    assert (
+        strategy._leg_duration_hours(
+            SimpleNamespace(sailing_distance="bad"), _active_now(), 20.0, ()
+        )
+        is None
+    )
+    assert (
+        strategy._leg_duration_hours(SimpleNamespace(sailing_distance=0), _active_now(), 20.0, ())
+        is None
+    )
+    assert (
+        strategy._edge_duration_hours(
+            SimpleNamespace(segments=[SimpleNamespace(associated_leg=None)], sailing_speed=20.0),
+            _active_now(),
+            (),
+        )
+        is None
+    )
+
+
+def test_installation_defers_on_bad_shapes_and_rolls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    ports = {name: _port(name) for name in ("Origin", "Destination")}
+    route, legs = _route(
+        "route",
+        [("Origin", "Destination", 100.0), ("Destination", "Origin", 100.0)],
+        ports,
+    )
+    edge = strategy._BookingEdge(
+        route, ports["Origin"], ports["Destination"], 1, 1, (route.segments[0],), 20.0
+    )
+    shipment = _shipment(ports["Origin"], ports["Destination"])
+    shipment.associated_bookings = ()
+    assert strategy._install_path(shipment, (edge,)) is None
+
+    shipment.associated_bookings = []
+    route.associated_bookings = object()
+    monkeypatch.setitem(
+        sys.modules, "maritime_data_context", types.ModuleType("maritime_data_context")
+    )
+    assert strategy._install_path(shipment, (edge,)) is None
+
+    class FailingList(list[object]):
+        def append(self, value: object) -> None:
+            raise RuntimeError("synthetic install failure")
+
+    route.associated_bookings = FailingList()
+    old_booking = SimpleNamespace(service_route=route, sequence_index=1)
+    route.associated_bookings.extend([old_booking])
+    shipment.associated_bookings = [old_booking]
+    shipment.current_booking_index = 7
+    fake_module = types.ModuleType("maritime_data_context")
+    fake_module.Booking = FakeBooking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "maritime_data_context", fake_module)
+    assert strategy._install_path(shipment, (edge,)) is None
+    assert shipment.associated_bookings == [old_booking]
+    assert shipment.current_booking_index == 7
+    assert route.associated_bookings == [old_booking]
+
+
+def test_additional_edge_and_active_delegation_guards(monkeypatch: pytest.MonkeyPatch) -> None:
+    ports = {name: _port(name) for name in ("Origin", "Destination", "Closed")}
+    route, legs = _route(
+        "route",
+        [("Origin", "Destination", 100.0), ("Destination", "Origin", 100.0)],
+        ports,
+    )
+    shipment = _shipment(ports["Origin"], ports["Destination"])
+    inactive_context = _context([route], legs, ports, [])
+    assert (
+        UserStrategy.assign_associated_bookings(inactive_context, _active_now(), shipment) is None
+    )
+
+    malformed_plan = SimpleNamespace()
+    active_context = _context(
+        [route], legs, ports, [malformed_plan, _leg_plan(legs[0], multiplier=2.0)]
+    )
+    active_state = strategy._collect_active_state(active_context, _active_now())
+    assert active_state is not None and len(active_state.congested_plans) == 1
+
+    close_one = _closed_port_plan(ports["Closed"])
+    close_two = _closed_port_plan(ports["Closed"])
+    duplicate_state = strategy._collect_active_state(
+        _context([route], legs, ports, [close_one, close_two]), _active_now()
+    )
+    assert duplicate_state is not None and duplicate_state.closed_ports == (ports["Closed"],)
+
+    route.deployed_vessels.append(SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=30.0)))
+    assert strategy._route_speed(route) == 30.0
+    no_speed_route = SimpleNamespace(deployed_vessels=[])
+    assert (
+        strategy._build_booking_edges(
+            SimpleNamespace(service_routes=[no_speed_route]), active_state
+        )
+        == ()
+    )
+
+    malformed_leg_route = SimpleNamespace(
+        source_service_route=None,
+        deployed_vessels=route.deployed_vessels,
+        segments=[
+            SimpleNamespace(sequence_index=1, associated_leg=None),
+            SimpleNamespace(sequence_index=2, associated_leg=None),
+        ],
+    )
+    assert (
+        strategy._build_booking_edges(
+            SimpleNamespace(service_routes=[malformed_leg_route]), active_state
+        )
+        == ()
+    )
+    missing_arrival_leg = SimpleNamespace(
+        departure_port=ports["Origin"], arrival_port=None, sailing_distance=10.0
+    )
+    missing_arrival_route = SimpleNamespace(
+        source_service_route=None,
+        deployed_vessels=route.deployed_vessels,
+        segments=[
+            SimpleNamespace(sequence_index=1, associated_leg=missing_arrival_leg),
+            SimpleNamespace(sequence_index=2, associated_leg=missing_arrival_leg),
+        ],
+    )
+    assert (
+        strategy._build_booking_edges(
+            SimpleNamespace(service_routes=[missing_arrival_route]), active_state
+        )
+        == ()
+    )
+
+    assert (
+        strategy._find_fastest_path(
+            SimpleNamespace(ports=list(ports.values())),
+            _port("absent"),
+            ports["Destination"],
+            _active_now(),
+            (),
+            active_state,
+        )
+        is None
+    )
+
+    edge = strategy._BookingEdge(
+        route, ports["Origin"], ports["Destination"], 1, 1, (route.segments[0],), 20.0
+    )
+    shipment.associated_bookings = []
+    assert strategy._install_path(shipment, ()) is None
+    disconnected_edge = strategy._BookingEdge(
+        route, ports["Closed"], ports["Destination"], 1, 1, (route.segments[0],), 20.0
+    )
+    assert strategy._install_path(shipment, (edge, disconnected_edge)) is None
+
+    monkeypatch.setitem(sys.modules, "maritime_data_context", None)
+    assert strategy._install_path(shipment, (edge,)) is None
+
+    fake_module = types.ModuleType("maritime_data_context")
+    fake_module.Booking = FakeBooking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "maritime_data_context", fake_module)
+    route.associated_bookings = object()
+    assert strategy._install_path(shipment, (edge,)) is None
+
+    class BadBooking:
+        def __init__(self, **_: object) -> None:
+            raise RuntimeError("synthetic constructor failure")
+
+    fake_module.Booking = BadBooking  # type: ignore[attr-defined]
+    route.associated_bookings = []
+    assert strategy._install_path(shipment, (edge,)) is None
+
+    old_booking = SimpleNamespace(service_route=SimpleNamespace(associated_bookings=None))
+    shipment.associated_bookings = [old_booking]
+    fake_module.Booking = FakeBooking  # type: ignore[attr-defined]
+    assert strategy._install_path(shipment, (edge,)) is None

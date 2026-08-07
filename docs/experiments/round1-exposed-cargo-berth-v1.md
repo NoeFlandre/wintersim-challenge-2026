@@ -140,9 +140,35 @@ process; it is not a second candidate run.
 ## Rejection and restoration
 
 The candidate result is committed before restoration. The candidate
-implementation and candidate-only tests will be reverted in reverse order with
+implementation and candidate-only tests were reverted in reverse order with
 `git revert`; the design, pre-run review, result, and aggregate audit records
-remain. The participant adapter will then be synchronized back to the no-op
-fallback, the pinned fallback ATT bytes restored and re-scored exactly, and all
-final gates rerun. No tuning, second candidate, submission, publication, or
-history rewrite is permitted.
+remain. Restoration commits are:
+
+- `861b4ed` — revert coverage tests
+- `b4533cc` — revert boundary corrections
+- `ea69cf5` — revert participant implementation
+- `fa990ae` — revert real-runtime integration test
+- `46e9a31` — revert RED unit tests
+
+The no-op adapter was synchronized into the private Round 1 source, and the
+pinned fallback ATT snapshot was restored before re-scoring. The restored
+state is:
+
+- participant/runtime strategy SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- active ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- re-scored fallback: `20.436668751255972`, `period_count=72`
+- no active candidate simulator remains
+
+No tuning, second candidate, submission, publication, or history rewrite was
+performed.
+
+## Final restored verification
+
+After restoration, the final gates must be rerun against the no-op adapter:
+locked `uv` resolution/sync, Ruff format/check, Ty, mypy, non-integration
+coverage at least 90%, all integration tests, Round 1 sync/cmp, smoke,
+deterministic participant-only packaging twice, restricted-material scans, diff
+hygiene, and a no-running-process check. This branch is complete only when
+those gates pass and the working tree is clean.

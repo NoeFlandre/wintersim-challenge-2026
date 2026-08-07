@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; five controlled Round 1 experiments
+**Status:** bootstrapped and smoke-tested; six controlled Round 1 experiments
 have run and all were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
@@ -57,6 +57,14 @@ tracked, copied into the public repository, or included in a submission.
   ran exactly once, scored `27.025393118568292` against the fallback
   `20.436668751255972`, and was rejected. Its candidate ATT and log remain in
   the ignored evidence directory; the active fallback is restored.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-phase-aware-valid-route-booking-v1.md`](experiments/round1-phase-aware-valid-route-booking-v1.md),
+  ran exactly once with the fixed Round 1 configuration and completed all 72
+  periods. Its phase-aware initial booking policy scored
+  `24.21744876585007`, which was `18.499981873815628%` worse than the pinned
+  fallback, so it was rejected. Its fresh ATT and log remain in the ignored
+  evidence directory; the active no-op fallback is restored and rescored at
+  `20.436668751255972`.
 
 ## Round 1 commands
 

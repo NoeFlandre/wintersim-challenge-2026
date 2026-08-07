@@ -1,7 +1,7 @@
 # Round 1 immediate direct-next-leg booking v1
 
 **Status:** rejected; the candidate was run exactly once, evidence was
-preserved, the no-op fallback was restored, and final gates are being rerun.
+preserved, the no-op fallback was restored, and final gates passed.
 
 ## Hypothesis and policy
 

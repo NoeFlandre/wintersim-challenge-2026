@@ -395,7 +395,7 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; six controlled Round 1 strategy
+        Round 1 has its own private source tree; seven controlled Round 1 strategy
         experiments are recorded below alongside
         the Round 0 history.
       </p>
@@ -595,8 +595,8 @@
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Three Round 1 candidates were
-        worse and three tied the fallback; all six were rejected.
+        fallback is <strong>20.4366687513</strong>. Four Round 1 candidates were
+        worse and three tied the fallback; all seven were rejected.
       </div>
     </section>
 
@@ -717,6 +717,11 @@
               <td>During active disruptions, we kept every fallback safety filter but estimated when each deployed vessel would next reach a booking's departure port. We then chose the complete route whose sailing time plus next-service wait looked shortest, while preserving deterministic ties and rolling back safely on installation failure. The idea was to avoid sending cargo to a short route whose next vessel was far away. In the full run, the estimate made many choices that looked good locally but accumulated more delay overall.</td>
               <td><strong>24.2174</strong><br><span class="status worse">18.50% worse than the 20.4367 Round 1 fallback</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-immediate-direct-next-leg-v1.md">Use an immediately ready direct leg</a></td>
+              <td>During an active disruption, we tried a very narrow exception: if a shipment's exact origin-to-destination pair was one original route segment and a vessel was already at that origin with that segment as its next leg, we booked the direct leg. We skipped the rule for congested, slowed, or closed legs and delegated every other case to the fallback. The idea was to avoid an unnecessary transfer, but the full run produced more delay overall.</td>
+              <td><strong>24.1314</strong><br><span class="status worse">18.08% worse than the 20.4367 Round 1 fallback</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -726,10 +731,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, and six completed Round 1
+    reports, nine completed Round 0 experiments, and seven completed Round 1
     experiments. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-phase-aware-valid-route-booking-v1.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-immediate-direct-next-leg-v1.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

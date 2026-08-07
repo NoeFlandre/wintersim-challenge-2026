@@ -171,8 +171,38 @@ from the pre-run backup; rescore it to `20.436668751255972` with 72 periods;
 and rerun every final gate. The design and result audit remain tracked; raw
 organizer-derived evidence stays ignored and private.
 
-## Restoration status
+## Rejection and restoration complete
 
-Candidate restoration is the next mandatory step. No candidate code will be
-kept after this rejected result; the final section will record the revert
-commits, synchronized no-op SHA, restored ATT SHA/score, and all final gates.
+The candidate implementation/tests were reverted in the required reverse
+order after the result record was committed:
+
+- `785bbb2` reverted `d0084b3` (implementation, boundary tests, and real
+  integration test);
+- `6c3a593` reverted `1a94a13` (RED contract tests).
+
+Round 1 was synchronized from the restored participant adapter, and the
+pre-run fallback ATT was copied back from the private backup. The final
+participant/runtime strategy SHA is
+`b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`; the
+active ATT SHA is
+`c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`. A fresh
+canonical-root score returns `20.436668751255972` with `period_count=72`.
+
+Post-restoration gates passed:
+
+- `uv lock --check` and `uv sync --locked --all-groups`;
+- Ruff format/check, Ty, and mypy;
+- non-integration tests: `188 passed, 7 deselected`, `90.93%` coverage;
+- integration tests: `7 passed`;
+- Round 1 sync plus byte-identical participant/runtime strategy;
+- Round 1 smoke: `SMOKE_OK`;
+- two deterministic no-op packages, both SHA-256
+  `e43e57e7d4494c4abe134e4e17973fdc6ad72b72c57215d9e3b0b9c16391471e`, with
+  only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` members;
+- restricted-material history/path scans, `git diff --check`, and the
+  no-active-simulation process check.
+
+No candidate process remains. The candidate raw CSV/log/score and aggregate
+remain ignored and private; no second candidate, tuning, submission, archive
+publication, or history rewrite occurred.

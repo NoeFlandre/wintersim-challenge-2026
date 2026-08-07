@@ -56,12 +56,12 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`, and two controlled strategy experiments have
-  completed. Both were rejected: the first was worse and the second tied the
-  fallback exactly. The no-op adapter and pinned fallback are restored; smoke,
-  scoring, and deterministic package checks pass. See
-  [`docs/round1-readiness.md`](docs/round1-readiness.md) and the
-  [`Round 1 progress-first berth report`](docs/experiments/round1-progress-first-berth-v1.md).
+  `.challenge/round1/source/`, and three controlled strategy experiments have
+  completed. All three were rejected: two were worse and one tied the fallback
+  exactly. The no-op adapter and pinned fallback are restored; smoke, scoring,
+  and deterministic package checks pass. See
+  [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
+  [`Round 1 disruption-weighted booking report`](docs/experiments/round1-disruption-weighted-booking-v1.md).
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
@@ -70,8 +70,9 @@ The current `UserStrategy` delegates every decision to the organizer fallback.
 This is the retained baseline. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
-Round 1's latest progress-first berth experiment also tied its fallback and was
-rejected under the strict improvement rule.
+Round 1's latest disruption-weighted booking experiment was materially worse
+than its fallback and was rejected under the strict improvement rule; its
+candidate evidence remains preserved in the ignored results directory.
 
 ## Prerequisites
 

@@ -119,7 +119,7 @@ def test_delegates_when_safe_detour_is_faster() -> None:
 
 
 def test_active_window_start_is_inclusive() -> None:
-    context, shipment, _plan, _nominal, _safe = _fixture(safe_distance=3_000.0)
+    context, shipment, _plan, _nominal, _safe = _fixture(safe_distance=1_000.0)
 
     assert UserStrategy.assign_associated_bookings(context, _now(10.0), shipment) is False
 

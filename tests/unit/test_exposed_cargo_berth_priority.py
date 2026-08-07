@@ -118,12 +118,15 @@ def test_closed_port_exposure_is_detected() -> None:
     safe_vessel = _vessel(80, safe_leg)
     now = _clock(11.0)
 
-    assert _call(
-        context,
-        [safe_vessel, exposed_vessel],
-        now,
-        {safe_vessel: _clock(10.5), exposed_vessel: _clock(10.0)},
-    ) is exposed_vessel
+    assert (
+        _call(
+            context,
+            [safe_vessel, exposed_vessel],
+            now,
+            {safe_vessel: _clock(10.5), exposed_vessel: _clock(10.0)},
+        )
+        is exposed_vessel
+    )
 
 
 def test_inactive_or_unexposed_queue_delegates() -> None:
@@ -142,12 +145,15 @@ def test_exact_score_tie_delegates_to_fallback() -> None:
     second = _vessel(10, exposed_leg)
     now = _clock(11.0)
 
-    assert _call(
-        context,
-        [first, second],
-        now,
-        {first: _clock(10.0), second: _clock(9.0)},
-    ) is None
+    assert (
+        _call(
+            context,
+            [first, second],
+            now,
+            {first: _clock(10.0), second: _clock(9.0)},
+        )
+        is None
+    )
 
 
 def test_missing_wait_entries_use_current_time_and_delegate_when_zero() -> None:

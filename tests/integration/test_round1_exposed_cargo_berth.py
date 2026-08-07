@@ -34,8 +34,7 @@ def _source_or_skip():
     )
     for module_name in list(sys.modules):
         if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.")
-            for prefix in prefixes
+            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
         ):
             sys.modules.pop(module_name, None)
     return source
@@ -115,9 +114,7 @@ def test_real_round1_exposed_cargo_selection_is_read_only():
 
     try:
         UserStrategy = _load_participant_strategy()
-        now = datetime.min + timedelta(
-            days=plan.start_offset_days + (plan.duration_days / 2.0)
-        )
+        now = datetime.min + timedelta(days=plan.start_offset_days + (plan.duration_days / 2.0))
         result = UserStrategy.select_vessel_for_berth(
             context,
             target_leg.arrival_port,
@@ -126,8 +123,7 @@ def test_real_round1_exposed_cargo_selection_is_read_only():
             now,
             {
                 safe_vessel: datetime.min + timedelta(days=plan.start_offset_days),
-                exposed_vessel: datetime.min
-                + timedelta(days=plan.start_offset_days - 1.0),
+                exposed_vessel: datetime.min + timedelta(days=plan.start_offset_days - 1.0),
             },
         )
         assert result is exposed_vessel

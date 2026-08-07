@@ -136,3 +136,33 @@ evidence. The no-op participant adapter is then synchronized back into the
 private Round 1 source, the pinned fallback ATT bytes are restored, and the
 fallback is re-scored exactly before final gates are run. No second candidate,
 tuning, or duplicate full run is authorized in this experiment.
+
+Restoration commits are `0b5be5a` (boundary-test revert), `320dfed`
+(implementation revert), and `0930ea0` (RED-test revert), applied newest to
+oldest. The private runtime was synchronized from the no-op adapter and the
+pinned fallback snapshot was copied back before this verification.
+
+Post-restoration state:
+
+- participant and runtime `user_strategy.py` SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- active ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- active fallback score: `20.436668751255972`, `period_count=72`
+- no active Round 1 simulation or probe process
+
+Final gates passed with the no-op fallback active:
+
+- `uv lock --check` and locked all-group offline sync
+- Ruff format/check, Ty, and mypy
+- 188 non-integration tests, 90.93% coverage (minimum 90%)
+- 7 integration tests
+- Round 1 smoke: `SMOKE_OK`
+- two deterministic participant-only packages, both SHA-256
+  `a0b0db0871fee15dc540ed72f70cad8e72fee0263a54b9edc6d16f11c0d5dfcc`
+- package members only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py`
+- restricted-material scans, diff hygiene, and clean Git status
+
+No second candidate, tuning, submission archive, publication, history rewrite,
+or remote push was performed in this isolated experiment worktree.

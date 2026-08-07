@@ -97,3 +97,42 @@ reverted in reverse order, the no-op adapter synchronized, the pinned fallback
 ATT restored and re-scored exactly, and every final gate rerun. Only the
 tracked report and design record remain public; all raw organizer-derived
 evidence stays ignored and local.
+
+## Full-run result
+
+The one authorized run completed normally. The raw log contains
+`Simulation Progress: Day 360 / 360`, `Period Result Output: Period 72
+(Days 356-360)`, `Simulation completed`, and the CSV output path. The organizer
+reported a simulation-clock runtime of `00:51:15`. A shell-wrapper variable
+named `status` was rejected by zsh after the simulation had already completed,
+so no synthetic `UV_EXIT` line was appended; the simulation completion markers,
+fresh output, and clean process exit were independently verified.
+
+The fresh output and log were copied before scoring or restoration under:
+`.challenge/round1/results/congested_direct_booking_v1_20260807/`.
+
+- candidate ATT SHA-256:
+  `e28a9d812053f7673635cc5b050a69e11f2a81dc00764f2992879894d284f033`
+- raw log SHA-256:
+  `849cc505846465f57a063d866a3d7c0dfb2adc23b61f30b106bd7b3674a0babc`
+- candidate mean ATT: `20.738194444444439` days
+- period count: `72`
+- candidate cumulative resilience loss: `24.888361755688166`
+- pinned fallback loss: `20.436668751255972`
+- delta: `+4.451693004432194` (`+21.782870088153%`)
+- periods better/equal/worse than fallback: `8 / 19 / 45`
+
+The strict acceptance rule is not met. The candidate is **REJECTED**: allowing
+exact affected origin/destination pairs onto congested direct legs materially
+increased cumulative loss despite improving eight periods. The complete scorer
+JSON is preserved in the ignored evidence directory as `score.json`.
+
+## Rejection and restoration
+
+The candidate implementation and candidate-only tests are reverted in reverse
+order after this result record is committed. The design and result report stay
+tracked; the candidate ATT, score JSON, and raw log remain private ignored
+evidence. The no-op participant adapter is then synchronized back into the
+private Round 1 source, the pinned fallback ATT bytes are restored, and the
+fallback is re-scored exactly before final gates are run. No second candidate,
+tuning, or duplicate full run is authorized in this experiment.

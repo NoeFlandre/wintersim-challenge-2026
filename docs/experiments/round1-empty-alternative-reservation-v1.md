@@ -109,5 +109,52 @@ ATT restored and re-scored exactly, and every final gate rerun. Only the
 tracked report and design record remain public; raw organizer-derived evidence
 stays ignored and local.
 
-**Current state:** pre-run review complete; the one full candidate run is
-authorized but has not yet started.
+**Authorization checkpoint:** pre-run review was complete and the one full
+candidate run was authorized. The outcome is recorded below.
+
+## Full-run result
+
+The one authorized candidate simulation was run in a persistent monitored PTY.
+An earlier detached invocation emitted only the CLI warning, produced no
+simulation process or completion marker, and did not change `Output/`; it was
+not counted as a candidate run. The actual run completed with exit code 0 and
+the following observed markers:
+
+- `Simulation Progress: Day 360 / 360`
+- `Period Result Output: Period 72 (Days 356-360)`
+- `Simulation completed.`
+- `CSV output written to` the Round 1 `Output/` directory
+
+The fresh ATT file was copied to the ignored candidate evidence directory
+before scoring or restoration:
+`.challenge/round1/results/empty_alternative_reservation_v1_20260807/ATT_By_Statistics_Interval.csv`.
+
+- candidate ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- candidate period count: `72`
+- candidate mean ATT: `20.450972222222223` days
+- candidate cumulative resilience loss: `20.436668751255972`
+- pinned fallback ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- pinned fallback cumulative loss: `20.436668751255972`
+- delta versus fallback: `0.0`
+- periods better/equal/worse than fallback: `0 / 72 / 0`
+
+The candidate ATT is byte-identical to the pinned fallback. The strict rule
+requires a loss below `20.436668751255972 - 1e-9`, so this candidate is
+**REJECTED (equality)**. The complete summary JSON is retained in the ignored
+`experiments/results/round1_empty_alternative_reservation_v1_20260807.json`.
+
+The PTY was not redirected to a raw-log file. The ignored
+`run_completion.txt` records the observed completion markers and explicitly
+makes no raw-log hash claim; no synthetic log or hash is presented as a raw
+transcript.
+
+## Rejection and restoration
+
+The candidate implementation and candidate-only tests are now to be reverted
+in reverse order with `git revert`, while this design/result report and the
+private ignored evidence remain. The no-op participant adapter must then be
+synchronized back into the private Round 1 source, the pinned fallback ATT
+restored and re-scored exactly, and all final gates rerun. No second candidate,
+tuning, or duplicate full run is authorized by this experiment.

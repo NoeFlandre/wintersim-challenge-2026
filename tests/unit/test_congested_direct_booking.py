@@ -193,3 +193,164 @@ def test_installation_failure_restores_shipment_and_reverse_references(
     assert route.associated_bookings == [old]
     assert old.service_route is route
     assert leg is route.segments[0].associated_leg
+
+
+@pytest.mark.parametrize(
+    "context_factory",
+    [
+        lambda: SimpleNamespace(),
+        lambda: SimpleNamespace(disruption_plans=None),
+        lambda: SimpleNamespace(disruption_plans=object()),
+    ],
+)
+def test_missing_or_uniterable_disruption_plans_delegate(
+    context_factory,
+) -> None:
+    _context, _route, _leg, shipment, start = _case()
+    context = context_factory()
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda plan: setattr(plan, "multiplier", None),
+        lambda plan: setattr(plan, "duration_days", float("nan")),
+        lambda plan: setattr(plan, "duration_days", 0.0),
+        lambda plan: setattr(plan, "start_offset_days", 1e300),
+    ],
+)
+def test_invalid_plan_numbers_delegate(monkeypatch: pytest.MonkeyPatch, mutate) -> None:
+    _install_booking_module(monkeypatch)
+    context, _route, _leg, shipment, start = _case()
+    mutate(context.disruption_plans[0])
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_active_closure_without_a_valid_berth_delegates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, _route, _leg, shipment, start = _case(close_berth=True)
+    context.disruption_plans[0].target_berth = None
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda plan: setattr(plan, "target_leg", None),
+        lambda plan: setattr(plan.target_leg, "departure_port", None),
+        lambda plan: setattr(plan.target_leg, "arrival_port", None),
+    ],
+)
+def test_active_congested_plan_without_a_valid_leg_delegates(
+    monkeypatch: pytest.MonkeyPatch, mutate
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, _route, _leg, shipment, start = _case()
+    mutate(context.disruption_plans[0])
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_duplicate_target_plans_are_deduplicated_and_route_order_is_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, leg, shipment, start = _case()
+    duplicate = SimpleNamespace(
+        target_leg=leg,
+        target_berth=None,
+        start_offset_days=10.0,
+        duration_days=5.0,
+        multiplier=3.0,
+        close_berth=False,
+    )
+    context.disruption_plans.append(duplicate)
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is True
+    assert shipment.associated_bookings[0].service_route is route
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda context, route, leg: setattr(context, "service_routes", None),
+        lambda context, route, leg: setattr(context, "service_routes", object()),
+        lambda context, route, leg: setattr(route, "segments", [object()]),
+        lambda context, route, leg: setattr(
+            route, "segments", [SimpleNamespace(associated_leg=leg, sequence_index=True)]
+        ),
+        lambda context, route, leg: setattr(
+            route, "segments", [SimpleNamespace(associated_leg=leg, sequence_index=0)]
+        ),
+        lambda context, route, leg: setattr(route, "associated_bookings", ()),
+    ],
+)
+def test_invalid_route_shape_delegates(monkeypatch: pytest.MonkeyPatch, mutate) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, leg, shipment, start = _case()
+    mutate(context, route, leg)
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_original_route_is_required_when_an_alternative_precedes_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, leg, shipment, start = _case()
+    alternative = SimpleNamespace(
+        source_service_route=route,
+        deployed_vessels=[object()],
+        associated_bookings=[],
+        segments=[SimpleNamespace(associated_leg=leg, sequence_index=1)],
+    )
+    context.service_routes.insert(0, alternative)
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is True
+    assert shipment.associated_bookings[0].service_route is route
+
+
+def test_old_booking_on_another_route_is_removed_transactionally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, route, _leg, shipment, start = _case()
+    old_route = SimpleNamespace(associated_bookings=[])
+    old = _Booking(
+        sequence_index=4,
+        shipment=shipment,
+        service_route=old_route,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+    )
+    old_route.associated_bookings.append(old)
+    shipment.associated_bookings = [old]
+    shipment.current_booking_index = 4
+
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is True
+    assert old not in old_route.associated_bookings
+    assert shipment.current_booking_index == 1
+    assert shipment.associated_bookings[0].service_route is route
+
+
+def test_old_booking_without_a_reverse_route_delegates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_booking_module(monkeypatch)
+    context, _route, _leg, shipment, start = _case()
+    old = SimpleNamespace(service_route=None)
+    shipment.associated_bookings = [old]
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_missing_runtime_booking_type_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = types.ModuleType("maritime_data_context")
+    monkeypatch.setitem(sys.modules, "maritime_data_context", module)
+    context, _route, _leg, shipment, start = _case()
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None
+
+
+def test_same_origin_and_destination_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_booking_module(monkeypatch)
+    context, _route, _leg, shipment, start = _case()
+    shipment.demand.destination_port = shipment.demand.origin_port
+    assert UserStrategy.assign_associated_bookings(context, start, shipment) is None

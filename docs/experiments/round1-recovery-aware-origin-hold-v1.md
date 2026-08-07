@@ -128,6 +128,9 @@ pinned fallback ATT was copied back before verification.
 - post-restoration gates: locked `uv`, Ruff format/check, Ty, mypy, 188
   non-integration tests at `90.93%` coverage, 7 integration tests, and
   `SMOKE_OK`
+- two post-restoration packages were byte-identical, SHA-256
+  `f5aa13836cced9c83b23380da39c1656a8d087dfb02be691872bfddc83a81f5e`, with
+  only `README.md` and `user_strategy.py` under `response_strategies/`
 - no simulator process remains active; no second run, tuning, submission, or
   organizer-material publication occurred
 

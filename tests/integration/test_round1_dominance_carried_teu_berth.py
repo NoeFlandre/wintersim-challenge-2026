@@ -93,7 +93,7 @@ def test_real_round1_objects_are_read_only_and_queue_safe() -> None:
     finally:
         second.carried_shipments[:] = carried_before[second]
 
-    assert selected is None or selected in (first, second)
+    assert selected is second
     assert route_before == {
         first: first.assigned_service_route,
         second: second.assigned_service_route,

@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; eight controlled Round 1 experiments
+**Status:** bootstrapped and smoke-tested; nine controlled Round 1 experiments
 have run and all were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
@@ -81,6 +81,14 @@ tracked, copied into the public repository, or included in a submission.
   fallback, so it was rejected. Its fresh ATT SHA is
   `6134e12aec44c54a282bc39bb6291a24626cf458c3b88a8020c883e554da2a20`; the
   active no-op fallback is restored and rescored at `20.436668751255972`.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-dominance-carried-teu-berth-v1.md`](experiments/round1-dominance-carried-teu-berth-v1.md),
+  ran exactly once with the fixed Round 1 configuration and completed all 72
+  periods. Its fallback-gated carried-TEU berth-priority policy produced an
+  ATT byte-identical to the pinned fallback and the same loss
+  `20.436668751255972`, so it was rejected by strict equality. Its candidate
+  ATT, raw log, and scorer JSON remain in the ignored results directory; the
+  active no-op fallback is restored, synchronized, and rescored.
 
 ## Round 1 commands
 

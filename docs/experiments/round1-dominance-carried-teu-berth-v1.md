@@ -87,9 +87,10 @@ simulation yet.
 
 ## Pre-run review record
 
-The candidate is committed at `6a3401d` on
-`codex/round1-dominance-wspt-v1`; no full simulation has run for this
-candidate.  The participant strategy SHA-256 is
+The candidate implementation is committed at `e004818`, its real-object
+integration assertion was tightened at `6a3401d`, and the reviewed pre-run HEAD
+was `07bb6ba` on `codex/round1-dominance-wspt-v1`; no full simulation had run
+before that review.  The participant strategy SHA-256 is
 `d765dbf718d79f99081d592bb47388ab3e1c8626546b35f04ece37adf7579556` and the
 synchronized Round 1 runtime copy is byte-identical.  The RED focused run
 against the no-op adapter had the three expected behavior failures; the GREEN
@@ -141,8 +142,37 @@ preserved in the same ignored evidence directory and in
 
 **Decision: REJECTED (equality).**  The carried-TEU WSPT policy produced no
 observable change under the fixed Round 1 scenario and seed.  Candidate code
-and tests must be reverted, the no-op adapter and pinned fallback restored, and
-all final gates rerun before this branch is considered complete.
+and tests were reverted, the no-op adapter and pinned fallback were restored,
+and final gates were rerun as recorded below.
+
+## Rejection restoration and final verification
+
+The candidate result was committed before restoration (`6d1a767`).  The
+candidate-only commits were then reverted in reverse order:
+
+- `3b203e1` reverted the integration-test tightening (`6a3401d`);
+- `237c102` reverted the candidate implementation and real-object integration
+  test (`e004818`); and
+- `7ee1a8f` reverted the RED unit tests (`aa60a9b`).
+
+The design, pre-run review, and full-run result records remain tracked.  Round
+1 was synchronized from the tracked participant files; the active strategy is
+byte-identical to `submission/response_strategies/user_strategy.py` with the
+no-op SHA-256
+`b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`.  The
+active ATT was restored from the pinned fallback snapshot and is byte-identical
+at SHA-256
+`c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`;
+re-scoring it gives `20.436668751255972` over 72 periods.
+
+Post-restoration gates passed: locked `uv` lock/sync; Ruff format and lint; Ty;
+mypy; 188 non-integration tests with 90.93% coverage; the Round 1 integration
+test (the six Round 0 integration tests are skipped in this Round 1-only
+private checkout); Round 1 sync/cmp; `SMOKE_OK`; two byte-identical packages
+(SHA-256 `a0b0db0871fee15dc540ed72f70cad8e72fee0263a54b9edc6d16f11c0d5dfcc`,
+only the README and `user_strategy.py`); `git diff --check`; restricted-history
+scans; and a no-running-simulator check.  No second run, tuning, submission,
+publication, or history rewrite occurred.
 
 ## One-candidate rejection procedure
 

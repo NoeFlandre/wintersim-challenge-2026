@@ -110,3 +110,26 @@ Evidence was preserved before restoration:
 
 The preserved ATT hash is documented only to show that the run did not produce
 a replacement CSV; it must not be presented as a candidate measurement.
+
+## Restoration and final verification
+
+The candidate implementation and candidate-only tests were reverted in reverse
+order (`e432602`, `381d836`, `9436e9b`, `29a6ac5`). The design/specification,
+this report, and the ignored evidence remain as the audit trail. The restored
+participant adapter was synchronized to the private Round 1 runtime and the
+pinned fallback ATT was copied back before verification.
+
+- final participant/runtime strategy SHA-256:
+  `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`
+- final active ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- independent canonical-root re-score: cumulative loss
+  `20.436668751255972`, period count `72`
+- post-restoration gates: locked `uv`, Ruff format/check, Ty, mypy, 188
+  non-integration tests at `90.93%` coverage, 7 integration tests, and
+  `SMOKE_OK`
+- no simulator process remains active; no second run, tuning, submission, or
+  organizer-material publication occurred
+
+The ignored machine-readable record is
+`experiments/results/round1_recovery_aware_origin_hold_v1_20260807.json`.

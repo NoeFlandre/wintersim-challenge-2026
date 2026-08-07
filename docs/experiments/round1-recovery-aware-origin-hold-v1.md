@@ -80,8 +80,33 @@ All gates below passed in the isolated candidate worktree before a full run:
 - `git diff --check` clean and no active simulator process
 - restricted archive/blob/path scans clean
 
-The no-op runtime and fallback ATT were backed up before synchronization. The
-full run has **not** started at this stop point. After the one run completes,
-the fresh ATT and log must be copied to the evidence directory before scoring
-or restoration; the result must then be recorded here and the candidate
-reverted if it fails the strict gate.
+The no-op runtime and fallback ATT were backed up before synchronization.
+
+## Run outcome
+
+The single authorized command was started with the fixed contract above, but
+it was interrupted during the 140-day warm-up before any measured period was
+written. The log ends with `KeyboardInterrupt` in the organizer fallback and
+`interrupted`; it contains no Day-360, Period-72, `Simulation completed`, or
+CSV-output completion markers. This is therefore an **incomplete run and a
+rejection**, not a scored candidate result. No second run is permitted for
+this experiment.
+
+Evidence was preserved before restoration:
+
+```text
+.challenge/round1/results/recovery_aware_origin_hold_v1_20260807/
+├── ATT_By_Statistics_Interval.csv  (stale pre-run fallback output)
+└── full_run.log
+```
+
+- interruption log SHA-256:
+  `d0adec7e673d68948b253ba0118c34e47eb8ee9ae8dcccbc177800b90451f3c2`
+- preserved ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- fallback/candidate score: **not evaluated** because the ATT was unchanged
+  and no completed candidate output exists
+- strict decision: **REJECTED — incomplete/interrupted run**
+
+The preserved ATT hash is documented only to show that the run did not produce
+a replacement CSV; it must not be presented as a candidate measurement.

@@ -1,4 +1,4 @@
-# Round 1 dominance-filtered carried-TEU berth priority v1
+# Round 1 fallback-gated carried-TEU berth priority v1
 
 **Status: DESIGN REVIEW — no candidate simulation is authorized yet.**
 
@@ -84,6 +84,39 @@ deterministic package-twice, restricted-material, diff, and process checks must
 pass.  The fallback score/hash must be freshly verified and the exact candidate
 HEAD and strategy hash recorded here.  This review checkpoint authorizes no
 simulation yet.
+
+## Pre-run review record
+
+The candidate is committed at `6a3401d` on
+`codex/round1-dominance-wspt-v1`; no full simulation has run for this
+candidate.  The participant strategy SHA-256 is
+`d765dbf718d79f99081d592bb47388ab3e1c8626546b35f04ece37adf7579556` and the
+synchronized Round 1 runtime copy is byte-identical.  The RED focused run
+against the no-op adapter had the three expected behavior failures; the GREEN
+focused/unit run passed (`17` tests), and the real Round 1 object integration
+test passed.
+
+Fresh preflight gates are green:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, Ty, and mypy passed;
+- non-integration tests: `194 passed, 8 deselected`, true coverage `90.07%`;
+- integration tests: `2 passed, 6 Round 0-only skips`;
+- Round 1 sync/cmp passed and smoke returned `SMOKE_OK`;
+- two deterministic validation packages are byte-identical, SHA-256
+  `c63c0437184d9a4b28f9289bf1fcfb5a6527d7c2d3a88d7f34fb8c6ff3d14659`, with
+  only `README.md` and `user_strategy.py` members;
+- fallback snapshot and active Output are byte-identical at
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43` and
+  re-score to `20.436668751255972` over `72` periods;
+- the pre-run Output mtime/size is recorded as stale-state evidence
+  (`1786140224`, `1262` bytes), not candidate evidence;
+- `git diff --check`, tracked/reachable restricted-material scans, and the
+  no-running-simulator check passed.
+
+This is a review stop point.  Exactly one monitored full run is authorized only
+after this record is reviewed.  No tuning, second candidate, or threshold
+change is permitted.
 
 ## One-candidate rejection procedure
 

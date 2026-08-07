@@ -1,6 +1,6 @@
 # Round 1 pending alternative-route vessel activation v1
 
-Status: PRE-RUN REVIEW
+Status: CANDIDATE REJECTED — RESTORATION IN PROGRESS
 
 ## Hypothesis
 
@@ -101,9 +101,37 @@ Exactly one full candidate run is authorized after this commit. No tuning,
 second candidate, threshold change, or organizer-material publication is
 permitted.
 
-## Result
+## Result (candidate preserved before restoration)
 
-To be filled only after the single run has completed, its CSV and log have
-been preserved, and the candidate has been scored. On rejection, the candidate
-implementation/tests will be reverted, the pinned no-op strategy and ATT will
-be restored, and every final gate will be repeated.
+The one authorized full run completed on 2026-08-07 with exit 0. The log
+contains Period 72 (Days 356-360), Output Simulation Day 360, `Simulation
+completed.`, and `CSV output written`. The simulator reported runtime
+`00:28:54`.
+
+- Candidate cumulative resilience loss: `20.436668751255972`
+- Pinned fallback cumulative resilience loss: `20.436668751255972`
+- Delta: `0.0` (`0.0%`)
+- Candidate ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- Pinned fallback ATT SHA-256:
+  `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`
+- Candidate ATT: 72 periods, mean `20.450972222222223` days
+- Candidate versus fallback: 0 periods better, 72 equal, 0 worse; the CSVs
+  are byte-identical
+- Candidate run log SHA-256:
+  `e96c1c2348757bd30463c9af2da41aaed1201e54463b349cab682e2977f8fa2d`
+- Evidence preserved before scoring under
+  `.challenge/round1/results/pending_alt_activation_v1_20260807/`:
+  `ATT_By_Statistics_Interval.csv`, `run.log`, `score.json`, and the
+  candidate-versus-active-output score JSON
+- Ignored aggregate:
+  `experiments/results/round1_pending_alt_activation_v1_20260807.json`
+
+Decision: **REJECTED — equality**. The strict acceptance expression was not
+met because the candidate was not lower than the fallback by more than
+`1e-9`. The candidate made no measurable selection change in this fixed run.
+
+The candidate implementation and candidate-only tests will now be reverted;
+the pinned no-op strategy and fallback ATT will be restored and every final
+gate will be repeated. No second candidate, tuning, threshold change, or
+organizer-material publication is authorized.

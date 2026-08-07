@@ -8,6 +8,7 @@ import types
 from types import SimpleNamespace
 
 import pytest
+
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -27,16 +28,8 @@ class FakeBooking:
         self.arrival_segment_index = arrival_segment_index
 
 
-class FakePort:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.berths: list[object] = []
-
-    __hash__ = object.__hash__
-
-
-def _port(name: str) -> FakePort:
-    return FakePort(name)
+def _port(name: str) -> SimpleNamespace:
+    return SimpleNamespace(name=name, berths=[])
 
 
 def _route(name: str, pairs: list[tuple[str, str, float]], ports: dict[str, object]):
@@ -215,11 +208,7 @@ def test_closed_port_is_hard_exclusion(monkeypatch: pytest.MonkeyPatch) -> None:
     ports = {name: _port(name) for name in ("Origin", "Closed", "Destination")}
     via_closed, via_closed_legs = _route(
         "via-closed",
-        [
-            ("Origin", "Closed", 10.0),
-            ("Closed", "Destination", 10.0),
-            ("Destination", "Origin", 20.0),
-        ],
+        [("Origin", "Closed", 10.0), ("Closed", "Destination", 10.0), ("Destination", "Origin", 20.0)],
         ports,
     )
     direct, direct_legs = _route(

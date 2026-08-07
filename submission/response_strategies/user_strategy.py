@@ -14,7 +14,6 @@ import math
 import numbers
 from typing import Any, NamedTuple
 
-
 _NARROW_EXCEPTIONS = (
     AttributeError,
     IndexError,
@@ -55,8 +54,8 @@ class _Edge:
         self.segments = tuple(segments)
         total = 0.0
         for segment in self.segments:
-            leg = getattr(segment, "associated_leg")
-            distance = _positive_float(getattr(leg, "sailing_distance"))
+            leg = segment.associated_leg
+            distance = _positive_float(leg.sailing_distance)
             if distance is None:
                 raise ValueError("invalid sailing distance")
             total += distance
@@ -189,7 +188,7 @@ def _ordered_segments(route: Any) -> list[Any] | None:
     segments = getattr(route, "segments", None)
     if segments is None:
         return None
-    ordered = sorted(list(segments), key=lambda segment: segment.sequence_index)
+    ordered = sorted(segments, key=lambda segment: segment.sequence_index)
     return ordered if len(ordered) >= 2 else None
 
 
@@ -199,9 +198,8 @@ def _route_available(route: Any, state: _ActiveState, safe: bool) -> bool:
         return source is None
     if source is None:
         return True
-    return (
-        getattr(route, "disruption_key", None) == state.disruption_key
-        and bool(getattr(route, "deployed_vessels", None))
+    return getattr(route, "disruption_key", None) == state.disruption_key and bool(
+        getattr(route, "deployed_vessels", None)
     )
 
 
@@ -214,26 +212,22 @@ def _route_edges(route: Any, state: _ActiveState, safe: bool) -> list[_Edge]:
     edges: list[_Edge] = []
     count = len(segments)
     for start_index, start_segment in enumerate(segments):
-        first_leg = getattr(start_segment, "associated_leg")
-        departure_port = getattr(first_leg, "departure_port")
+        first_leg = start_segment.associated_leg
+        departure_port = first_leg.departure_port
         if departure_port is None:
             continue
         for step in range(1, count):
             end_index = (start_index + step - 1) % count
             candidate = [segments[(start_index + offset) % count] for offset in range(step)]
-            last_leg = getattr(candidate[-1], "associated_leg")
-            arrival_port = getattr(last_leg, "arrival_port")
+            last_leg = candidate[-1].associated_leg
+            arrival_port = last_leg.arrival_port
             if arrival_port is None or arrival_port is departure_port:
                 continue
             if safe:
-                if any(
-                    id(getattr(segment, "associated_leg")) in state.congested_ids
-                    for segment in candidate
-                ):
+                if any(id(segment.associated_leg) in state.congested_ids for segment in candidate):
                     continue
                 intermediate_names = [
-                    _port_name(getattr(getattr(segment, "associated_leg"), "arrival_port"))
-                    for segment in candidate[:-1]
+                    _port_name(segment.associated_leg.arrival_port) for segment in candidate[:-1]
                 ]
                 if any(name in state.closed_names for name in intermediate_names):
                     continue
@@ -255,8 +249,10 @@ def _route_edges(route: Any, state: _ActiveState, safe: bool) -> list[_Edge]:
     return edges
 
 
-def _pathfind(context: Any, edges: list[_Edge], origin: Any, destination: Any) -> list[_Edge] | None:
-    ports = list(getattr(context, "ports"))
+def _pathfind(
+    context: Any, edges: list[_Edge], origin: Any, destination: Any
+) -> list[_Edge] | None:
+    ports = list(context.ports)
     if origin is destination or not ports or not edges:
         return None
     port_ids = {id(port) for port in ports}
@@ -292,11 +288,11 @@ def _pathfind(context: Any, edges: list[_Edge], origin: Any, destination: Any) -
         if cursor is origin:
             path.reverse()
             return path
-        edge = previous.get(id(cursor))
-        if edge is None:
+        previous_edge = previous.get(id(cursor))
+        if previous_edge is None:
             return None
-        path.append(edge)
-        cursor = edge.departure_port
+        path.append(previous_edge)
+        cursor = previous_edge.departure_port
     return None
 
 
@@ -322,9 +318,7 @@ def _route_speeds(route: Any) -> list[float]:
 def _route_cycle_distance(route: Any) -> float | None:
     total = 0.0
     for segment in list(getattr(route, "segments", None) or []):
-        distance = _positive_float(
-            getattr(getattr(segment, "associated_leg"), "sailing_distance")
-        )
+        distance = _positive_float(segment.associated_leg.sailing_distance)
         if distance is None:
             return None
         total += distance
@@ -354,10 +348,9 @@ def _edge_intersects_constraint(edge: _Edge, constraint: _Constraint) -> bool:
         if edge.departure_port is constraint.target or edge.arrival_port is constraint.target:
             return True
         return any(
-            getattr(getattr(segment, "associated_leg"), "arrival_port") is constraint.target
-            for segment in edge.segments
+            segment.associated_leg.arrival_port is constraint.target for segment in edge.segments
         )
-    return any(getattr(segment, "associated_leg") is constraint.target for segment in edge.segments)
+    return any(segment.associated_leg is constraint.target for segment in edge.segments)
 
 
 def _latest_recovery(path: list[_Edge], constraints: tuple[_Constraint, ...]) -> dt.datetime | None:
@@ -382,7 +375,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     state = _active_state(context, now)
     if state is None:
         return False
-    routes = list(getattr(context, "service_routes"))
+    routes = list(context.service_routes)
     nominal_edges: list[_Edge] = []
     safe_edges: list[_Edge] = []
     for route in routes:

@@ -51,8 +51,10 @@ def _snapshot(context) -> tuple:
         tuple(context.service_routes),
         tuple(context.vessels),
         tuple(context.disruption_plans),
-        tuple((vessel, vessel.assigned_service_route, vessel.pending_assigned_service_route)
-              for vessel in context.vessels),
+        tuple(
+            (vessel, vessel.assigned_service_route, vessel.pending_assigned_service_route)
+            for vessel in context.vessels
+        ),
     )
 
 

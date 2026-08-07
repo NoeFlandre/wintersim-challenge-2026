@@ -1,7 +1,7 @@
 # Round 1 disruption-weighted booking v1
 
-**Status:** pre-run review; candidate implementation is not yet authorized to
-run the full simulation.
+**Status:** REJECTED — candidate run complete; no-op fallback restored and all
+final verification gates passed.
 
 ## Hypothesis
 

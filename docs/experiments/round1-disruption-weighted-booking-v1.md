@@ -163,3 +163,44 @@ worse; candidate mean ATT was `20.877222222222223` days versus fallback mean
 
 The candidate and raw evidence remain preserved for audit. Restoration is
 deliberately recorded separately below and will not rerun the simulator.
+
+## Rejection and fallback restoration (2026-08-07)
+
+The strict gate rejected the candidate. The candidate implementation and its
+tests were reverted in reverse order with these generated commits:
+
+- `5f40ec7` reverted the fail-closed coverage tests;
+- `0c489b9` reverted multiplier validation;
+- `cf12b03` reverted the disruption-weighted booking implementation;
+- `dfbb489` reverted the candidate behavior tests.
+
+The experiment contract and evidence documentation were retained. The no-op
+adapter was synchronized into the private Round 1 runtime, and the pinned
+fallback ATT snapshot was copied back byte-for-byte. The restored strategy
+SHA is `b377e70d9744e897009d24236289ed5f36cf85d0499a484b7f896b30f1a3a135`,
+and the active fallback ATT SHA is
+`c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43`.
+The restored fallback re-scores to `20.436668751255972` over 72 periods.
+No restoration simulation, second candidate, tuning, replay, submission, or
+history rewrite was performed.
+
+## Post-restore verification (2026-08-07)
+
+All final gates passed after restoration:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, `ty check src/wsc2026_tools submission`, and mypy passed;
+- non-integration tests: 188 passed, 7 integration deselected, 90.93% total
+  coverage (minimum 90%);
+- integration tests: 7 passed;
+- Round 1 sync and byte comparisons passed; smoke returned `SMOKE_OK`;
+- two validation packages were byte-identical, SHA-256
+  `a0b0db0871fee15dc540ed72f70cad8e72fee0263a54b9edc6d16f11c0d5dfcc`,
+  containing only `README.md` and `user_strategy.py`;
+- `git diff --check` and restricted-material scans passed;
+- no simulator/probe process remains;
+- active fallback re-score has 72 periods and cumulative loss exactly
+  `20.436668751255972`.
+
+The branch is ready for clean handoff with the rejected candidate evidence
+retained and the fallback runtime restored.

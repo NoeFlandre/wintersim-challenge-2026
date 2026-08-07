@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-
 from response_strategies.user_strategy import UserStrategy
 
 
@@ -89,7 +88,9 @@ def test_inactive_or_empty_plan_delegates() -> None:
     [
         _vessel(port=object(), carried=[object()]),
         SimpleNamespace(carried_shipments=[], pending_assigned_service_route=None),
-        SimpleNamespace(carried_shipments=[], pending_assigned_service_route=SimpleNamespace(segments=[])),
+        SimpleNamespace(
+            carried_shipments=[], pending_assigned_service_route=SimpleNamespace(segments=[])
+        ),
     ],
 )
 def test_ineligible_vessels_delegate(vessel: object) -> None:
@@ -120,8 +121,13 @@ def test_wrong_port_and_later_segment_do_not_match() -> None:
 @pytest.mark.parametrize(
     "vessel",
     [
-        SimpleNamespace(carried_shipments=[], pending_assigned_service_route=SimpleNamespace(segments=[SimpleNamespace()])),
-        SimpleNamespace(carried_shipments=[], pending_assigned_service_route=SimpleNamespace(segments=None)),
+        SimpleNamespace(
+            carried_shipments=[],
+            pending_assigned_service_route=SimpleNamespace(segments=[SimpleNamespace()]),
+        ),
+        SimpleNamespace(
+            carried_shipments=[], pending_assigned_service_route=SimpleNamespace(segments=None)
+        ),
         object(),
     ],
 )

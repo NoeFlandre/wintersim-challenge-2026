@@ -395,7 +395,7 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; four controlled Round 1
+        Round 1 has its own private source tree; five controlled Round 1
         strategy experiments are recorded below alongside the Round 0 history.
       </p>
 
@@ -595,7 +595,7 @@
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
         fallback is <strong>20.4366687513</strong>. Two Round 1 candidates were
-        worse and two tied the fallback; all four were rejected.
+        worse and three tied the fallback; all five were rejected.
       </div>
     </section>
 
@@ -607,7 +607,7 @@
         complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. All four Round 1
+        Lower is better; equality is not an improvement. All five Round 1
         trials were rejected, so the no-op fallback remains active.
       </p>
 
@@ -706,6 +706,11 @@
               <td>When the fallback had already reserved an empty vessel for a temporary alternative route, we selected that vessel first if it was waiting at the route's starting port during an active disruption. The goal was to make the fallback's existing detour available sooner without changing routes or bookings. The complete result was byte-identical to fallback, so the policy made no measurable change.</td>
               <td><strong>20.4367</strong><br><span class="status equal">No change; rejected by strict equality gate</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-teu-delay-smith-priority-v2.md">Prioritize the most delayed cargo per berth hour</a></td>
+              <td>During an active disruption, we ranked waiting vessels by the amount of affected container capacity they could release per unit of berth work. The ratio included carried cargo, cargo due to discharge, predicted eligible loading, crane count, and the organizer's fixed berthing overhead. It changed only the berth-selection hook and left routes and bookings untouched. The full result was byte-identical to the fallback.</td>
+              <td><strong>20.4367</strong><br><span class="status equal">No change; rejected by strict equality gate</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -715,10 +720,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, and four completed Round 1
+    reports, nine completed Round 0 experiments, and five completed Round 1
     experiments. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-pending-alt-activation-v1.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-teu-delay-smith-priority-v2.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

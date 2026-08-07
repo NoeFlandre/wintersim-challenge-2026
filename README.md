@@ -56,12 +56,12 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`, and four controlled strategy experiments have
-  completed. All four were rejected: two were worse and two tied the fallback
-  exactly. The no-op adapter and pinned fallback are restored; smoke, scoring,
-  and deterministic package checks pass. See
+  `.challenge/round1/source/`, and five controlled strategy experiments have
+  completed. All five were rejected: two were worse and three tied the
+  fallback exactly. The no-op adapter and pinned fallback are restored; smoke,
+  scoring, and deterministic package checks pass. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 pending alternative activation report`](docs/experiments/round1-pending-alt-activation-v1.md).
+  [`Round 1 TEU-delay Smith-priority report`](docs/experiments/round1-teu-delay-smith-priority-v2.md).
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
@@ -70,7 +70,7 @@ The current `UserStrategy` delegates every decision to the organizer fallback.
 This is the retained baseline. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
-Round 1's latest pending alternative-route activation experiment produced a
+Round 1's latest TEU-delay Smith-priority berth experiment produced a
 byte-identical ATT result and was rejected under the strict improvement rule;
 its candidate evidence remains preserved in the ignored results directory.
 

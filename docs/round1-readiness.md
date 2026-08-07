@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; four controlled Round 1 experiments
+**Status:** bootstrapped and smoke-tested; five controlled Round 1 experiments
 have run and all were rejected. The pinned no-op fallback is restored.
 
 ## Private organizer archive
@@ -39,6 +39,13 @@ tracked, copied into the public repository, or included in a submission.
 - The pinned fallback ATT SHA-256 is
   `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43` and its
   rescored cumulative loss is `20.436668751255972` over 72 periods.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-teu-delay-smith-priority-v2.md`](experiments/round1-teu-delay-smith-priority-v2.md),
+  executed exactly once. Its TEU-delay Smith-priority berth policy produced a
+  byte-identical ATT and the fallback loss `20.436668751255972`, so it was
+  rejected by the strict improvement rule. Candidate ATT, log, score JSON,
+  and package remain in the ignored evidence directory; the active fallback
+  is restored.
 - The latest controlled experiment, documented in
   [`docs/experiments/round1-pending-alt-activation-v1.md`](experiments/round1-pending-alt-activation-v1.md),
   ran exactly once, produced the same ATT SHA and score as the fallback

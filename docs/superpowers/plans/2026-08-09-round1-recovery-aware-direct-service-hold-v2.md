@@ -291,8 +291,8 @@ local ignored Round 1 organizer source.
     tests/unit/test_round1_recovery_aware_direct_service_hold_v2.py
   uv run ruff check submission/response_strategies/user_strategy.py \
     tests/unit/test_round1_recovery_aware_direct_service_hold_v2.py
-  uv run ty check submission tests/unit/test_round1_recovery_aware_direct_service_hold_v2.py
-  uv run mypy submission
+  uv run ty check src/wsc2026_tools submission
+  uv run mypy src/wsc2026_tools submission
   ```
 
 - [ ] Commit the minimal GREEN implementation:
@@ -379,8 +379,8 @@ local ignored Round 1 organizer source.
   uv sync --locked --all-groups
   uv run ruff format --check .
   uv run ruff check .
-  uv run ty check
-  uv run mypy
+  uv run ty check src/wsc2026_tools submission
+  uv run mypy src/wsc2026_tools submission
   uv run pytest -m "not integration" \
     --cov=src/wsc2026_tools --cov=submission --cov-report=term-missing \
     --cov-fail-under=90
@@ -525,8 +525,8 @@ local ignored Round 1 organizer source.
   uv sync --locked --all-groups
   uv run ruff format --check .
   uv run ruff check .
-  uv run ty check
-  uv run mypy
+  uv run ty check src/wsc2026_tools submission
+  uv run mypy src/wsc2026_tools submission
   uv run pytest -q
   uv run pytest -m "not integration" \
     --cov=src/wsc2026_tools --cov=submission --cov-report=term-missing \

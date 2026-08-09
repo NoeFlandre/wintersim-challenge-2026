@@ -56,28 +56,36 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`, and nine controlled strategy experiments have
-  completed. All nine were rejected: five were worse and four tied the
-  fallback exactly. The no-op adapter and pinned fallback are restored; smoke,
-  scoring, and deterministic package checks pass. See
+  `.challenge/round1/source/`. Ten controlled experiments have valid scores and
+  one earlier attempt was incomplete. The first nine scored candidates were
+  rejected; the recovery-aware direct-service hold policy is accepted at
+  `19.828803374740612`, improving on the `20.436668751255972` fallback by
+  `2.9743858155845607%`. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 carried-TEU berth report`](docs/experiments/round1-dominance-carried-teu-berth-v1.md).
+  [`Round 1 recovery-hold report`](docs/experiments/round1-recovery-aware-direct-service-hold-v2.md).
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
-The current `UserStrategy` delegates every decision to the organizer fallback.
-This is the retained baseline. The first controlled Round 0 experiment was
+The current `UserStrategy` keeps three decisions delegated to the organizer.
+For new cargo only, it may wait for a disrupted one-booking direct service when
+that service is estimated to recover and deliver sooner than the safe path that
+requires transfers. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
 Round 1's preceding no-safe congestion-tail booking experiment produced a
 `25.80681018404835` loss against the `20.436668751255972` fallback, worse by
 `26.27699014039333%`, and was rejected under the strict improvement rule; its
 candidate evidence remains preserved in the ignored results directory.
-- The latest Round 1 carried-TEU berth-priority experiment produced the exact
+
+- The preceding Round 1 carried-TEU berth-priority experiment produced the exact
   fallback loss `20.436668751255972` and byte-identical ATT, so it was rejected
   by strict equality; its candidate ATT, log, and scorer JSON remain in the
-  ignored results directory and the no-op fallback is restored.
+  ignored results directory.
+- The accepted Round 1 recovery-aware direct-service hold experiment produced
+  `19.828803374740612` over all 72 periods. Its ATT SHA-256 is
+  `d381b087f8d67124a8078b5afc795f5b59b08db90148614b43dcfdf351e7ac48`;
+  the tested candidate remains active.
 
 ## Prerequisites
 

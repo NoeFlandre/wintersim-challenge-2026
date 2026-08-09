@@ -1,6 +1,6 @@
 # Round 1 recovery-aware direct-service hold v2
 
-**Status: PRE-RUN REVIEW — one fixed candidate run is authorized.**
+**Status: ACCEPTED — strictly beats the pinned Round 1 fallback.**
 
 ## Question being tested
 
@@ -169,6 +169,57 @@ Fresh preflight gates passed on 2026-08-09:
 The generated validation archive was moved out of the repository. No
 submission, upload, push, merge, pull request, or history rewrite occurred.
 
+## Full-run result (2026-08-09)
+
+Exactly one candidate run was launched from tracked HEAD
+`6fca6f04301956919cd6d92d0b5b4c0c692ad819` with the fixed command and
+configuration above. It started at `2026-08-09T09:30:26Z`, completed at
+`2026-08-09T10:00:50Z`, and reported simulation runtime `00:30:22`.
+
+The process exited zero and the raw log contains Period 72 (Days 356–360),
+Simulation Day 360, and the explicit `Simulation completed.` marker. Its
+SHA-256 is
+`a9a3de961e92b9422c0cb0222bac3b59a5a3d827b859bc87876578fb35e52fa7`.
+No duplicate simulator remained after exit.
+
+Before scoring or synchronization, the fresh ATT was copied byte-for-byte to
+the precommitted ignored evidence directory. The source and preserved files
+were identical at preservation time:
+
+- ATT SHA-256:
+  `d381b087f8d67124a8078b5afc795f5b59b08db90148614b43dcfdf351e7ac48`;
+- size: 1,262 bytes;
+- source mtime epoch: `1786269649`, newer than the pinned stale mtime
+  `1786143554`;
+- numbered periods: 72;
+- mean ATT: `20.415972222222222` days.
+
+The official scorer produced cumulative resilience loss
+`19.828803374740612`. Against the pinned fallback
+`20.436668751255972`, the candidate delta is
+`-0.607865376515360`, a `2.9743858155845607%` relative improvement. Its
+period ATT is lower in 28 periods, equal in 19, and higher in 25. The strict
+precommitted expression is satisfied:
+
+```text
+19.828803374740612 < 20.436668751255972 - 1e-9
+```
+
+**Decision: ACCEPTED.** The candidate remains the active participant strategy;
+no revert or fallback restoration is permitted by the decision protocol.
+
+This result supports the narrow policy under the fixed public Round 1 scenario
+and seed. It does not establish that each individual hold is beneficial or
+that the same improvement magnitude will occur across hidden scenarios and
+seeds: 25 individual periods were worse, and the experiment did not add
+causal per-shipment instrumentation. The structural gates and fail-closed
+behavior remain important generalization safeguards.
+
+Raw private evidence remains ignored at
+`.challenge/round1/results/recovery_aware_direct_service_hold_v2_20260809/`;
+the aggregate record remains ignored at
+`experiments/results/round1_recovery_aware_direct_service_hold_v2_20260809.json`.
+
 ## One-run evidence and restoration procedure
 
 Immediately before launch, an ignored manifest will pin the exact launch HEAD,
@@ -187,4 +238,5 @@ and RED-test commits are reverted in reverse order with `git revert`; the
 restored no-op adapter is synchronized; the pinned ATT is restored and rescored;
 and every final gate is rerun. The design, plan, and result audit history remain.
 No second candidate, tuning run, submission, push, merge, PR, or history rewrite
-is part of this experiment.
+is part of this experiment. Because the fixed candidate was accepted, the
+rejection branch of this procedure was not executed.

@@ -188,4 +188,3 @@ restored no-op adapter is synchronized; the pinned ATT is restored and rescored;
 and every final gate is rerun. The design, plan, and result audit history remain.
 No second candidate, tuning run, submission, push, merge, PR, or history rewrite
 is part of this experiment.
-

@@ -130,7 +130,7 @@ def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
     if isinstance(value, list):
         return ("list", identity, tuple(_freeze(item, seen) for item in value))
     if isinstance(value, tuple):
-        return ("tuple", identity, tuple(_freeze(item, seen) for item in value))
+        return ("tuple", tuple(_freeze(item, seen) for item in value))
     if isinstance(value, dict):
         return (
             "dict",

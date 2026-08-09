@@ -7,9 +7,8 @@ These tests pin the public surface that the organizer framework calls:
   argument signature (the organizer's documented parameter names must be
   accepted positionally or by keyword).
 * Each method is static and callable without instantiation.
-* For this baseline milestone every method returns ``None`` (delegating to the
-  organizer fallback) and never mutates any of its arguments, even sentinel
-  mutable inputs.
+* Malformed or non-qualifying calls delegate with ``None`` and never mutate
+  sentinel mutable inputs. Candidate-specific behavior is covered separately.
 
 The tests use only sentinel objects defined here; they never import organizer
 source.
@@ -85,7 +84,7 @@ def test_create_alternative_service_routes_returns_none_and_leaves_context_uncha
     assert context == snapshot, "None result must leave context unchanged"
 
 
-def test_assign_associated_bookings_returns_none() -> None:
+def test_assign_associated_bookings_delegates_malformed_context() -> None:
     result = UserStrategy.assign_associated_bookings(context={"k": 1}, now=10, shipment=object())
     assert result is None
 

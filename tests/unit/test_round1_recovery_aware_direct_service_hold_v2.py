@@ -76,6 +76,22 @@ def _leg_plan(
     )
 
 
+def _berth_plan(
+    port: SimpleNamespace,
+    *,
+    start_day: float = 10.0,
+    duration_days: float = 5.0,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        target_leg=None,
+        target_berth=SimpleNamespace(port=port),
+        start_offset_days=start_day,
+        duration_days=duration_days,
+        multiplier=1.0,
+        close_berth=True,
+    )
+
+
 def _shipment(origin: Any, destination: Any) -> SimpleNamespace:
     return SimpleNamespace(
         demand=SimpleNamespace(origin_port=origin, destination_port=destination),
@@ -227,6 +243,59 @@ def test_nominal_path_unaffected_by_active_disruption_delegates() -> None:
     assert _decision(context, now, shipment) is None
 
 
+def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
+    origin = _port("Origin")
+    closed = _port("Closed")
+    transfer = _port("Transfer")
+    destination = _port("Destination")
+    nominal = _route(
+        "nominal",
+        [origin, closed, destination, origin],
+        [50.0, 50.0, 100.0],
+    )
+    safe_a = _route("safe-a", [origin, transfer, origin], [1000.0, 1000.0])
+    safe_b = _route("safe-b", [transfer, destination, transfer], [1000.0, 1000.0])
+    context = SimpleNamespace(
+        ports=[origin, closed, transfer, destination],
+        service_routes=[nominal, safe_a, safe_b],
+        disruption_plans=[_berth_plan(closed)],
+    )
+
+    assert (
+        _decision(
+            context,
+            ANCHOR + dt.timedelta(days=14.5),
+            _shipment(origin, destination),
+        )
+        is False
+    )
+
+
+def test_matching_deployed_alternative_routes_are_eligible() -> None:
+    context, now, shipment, items = _qualifying_fixture()
+    disruption_key = ((), (("origin", "destination"),))
+    for route in (items["safe_a"], items["safe_b"]):
+        route.source_service_route = items["nominal"]
+        route.disruption_key = disruption_key
+
+    assert _decision(context, now, shipment) is False
+
+
+@pytest.mark.parametrize("failure", ["wrong-key", "no-vessels"])
+def test_unavailable_alternative_routes_delegate(failure: str) -> None:
+    context, now, shipment, items = _qualifying_fixture()
+    disruption_key = ((), (("origin", "destination"),))
+    for route in (items["safe_a"], items["safe_b"]):
+        route.source_service_route = items["nominal"]
+        route.disruption_key = disruption_key
+    if failure == "wrong-key":
+        items["safe_a"].disruption_key = (("other",), ())
+    else:
+        items["safe_a"].deployed_vessels = []
+
+    assert _decision(context, now, shipment) is None
+
+
 def test_single_service_indirect_safe_path_is_not_a_transfer() -> None:
     context, now, shipment, items = _qualifying_fixture()
     safe_single_route = _route(
@@ -296,6 +365,26 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
         ),
         lambda context, shipment, items: setattr(items["safe_a"], "segments", []),
         lambda context, shipment, items: setattr(shipment, "demand", None),
+        lambda context, shipment, items: setattr(context, "disruption_plans", None),
+        lambda context, shipment, items: setattr(context, "service_routes", None),
+        lambda context, shipment, items: setattr(context, "ports", None),
+        lambda context, shipment, items: context.ports.append(context.ports[0]),
+        lambda context, shipment, items: context.ports.remove(items["destination"]),
+        lambda context, shipment, items: setattr(
+            items["safe_a"].segments[0], "sequence_index", True
+        ),
+        lambda context, shipment, items: setattr(
+            items["safe_a"].segments[0].associated_leg,
+            "arrival_port",
+            items["safe_a"].segments[0].associated_leg.departure_port,
+        ),
+        lambda context, shipment, items: setattr(
+            items["safe_a"].segments[1].associated_leg,
+            "departure_port",
+            items["destination"],
+        ),
+        lambda context, shipment, items: setattr(items["nominal"], "deployed_vessels", []),
+        lambda context, shipment, items: setattr(items["plan"], "start_offset_days", 1e308),
     ],
     ids=[
         "existing-bookings",
@@ -310,6 +399,16 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
         "zero-speed",
         "empty-route",
         "missing-demand",
+        "missing-plans",
+        "missing-routes",
+        "missing-ports",
+        "duplicate-port-identity",
+        "destination-outside-context",
+        "boolean-sequence-index",
+        "self-loop-leg",
+        "incoherent-cycle",
+        "empty-nominal-fleet",
+        "overflowing-window",
     ],
 )
 def test_malformed_or_ineligible_state_fails_closed_without_mutation(

@@ -273,3 +273,38 @@ decision.
 
 These paths are ignored and contain no organizer source or input material.
 No archive was submitted, uploaded, or retained inside the repository.
+
+## Post-acceptance verification
+
+The complete final gate was rerun against the retained v3 policy:
+
+- `uv lock --check`: 29 packages resolved;
+- `uv sync --locked --all-groups`: 29 packages resolved, 25 checked;
+- Ruff format: 21 files already formatted;
+- Ruff lint, Ty, and mypy: all passed;
+- non-integration suite: 227 passed, 8 deselected, with `90.84%` true branch
+  coverage;
+- real-context integration suite: 8 passed, 227 deselected;
+- Round 1 synchronization: exactly the participant README and strategy copied;
+- participant/runtime README and strategy: byte-identical;
+- one-day smoke: `SMOKE_OK` and `smoke: OK`;
+- participant/runtime strategy SHA-256 remained `f04bda9d...` after smoke;
+- active and preserved candidate ATT SHA-256 remained `58389938...` after
+  synchronization and smoke;
+- active output freshly rescored to `19.084638612143134` over 72 periods;
+- two final validation packages were byte-identical SHA-256
+  `5f63fce47a5dc3e5b84cc66660b7772826bdc9b169466796f9d0e327b6068d19`,
+  5,907 bytes, and contained only the participant README and strategy;
+- the newly generated validation archive was moved to the private temporary
+  directory `/tmp/wsc-v3-final-package.BM6KhX` and was not submitted or
+  uploaded;
+- aggregate JSON values and hashes were checked against the preserved ATT and
+  log bytes;
+- restricted-material scans returned no matches in tracked or reachable Git
+  objects;
+- the repository has one worktree, one local branch (`main`), and no live WSC
+  or organizer simulation process.
+
+The public README, Round 1 readiness record, and HTML overview name v3 and
+`19.084638612143134` as the current best. No restoration, second candidate,
+parameter tuning, push, pull request, upload, or submission occurred.

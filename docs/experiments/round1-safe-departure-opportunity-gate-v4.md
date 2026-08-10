@@ -2,10 +2,11 @@
 
 ## Status
 
-**PRE-RUN.** The approved candidate is implemented through strict RED -> GREEN
-TDD. No full simulation has started. Exactly one full candidate run may begin
-only after every mandatory preflight gate below passes and the immutable launch
-identity is committed and recorded in the ignored manifest.
+**PRE-RUN GATES PASSED — ONE FULL RUN AUTHORIZED.** The approved candidate is
+implemented through strict RED -> GREEN TDD, and every mandatory preflight
+gate below is green. No full simulation has started. Exactly one candidate run
+may begin after the commit containing this record is pinned in the ignored
+manifest and its launch identity is rechecked immediately before execution.
 
 ## Question being tested
 
@@ -227,4 +228,47 @@ push, upload, or submission is allowed.
 
 ## Preflight verification record
 
-Pending. No full simulation has started.
+Completed on 2026-08-10 before any full simulation:
+
+- `uv lock --check`: 29 packages resolved;
+- `uv sync --locked --all-groups`: 29 resolved and 25 checked;
+- Ruff format: 21 files already formatted;
+- Ruff lint: all checks passed;
+- Ty: all checks passed;
+- mypy: no issues in 8 source files;
+- non-integration suite: 230 passed and 8 deselected;
+- true branch coverage: `90.89%`, above the fixed `90%` floor;
+- real-context integration suite: 8 passed and 230 deselected;
+- Round 1 synchronization copied exactly the participant README and strategy;
+- participant/runtime README and strategy were byte-identical after sync;
+- one-day Round 1 smoke: `SMOKE_OK` and `smoke: OK`;
+- participant/runtime strategy remained byte-identical after smoke at SHA-256
+  `cb9106fe5484f56cd41f2f5b25b7957d9c5172f56ed405c09b888b22dfa5f2ec`;
+- smoke left the stale accepted Output unchanged at 1,262 bytes, mtime epoch
+  `1786355147`, and SHA-256
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- two Round 1 validation packages were byte-identical SHA-256
+  `7f6f10e5b679a3cac538662608871dfba51a37b6a4de24cde46705d57736d3b4`,
+  6,110 bytes, and contained only:
+  `Round1_NoeFlandre/response_strategies/README.md` and
+  `Round1_NoeFlandre/response_strategies/user_strategy.py`;
+- both candidate validation archives were moved outside the repository to
+  `/tmp/wsc-v4-package.9o2s8e/` and were not uploaded or submitted;
+- the accepted v3 snapshot freshly rescored to exactly
+  `19.084638612143134` over 72 periods;
+- accepted v3 snapshot and stale active Output remained byte-identical at
+  SHA-256 `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- `git diff --check` passed and the tracked tree was clean before this report
+  update;
+- exactly one worktree and one local branch (`main`) exist;
+- no live WSC or Round 1 organizer simulation process was found;
+- tracked-file and reachable-history scans found no restricted organizer ZIP,
+  restricted blob, `Input/`, `Output/`, organizer `main.py`, or
+  `default_strategy.py`.
+
+The commit containing this completed gate record is the immutable launch HEAD.
+The ignored manifest must record its full SHA, candidate/runtime hashes,
+package identity, control evidence, stale Output metadata, run configuration,
+acceptance expression, and no-live-process proof before execution. Any mismatch
+at the immediate pre-launch recheck cancels authorization without starting the
+simulator.

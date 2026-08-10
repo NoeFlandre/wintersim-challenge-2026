@@ -306,7 +306,19 @@ worktree, exactly one branch (`main`), no restricted tracked/reachable object,
 and no tracked ZIP, `Input/`, `Output/`, organizer `main.py`, or
 `default_strategy.py`.
 
-- [ ] **Step 5: Prove no simulator is live and write the manifest**
+- [ ] **Step 5: Commit the tracked pre-run gate record**
+
+Append exact preflight evidence to the tracked experiment report and commit:
+
+```bash
+git add docs/experiments/round1-multi-transfer-recovery-hold-v3.md
+git commit -m "docs: approve multi-transfer hold full run"
+```
+
+Require a clean status. This commit establishes the immutable candidate launch
+HEAD that the ignored manifest must pin.
+
+- [ ] **Step 6: Prove no simulator is live and write the manifest**
 
 Inspect the process list for `wsc2026 run` and the Round 1 organizer `main.py`.
 Ignore only the process-inspection command itself. Abort before launch if any
@@ -317,16 +329,6 @@ candidate HEAD, strategy/runtime SHA-256, `cmp` result, package SHA/members,
 control score/hash/mean/periods/snapshot, active Output hash/size/mtime,
 configuration, exact acceptance expression, gate results, and no-live-process
 proof. Refuse to overwrite an existing manifest.
-
-- [ ] **Step 6: Commit the pre-run gate record**
-
-Append exact preflight evidence to the tracked experiment report and commit:
-
-```bash
-git add docs/experiments/round1-multi-transfer-recovery-hold-v3.md
-git commit -m "docs: approve multi-transfer hold full run"
-```
-
 Require a clean status before launch.
 
 ### Task 5: Execute exactly one full candidate run

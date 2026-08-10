@@ -2,8 +2,9 @@
 
 ## Status
 
-**PRE-RUN.** The participant policy and its RED-GREEN contract are committed,
-but no full candidate simulation has run and no performance result is claimed.
+**PRE-RUN APPROVED.** The participant policy, RED-GREEN contract, and complete
+preflight are committed. No full candidate simulation has run and no
+performance result is claimed.
 
 ## Hypothesis
 
@@ -141,6 +142,54 @@ hashes, package hash and member list, accepted v2 evidence, stale Output hash
 and mtime, fixed configuration, acceptance expression, and gate results. No
 full run is permitted until this tracked report records the exact successful
 preflight.
+
+## Pre-run verification record
+
+The full preflight completed on 2026-08-10 before any candidate launch. The
+reviewed code/test/report-parent HEAD was
+`63138bb459486b32655c2c91ee86936d69e4bdea`. The final launch HEAD is the
+documentation commit containing this record and is pinned separately in the
+ignored non-overwriting manifest.
+
+- participant strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- synchronized Round 1 strategy SHA-256: the same `f04bda9d...` value;
+- participant/runtime strategy comparison: byte-identical before and after
+  smoke;
+- `uv lock --check`: 29 packages resolved;
+- `uv sync --locked --all-groups`: 29 packages resolved and 25 checked;
+- Ruff format: 21 files already formatted;
+- Ruff lint: all checks passed;
+- Ty over `src/wsc2026_tools` and `submission`: all checks passed;
+- mypy over the same participant/dev surfaces: 8 files, no issues;
+- non-integration suite: 227 passed, 8 deselected;
+- true branch coverage: `90.84%`, above the fixed `90.00%` gate;
+- real integration suite: 8 passed, 227 deselected;
+- Round 1 sync: exactly `README.md` and `user_strategy.py` synchronized;
+- one-day Round 1 smoke: `SMOKE_OK` and `smoke: OK`;
+- two validation-only Round 1 packages: byte-identical SHA-256
+  `5f63fce47a5dc3e5b84cc66660b7772826bdc9b169466796f9d0e327b6068d19`,
+  5,907 bytes each;
+- package members only:
+  `Round1_NoeFlandre/response_strategies/README.md` and
+  `Round1_NoeFlandre/response_strategies/user_strategy.py`;
+- generated validation archive moved outside the repository to the private
+  temporary package-evidence directory; it was not submitted or uploaded;
+- accepted v2 control freshly rescored to exactly `19.828803374740612` over 72
+  periods;
+- accepted v2 snapshot and active stale Output were byte-identical SHA-256
+  `d381b087f8d67124a8078b5afc795f5b59b08db90148614b43dcfdf351e7ac48`;
+- exact decimal control mean ATT:
+  `20.41597222222222222222222222` days;
+- stale active Output: 1,262 bytes, mtime epoch `1786269649`;
+- `git diff --check`, one-worktree/one-branch checks, and tracked/reachable
+  restricted-material scans: clean;
+- process inspection found no live WSC run or organizer Round 1 `main.py`
+  process (only the inspection command itself matched).
+
+The preflight did not run a full simulation, score candidate output, tune any
+parameter, build a second candidate, push, merge, open a pull request, upload,
+or submit anything.
 
 ## One-run and decision procedure
 

@@ -229,9 +229,7 @@ def test_disruption_end_is_exclusive() -> None:
 
 
 def test_exact_hold_detour_equality_delegates() -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(40.0, 40.0, 80.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
 
     assert _decision(context, now, shipment) is None
 
@@ -296,9 +294,7 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
     )
     safe_a = _route("safe-a", [origin, transfer_a, origin], [1000.0, 1000.0])
     safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [1000.0, 1000.0])
-    safe_c = _route(
-        "safe-c", [transfer_b, destination, transfer_b], [1000.0, 1000.0]
-    )
+    safe_c = _route("safe-c", [transfer_b, destination, transfer_b], [1000.0, 1000.0])
     context = SimpleNamespace(
         ports=[origin, closed, transfer_a, transfer_b, destination],
         service_routes=[nominal, safe_a, safe_b, safe_c],
@@ -364,15 +360,9 @@ def _tie_fixture(port_order: list[str]) -> tuple[SimpleNamespace, dt.datetime, A
     fast_a = _route("fast-a", [ports["O"], ports["X1"], ports["O"]], [40.0, 40.0])
     fast_b = _route("fast-b", [ports["X1"], ports["X2"], ports["X1"]], [40.0, 40.0])
     fast_c = _route("fast-c", [ports["X2"], ports["D"], ports["X2"]], [80.0, 80.0])
-    slow_a = _route(
-        "slow-a", [ports["O"], ports["Y1"], ports["O"]], [40.0, 40.0], speed=1.0
-    )
-    slow_b = _route(
-        "slow-b", [ports["Y1"], ports["Y2"], ports["Y1"]], [40.0, 40.0], speed=1.0
-    )
-    slow_c = _route(
-        "slow-c", [ports["Y2"], ports["D"], ports["Y2"]], [80.0, 80.0], speed=1.0
-    )
+    slow_a = _route("slow-a", [ports["O"], ports["Y1"], ports["O"]], [40.0, 40.0], speed=1.0)
+    slow_b = _route("slow-b", [ports["Y1"], ports["Y2"], ports["Y1"]], [40.0, 40.0], speed=1.0)
+    slow_c = _route("slow-c", [ports["Y2"], ports["D"], ports["Y2"]], [80.0, 80.0], speed=1.0)
     context = SimpleNamespace(
         ports=[ports[name] for name in port_order],
         service_routes=[nominal, fast_a, fast_b, fast_c, slow_a, slow_b, slow_c],

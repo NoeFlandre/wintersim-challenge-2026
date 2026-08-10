@@ -1,4 +1,4 @@
-"""Contract for the Round 1 safe-departure opportunity gate v4 policy."""
+"""Contract for the Round 1 multi-transfer recovery-hold policy."""
 
 from __future__ import annotations
 
@@ -190,27 +190,6 @@ def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None
     result = _decision(context, now, shipment)
 
     assert result is False
-    assert _freeze((context, shipment)) == before
-
-
-def test_recovery_wait_equal_to_safe_first_headway_can_hold_without_mutation() -> None:
-    context, now, shipment, _ = _qualifying_fixture(safe_distances=(60.0, 1000.0, 1000.0))
-    before = _freeze((context, shipment))
-
-    result = _decision(context, now, shipment)
-
-    assert result is False
-    assert _freeze((context, shipment)) == before
-
-
-def test_recovery_wait_beyond_safe_first_headway_delegates_without_mutation() -> None:
-    context, _, shipment, _ = _qualifying_fixture(safe_distances=(60.0, 1000.0, 1000.0))
-    now = ANCHOR + dt.timedelta(days=14.0)
-    before = _freeze((context, shipment))
-
-    result = _decision(context, now, shipment)
-
-    assert result is None
     assert _freeze((context, shipment)) == before
 
 
@@ -427,11 +406,6 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
             "sailing_speed",
             0.0,
         ),
-        lambda context, shipment, items: setattr(
-            items["safe_a"].deployed_vessels[0].vessel_class,
-            "sailing_speed",
-            0.0,
-        ),
         lambda context, shipment, items: setattr(items["safe_a"], "segments", []),
         lambda context, shipment, items: setattr(shipment, "demand", None),
         lambda context, shipment, items: setattr(context, "disruption_plans", None),
@@ -466,7 +440,6 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
         "duplicate-sequence-index",
         "nonfinite-distance",
         "zero-speed",
-        "zero-first-safe-speed",
         "empty-route",
         "missing-demand",
         "missing-plans",

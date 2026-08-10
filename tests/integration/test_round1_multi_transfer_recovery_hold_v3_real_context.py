@@ -1,4 +1,4 @@
-"""Real Round 1 contract for the safe-departure opportunity gate v4 policy."""
+"""Real Round 1 context contract for the multi-transfer recovery-hold policy."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _prepare_imports(source: Path) -> None:
 def _load_participant_module() -> Any:
     participant_file = submission_strategies_dir() / "user_strategy.py"
     spec = importlib.util.spec_from_file_location(
-        "wsc_round1_safe_departure_opportunity_gate_v4_participant", participant_file
+        "wsc_round1_multi_transfer_recovery_hold_v3_participant", participant_file
     )
     if spec is None or spec.loader is None:
         pytest.fail(f"cannot load participant strategy from {participant_file}")
@@ -157,7 +157,7 @@ def _snapshot(context: Any, shipment: Any) -> tuple[Any, ...]:
 
 
 def _candidate_times(context: Any) -> tuple[dt.datetime, ...]:
-    times: set[dt.datetime] = set()
+    times: list[dt.datetime] = []
     for plan in context.disruption_plans:
         start_days = getattr(plan, "start_offset_days", None)
         duration_days = getattr(plan, "duration_days", None)
@@ -170,10 +170,10 @@ def _candidate_times(context: Any) -> tuple[dt.datetime, ...]:
             and math.isfinite(duration_days)
             and duration_days > 0
         ):
-            for offset in range(math.ceil(duration_days)):
-                midpoint = start_days + offset + 0.5
-                if midpoint < start_days + duration_days:
-                    times.add(dt.datetime.min + dt.timedelta(days=midpoint))
+            for fraction in (0.25, 0.5, 0.75):
+                times.append(
+                    dt.datetime.min + dt.timedelta(days=start_days + duration_days * fraction)
+                )
     return tuple(sorted(set(times)))
 
 
@@ -189,54 +189,6 @@ def _outside_time(context: Any) -> dt.datetime:
     earliest = min(starts)
     assert earliest > dt.datetime.min
     return earliest - dt.timedelta(microseconds=1)
-
-
-def _v3_eligible_metrics(
-    participant: Any,
-    context: Any,
-    now: dt.datetime,
-    demand: Any,
-) -> tuple[float, float] | None:
-    state = participant._active_state(context, now)
-    if state is None:
-        return None
-    graphs = participant._graphs(context, state)
-    if graphs is None:
-        return None
-    nominal = participant._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[0]
-    )
-    safe = participant._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[1]
-    )
-    if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
-        return None
-    route_changes = sum(
-        left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
-    )
-    if route_changes < 2:
-        return None
-    recovery = participant._edge_constraint_recovery(nominal[0], state)
-    nominal_hours = participant._path_service_hours(nominal)
-    detour_hours = participant._path_service_hours(safe)
-    safe_first_profile = participant._route_profile(safe[0].route)
-    if (
-        recovery is None
-        or nominal_hours is None
-        or detour_hours is None
-        or safe_first_profile is None
-    ):
-        return None
-    wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
-    hold_hours = wait_hours + nominal_hours
-    if not all(
-        math.isfinite(value) and value > 0.0
-        for value in (hold_hours, detour_hours, safe_first_profile.headway_hours)
-    ):
-        return None
-    if hold_hours >= detour_hours:
-        return None
-    return wait_hours, safe_first_profile.headway_hours
 
 
 def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
@@ -257,15 +209,11 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     times = _candidate_times(template)
     assert times, "real Round 1 context must expose at least one valid disruption window"
 
-    found_retained_hold = False
-    found_long_wait_delegation = False
+    qualifying: tuple[Any, Any, Any] | None = None
     for now in times:
         context = scenario_builders.create_with_disruption()
         DefaultStrategy.create_alternative_service_routes(context, now)
         for index, demand in enumerate(context.demands):
-            metrics = _v3_eligible_metrics(participant, context, now, demand)
-            if metrics is None:
-                continue
             shipment = Shipment(
                 index=index,
                 teu_size=1,
@@ -277,20 +225,33 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
             decision = participant.UserStrategy.assign_associated_bookings(context, now, shipment)
             after = _snapshot(context, shipment)
             assert after == before, "participant decision mutated real Round 1 state"
-            wait_hours, safe_first_headway = metrics
-            if wait_hours <= safe_first_headway:
-                assert decision is False
-                found_retained_hold = True
-            else:
-                assert decision is None
-                found_long_wait_delegation = True
-            if found_retained_hold and found_long_wait_delegation:
+            if decision is False:
+                state = participant._active_state(context, now)
+                assert state is not None
+                graphs = participant._graphs(context, state)
+                assert graphs is not None
+                safe_path = participant._shortest_path(
+                    context,
+                    demand.origin_port,
+                    demand.destination_port,
+                    graphs[1],
+                )
+                assert safe_path is not None
+                route_changes = sum(
+                    left.route is not right.route
+                    for left, right in zip(safe_path, safe_path[1:], strict=False)
+                )
+                assert route_changes >= 2
+                qualifying = (context, now, shipment)
                 break
-        if found_retained_hold and found_long_wait_delegation:
+            assert decision is None
+        if qualifying is not None:
             break
 
-    assert found_retained_hold, "v4 has no retained short-wait hold in the real context"
-    assert found_long_wait_delegation, "v4 has no long-wait delegation in the real context"
+    assert qualifying is not None, (
+        "approved policy is dormant in the real Round 1 context at every "
+        "derived active-window sample"
+    )
 
     context = scenario_builders.create_with_disruption()
     earliest = _outside_time(context)

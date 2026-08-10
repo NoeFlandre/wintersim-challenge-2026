@@ -2,11 +2,11 @@
 
 ## Status
 
-**REJECTED — RESULT PRESERVED; V3 RESTORATION PENDING.** Exactly one authorized
-candidate run completed successfully, but its cumulative resilience loss was
+**REJECTED — COMPLETE; V3 RESTORED.** Exactly one authorized candidate run
+completed successfully, but its cumulative resilience loss was
 `25.943159029801052`, which is worse than the immutable v3 control
-`19.084638612143134`. The fresh evidence and rejection are recorded before the
-predeclared Git restoration procedure begins.
+`19.084638612143134`. The fresh evidence was preserved and audited, and the
+accepted v3 strategy and output are again active.
 
 ## Question being tested
 
@@ -344,7 +344,47 @@ be removed by this headway rule.
 All evidence paths are ignored and untracked. No second candidate, tuning,
 push, upload, email, archive submission, or history rewrite occurred.
 
-The next required action is the predeclared rejection restoration: commit this
-result record, revert implementation commit `1169632`, then RED-test commit
-`cc33661`, synchronize restored v3, restore its pinned ATT bytes, re-score the
-exact v3 control, and rerun final verification.
+## Restoration and final verification
+
+The rejection record was committed before restoration. Commit `54dfee5`
+reverted implementation commit `1169632`, then commit `e5373f4` reverted RED
+contract commit `cc33661`, exactly in the predeclared reverse order. The Round
+1 participant files were synchronized afterward, and the accepted v3 ATT
+snapshot was copied byte-for-byte back to the active organizer Output.
+
+The restored state was independently re-audited:
+
+- participant and runtime strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- active and pinned v3 ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- freshly re-scored active loss: `19.084638612143134` over 72 periods;
+- candidate ATT and log SHA-256 values, score, delta, relative change, period
+  comparison, candidate strategy blob, manifest, and ignored aggregate all
+  agree;
+- no restoration simulation, second candidate, tuning, or replay ran.
+
+All final gates passed after restoration:
+
+- locked `uv` checks completed with 29 resolved packages and 25 checked;
+- Ruff format/lint, Ty, and mypy passed;
+- non-integration suite: 227 passed and 8 deselected, with `90.84%` true branch
+  coverage;
+- integration suite: 8 passed and 227 deselected;
+- participant/runtime synchronization and byte comparison passed;
+- one-day smoke emitted `SMOKE_OK` and did not change the restored strategy or
+  ATT hashes;
+- the active Output freshly re-scored to the exact accepted v3 result after
+  smoke;
+- two final packages were byte-identical SHA-256
+  `5f63fce47a5dc3e5b84cc66660b7772826bdc9b169466796f9d0e327b6068d19`,
+  5,907 bytes, and contained only
+  `Round1_NoeFlandre/response_strategies/README.md` and
+  `Round1_NoeFlandre/response_strategies/user_strategy.py`;
+- the validation copies remain outside the repository under
+  `/tmp/wsc-v4-final-package.DQ1rEA/` and were not uploaded or submitted;
+- Git diff, one-worktree/one-branch, no-live-simulator, and restricted-material
+  checks passed.
+
+The repository therefore retains v3 as the current best. Version 4 is a
+complete, reproducible rejected experiment, not an active strategy.

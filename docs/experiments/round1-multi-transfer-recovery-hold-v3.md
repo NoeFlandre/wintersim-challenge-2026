@@ -2,9 +2,10 @@
 
 ## Status
 
-**PRE-RUN APPROVED.** The participant policy, RED-GREEN contract, and complete
-preflight are committed. No full candidate simulation has run and no
-performance result is claimed.
+**ACCEPTED.** One authorized full candidate run completed and produced a
+cumulative resilience loss of `19.084638612143134`. This is strictly below
+the predeclared acceptance boundary and improves the previous best result by
+`3.7529484181856874%`. Version 3 remains the active participant strategy.
 
 ## Hypothesis
 
@@ -211,3 +212,64 @@ remain.
 
 No second candidate, tuning, submission, upload, push, merge, pull request, or
 history rewrite is part of this experiment.
+
+## Full-run result
+
+Exactly one candidate simulation ran with the precommitted policy, launch HEAD,
+configuration, and acceptance expression. No tracked or runtime file changed
+between launch and decision.
+
+- launch HEAD: `796e983ef9a1d038ae737efd0a8cef9888dcddee`;
+- start: `2026-08-10T08:45:01Z`;
+- finish: `2026-08-10T09:45:47Z`;
+- simulator runtime: `01:00:45`;
+- process exit: `0`;
+- terminal evidence: Day 360, Period 72 (Days 356-360), and
+  `Simulation completed.`;
+- candidate ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- candidate ATT size and mtime: 1,262 bytes and epoch `1786355147`, both fresh
+  relative to the pinned stale output;
+- full-run log SHA-256:
+  `008b3eee1cd763cdf2ed2e634a46d73255c759581ac8c30d4d46beb4a013708e`;
+- numbered periods: 72, with two expected organizer summary rows;
+- exact numbered-period mean ATT: `20.3675` days.
+
+The fresh ATT was copied byte-for-byte into the ignored evidence directory
+before scoring or any other runtime operation. The source and snapshot hashes
+matched.
+
+## Score and decision
+
+- candidate cumulative resilience loss: `19.084638612143134`;
+- previous accepted v2 loss: `19.828803374740612`;
+- candidate minus v2: `-0.744164762597478`;
+- relative improvement over v2: `3.7529484181856874%`;
+- original Round 1 fallback loss: `20.436668751255972`;
+- candidate minus fallback: `-1.352030139112838`;
+- relative improvement over fallback: `6.615707068353528%`;
+- ATT periods versus accepted v2: 24 better, 23 equal, 25 worse.
+
+The sole decision expression was evaluated without change:
+
+```text
+19.084638612143134 < 19.828803374740612 - 1e-9
+```
+
+It is true, so the experiment is **ACCEPTED**. Mean ATT and per-period counts
+are descriptive; the official cumulative-loss score alone determined the
+decision.
+
+## Preserved private evidence
+
+- ATT snapshot:
+  `.challenge/round1/results/multi_transfer_recovery_hold_v3_20260810/ATT_By_Statistics_Interval.csv`;
+- raw run log:
+  `.challenge/round1/results/multi_transfer_recovery_hold_v3_20260810/full_run.log`;
+- pre-run manifest:
+  `.challenge/round1/results/multi_transfer_recovery_hold_v3_20260810/pre_run_manifest.json`;
+- aggregate result:
+  `experiments/results/round1_multi_transfer_recovery_hold_v3_20260810.json`.
+
+These paths are ignored and contain no organizer source or input material.
+No archive was submitted, uploaded, or retained inside the repository.

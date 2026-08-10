@@ -3,7 +3,8 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+changes between service routes, provided recovery is no more than one live
+headway of the detour's first safe service.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -438,11 +439,16 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     recovery = _edge_constraint_recovery(nominal_path[0], state)
     if recovery is None:
         return False
+    safe_first_profile = _route_profile(safe_path[0].route)
+    if safe_first_profile is None:
+        return False
     nominal_hours = _path_service_hours(nominal_path)
     detour_hours = _path_service_hours(safe_path)
     if nominal_hours is None or detour_hours is None:
         return False
     wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
+    if wait_hours > safe_first_profile.headway_hours:
+        return False
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
         return False
@@ -471,7 +477,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Hold a direct shipment for near recovery instead of a fragmented detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

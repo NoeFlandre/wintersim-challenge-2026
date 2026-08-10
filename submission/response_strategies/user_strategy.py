@@ -2,7 +2,8 @@
 
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than the currently safe multi-route transfer.
+is estimated to recover sooner than a safe detour requiring at least two
+changes between service routes.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -428,9 +429,10 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
         return False
     if len(nominal_path) != 1 or len(safe_path) < 2:
         return False
-    if not any(
+    route_change_count = sum(
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
-    ):
+    )
+    if route_change_count < 2:
         return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)
@@ -469,7 +471,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a narrowly dominated direct-service shipment at origin."""
+        """Hold a direct-service shipment instead of a two-transfer detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

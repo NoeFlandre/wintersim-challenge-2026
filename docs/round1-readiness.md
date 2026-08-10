@@ -1,8 +1,8 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; ten controlled Round 1 experiments
-have valid scores and one earlier attempt was incomplete. The recovery-aware
-direct-service hold policy is accepted and remains active.
+**Status:** bootstrapped and smoke-tested; eleven controlled Round 1
+experiments have valid scores and one earlier attempt was incomplete. The
+multi-transfer recovery-hold v3 policy is accepted and remains active.
 
 ## Private organizer archive
 
@@ -37,21 +37,28 @@ tracked, copied into the public repository, or included in a submission.
   `response_strategies/README.md` and `response_strategies/user_strategy.py`.
 - The active strategy delegates three hooks. Its initial-booking hook may return
   `False` to hold new cargo only when a disrupted one-booking direct service is
-  estimated to recover and deliver sooner than a safe multi-service transfer.
+  estimated to recover and deliver sooner than a safe detour requiring at least
+  three service boardings. Simpler safe detours delegate to the organizer.
 - The accepted candidate ATT SHA-256 is
-  `d381b087f8d67124a8078b5afc795f5b59b08db90148614b43dcfdf351e7ac48` and its
-  cumulative loss is `19.828803374740612` over 72 periods. This is
-  `2.9743858155845607%` lower than the pinned fallback.
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a` and its
+  cumulative loss is `19.084638612143134` over 72 periods. This is
+  `6.615707068353528%` lower than the pinned fallback and
+  `3.7529484181856874%` lower than the preceding accepted v2 result.
 - The pinned fallback ATT SHA-256 is
   `c2eead01e219b377babecc542b082d9de23563837d7b00ee081f14a580560c43` and its
   rescored cumulative loss is `20.436668751255972` over 72 periods.
 - The latest controlled experiment, documented in
-  [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
+  [`docs/experiments/round1-multi-transfer-recovery-hold-v3.md`](experiments/round1-multi-transfer-recovery-hold-v3.md),
   executed exactly once and completed all 72 periods. It scored
-  `19.828803374740612`; 28 period ATT values improved, 19 were equal, and 25
-  worsened relative to fallback. The strict aggregate gate accepted it, so the
-  candidate source/tests remain and no restoration was performed. Raw ATT,
-  scorer JSON, and the full log remain in ignored private evidence.
+  `19.084638612143134`; 24 period ATT values improved, 23 were equal, and 25
+  worsened relative to accepted v2. The strict aggregate gate accepted it, so
+  the candidate source/tests remain and no restoration was performed. Raw ATT,
+  aggregate JSON, and the full log remain in ignored private evidence.
+- The preceding accepted experiment, documented in
+  [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
+  scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.
+  Version 3 retains that policy only for fragmented safe detours and improves
+  its aggregate result by `3.7529484181856874%`.
 - An earlier controlled experiment, documented in
   [`docs/experiments/round1-teu-delay-smith-priority-v2.md`](experiments/round1-teu-delay-smith-priority-v2.md),
   executed exactly once. Its TEU-delay Smith-priority berth policy produced a

@@ -56,21 +56,23 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`. Ten controlled experiments have valid scores and
-  one earlier attempt was incomplete. The first nine scored candidates were
-  rejected; the recovery-aware direct-service hold policy is accepted at
-  `19.828803374740612`, improving on the `20.436668751255972` fallback by
-  `2.9743858155845607%`. See
+  `.challenge/round1/source/`. Eleven controlled experiments have valid scores
+  and one earlier attempt was incomplete. The first nine scored candidates were
+  rejected; recovery-aware direct-service hold v2 beat the fallback, and the
+  multi-transfer refinement v3 improved the active best to
+  `19.084638612143134`. This is `6.615707068353528%` below the
+  `20.436668751255972` fallback. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 recovery-hold report`](docs/experiments/round1-recovery-aware-direct-service-hold-v2.md).
+  [`Round 1 multi-transfer hold report`](docs/experiments/round1-multi-transfer-recovery-hold-v3.md).
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
 The current `UserStrategy` keeps three decisions delegated to the organizer.
 For new cargo only, it may wait for a disrupted one-booking direct service when
-that service is estimated to recover and deliver sooner than the safe path that
-requires transfers. The first controlled Round 0 experiment was
+that service is estimated to recover and deliver sooner than a fragmented safe
+detour requiring at least three service boardings. Simpler safe detours remain
+delegated to the organizer. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
 Round 1's preceding no-safe congestion-tail booking experiment produced a
@@ -82,10 +84,11 @@ candidate evidence remains preserved in the ignored results directory.
   fallback loss `20.436668751255972` and byte-identical ATT, so it was rejected
   by strict equality; its candidate ATT, log, and scorer JSON remain in the
   ignored results directory.
-- The accepted Round 1 recovery-aware direct-service hold experiment produced
-  `19.828803374740612` over all 72 periods. Its ATT SHA-256 is
-  `d381b087f8d67124a8078b5afc795f5b59b08db90148614b43dcfdf351e7ac48`;
-  the tested candidate remains active.
+- The accepted Round 1 multi-transfer recovery-hold experiment produced
+  `19.084638612143134` over all 72 periods, improving the preceding accepted
+  v2 result by `3.7529484181856874%`. Its ATT SHA-256 is
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+  the tested v3 candidate remains active.
 
 ## Prerequisites
 

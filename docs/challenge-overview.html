@@ -387,7 +387,7 @@
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context &amp; experiment log · 9 August 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 10 August 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -396,14 +396,14 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; ten scored and one incomplete
+        Round 1 has its own private source tree; eleven scored and one incomplete
         controlled Round 1 strategy experiments are recorded below. The tenth
-        scored candidate is the first to beat its fallback.
+        scored candidate first beat fallback; the eleventh improved that result.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
         <div class="metric">
-          <strong>19.8288</strong>
+          <strong>19.0846</strong>
           <span>accepted Round 1 loss</span>
         </div>
         <div class="metric">
@@ -411,8 +411,8 @@
           <span>Round 1 fallback loss</span>
         </div>
         <div class="metric">
-          <strong>1</strong>
-          <span>candidates accepted</span>
+          <strong>2</strong>
+          <span>controlled candidates accepted</span>
         </div>
         <div class="metric">
           <strong>72</strong>
@@ -598,8 +598,8 @@
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
         fallback is <strong>20.4366687513</strong>. Nine Round 1 candidates were
         scored and rejected, one run was interrupted before measured output,
-        and the tenth scored candidate was accepted at
-        <strong>19.8288033747</strong>.
+        the tenth scored candidate was accepted at <strong>19.8288033747</strong>,
+        and the eleventh improved it to <strong>19.0846386121</strong>.
       </div>
     </section>
 
@@ -612,8 +612,8 @@
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
         Lower is better; equality is not an improvement. Nine scored Round 1
-        trials were rejected and one was incomplete. The latest trial lowered
-        loss by 2.97%, so its strategy remains active.
+        trials were rejected and one was incomplete. Two were accepted in
+        sequence; the latest is 6.62% below fallback and remains active.
       </p>
 
       <div class="table-wrap">
@@ -746,6 +746,11 @@
               <td>For new cargo, we first found its normal shortest path and the path that was safe during the active disruption. We acted only when the normal path was one direct booking and the safe path changed between services. Using live vessel speeds and route headways, we compared waiting for the direct service to recover with leaving immediately on the transfer path. When waiting was strictly faster, we left the shipment at origin for the organizer's next retry; we never edited its bookings. This narrow rule lowered the complete 72-period loss.</td>
               <td><strong>19.8288</strong><br><span class="status better">2.97% better than the 20.4367 Round 1 fallback; accepted</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-multi-transfer-recovery-hold-v3.md">Wait only when the safe detour needs several transfers</a></td>
+              <td>We refined the accepted waiting rule instead of replacing it. The earlier version held cargo whenever a disrupted direct service was predicted to recover sooner than a safe transfer path. Version 3 delegates simple detours with one service change and holds only when the safe path is fragmented across at least three service boardings. It still reads the live network without mutating routes or bookings, and all malformed or uncertain cases fall back to the organizer. This narrower rule improved the previous accepted score in its single complete run.</td>
+              <td><strong>19.0846</strong><br><span class="status better">6.62% better than fallback and 3.75% better than accepted v2; accepted and active</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -755,10 +760,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, ten scored Round 1
+    reports, nine completed Round 0 experiments, eleven scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-recovery-aware-direct-service-hold-v2.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-multi-transfer-recovery-hold-v3.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

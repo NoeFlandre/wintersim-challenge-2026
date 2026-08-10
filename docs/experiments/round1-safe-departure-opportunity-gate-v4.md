@@ -2,11 +2,11 @@
 
 ## Status
 
-**PRE-RUN GATES PASSED — ONE FULL RUN AUTHORIZED.** The approved candidate is
-implemented through strict RED -> GREEN TDD, and every mandatory preflight
-gate below is green. No full simulation has started. Exactly one candidate run
-may begin after the commit containing this record is pinned in the ignored
-manifest and its launch identity is rechecked immediately before execution.
+**REJECTED — RESULT PRESERVED; V3 RESTORATION PENDING.** Exactly one authorized
+candidate run completed successfully, but its cumulative resilience loss was
+`25.943159029801052`, which is worse than the immutable v3 control
+`19.084638612143134`. The fresh evidence and rejection are recorded before the
+predeclared Git restoration procedure begins.
 
 ## Question being tested
 
@@ -272,3 +272,79 @@ package identity, control evidence, stale Output metadata, run configuration,
 acceptance expression, and no-live-process proof before execution. Any mismatch
 at the immediate pre-launch recheck cancels authorization without starting the
 simulator.
+
+## Full-run result
+
+Exactly one candidate simulation ran from immutable launch HEAD
+`2c102c6a64e42adf845e6202a96cec2999f0e461` with participant/runtime strategy
+SHA-256
+`cb9106fe5484f56cd41f2f5b25b7957d9c5172f56ed405c09b888b22dfa5f2ec`.
+The immediate pre-launch recheck matched the manifest: tracked status was
+clean, participant/runtime bytes matched, the stale Output and v3 control
+snapshot both had SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`,
+and no other WSC simulator was live.
+
+- start UTC: `2026-08-10T10:37:59Z`;
+- finish UTC: `2026-08-10T11:05:54Z`;
+- simulator runtime: `00:27:18`;
+- process exit: `0`;
+- terminal evidence: warm-up completed, Day 360, Period 72 (Days 356–360),
+  Output Simulation Day 360, and `Simulation completed.`;
+- fresh candidate ATT SHA-256:
+  `27ef8f6ccbda22bed498d8f4cb161ead2a5e0d01659a932c7ea8fb7a0ade5e42`;
+- fresh candidate ATT size and source mtime: 1,262 bytes and epoch
+  `1786359931`, newer than the pinned stale epoch `1786355147`;
+- numbered periods: 72, plus two expected organizer summary rows;
+- exact numbered-period mean ATT: `20.79875` days;
+- full-run log SHA-256:
+  `1c544974ed7a40bf98517e021787b22c1595ca99e2984e81234fe7140fa89a9c`.
+
+Before scoring, synchronization, smoke, or restoration, the fresh source ATT
+was copied byte-for-byte to the ignored candidate evidence path. Source and
+snapshot hashes matched, all numbered values were finite, the CSV header was
+canonical, and no simulation process remained.
+
+## Score and decision
+
+The repository scorer was run only on the preserved candidate ATT against the
+authoritative Round 1 baseline ATT. It produced:
+
+- candidate cumulative resilience loss: `25.943159029801052`;
+- accepted v3 cumulative resilience loss: `19.084638612143134`;
+- candidate minus v3: `+6.8585204176579175`;
+- relative change: `+35.937386906000896%` (worse);
+- candidate periods versus v3: 8 better, 20 equal, 44 worse;
+- period count: 72.
+
+The immutable decision expression is false:
+
+```text
+25.943159029801052 < 19.084638612143134 - 1e-9
+```
+
+**Decision: REJECTED.** The result directly rejects this exact implementation
+under the fixed public Round 1 scenario and seed. It does not prove that every
+long wait is beneficial: the experiment did not instrument per-shipment causal
+flows, and 8 periods improved. It does show that removing the selected long
+holds caused large aggregate degradation, so v3's long-hold subset should not
+be removed by this headway rule.
+
+## Preserved private evidence
+
+- pre-run manifest:
+  `.challenge/round1/results/safe_departure_opportunity_gate_v4_20260810/pre_run_manifest.json`;
+- candidate ATT snapshot:
+  `.challenge/round1/results/safe_departure_opportunity_gate_v4_20260810/ATT_By_Statistics_Interval.csv`;
+- raw full-run log:
+  `.challenge/round1/results/safe_departure_opportunity_gate_v4_20260810/full_run.log`;
+- aggregate result:
+  `experiments/results/round1_safe_departure_opportunity_gate_v4_20260810.json`.
+
+All evidence paths are ignored and untracked. No second candidate, tuning,
+push, upload, email, archive submission, or history rewrite occurred.
+
+The next required action is the predeclared rejection restoration: commit this
+result record, revert implementation commit `1169632`, then RED-test commit
+`cc33661`, synchronize restored v3, restore its pinned ATT bytes, re-score the
+exact v3 control, and rerun final verification.

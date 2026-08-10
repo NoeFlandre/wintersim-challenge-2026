@@ -1,4 +1,4 @@
-"""Contract for the Round 1 recovery-aware direct-service hold policy."""
+"""Contract for the Round 1 multi-transfer recovery-hold policy."""
 
 from __future__ import annotations
 
@@ -102,18 +102,32 @@ def _shipment(origin: Any, destination: Any) -> SimpleNamespace:
 
 def _qualifying_fixture(
     *,
-    safe_distance: float = 1000.0,
+    safe_distances: tuple[float, float, float] = (1000.0, 1000.0, 1000.0),
 ) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace, dict[str, Any]]:
     origin = _port("Origin")
-    transfer = _port("Transfer")
+    transfer_a = _port("Transfer A")
+    transfer_b = _port("Transfer B")
     destination = _port("Destination")
     nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
-    safe_a = _route("safe-a", [origin, transfer, origin], [safe_distance, safe_distance])
-    safe_b = _route("safe-b", [transfer, destination, transfer], [safe_distance, safe_distance])
+    safe_a = _route(
+        "safe-a",
+        [origin, transfer_a, origin],
+        [safe_distances[0], safe_distances[0]],
+    )
+    safe_b = _route(
+        "safe-b",
+        [transfer_a, transfer_b, transfer_a],
+        [safe_distances[1], safe_distances[1]],
+    )
+    safe_c = _route(
+        "safe-c",
+        [transfer_b, destination, transfer_b],
+        [safe_distances[2], safe_distances[2]],
+    )
     plan = _leg_plan(_leg(nominal))
     context = SimpleNamespace(
-        ports=[origin, transfer, destination],
-        service_routes=[nominal, safe_a, safe_b],
+        ports=[origin, transfer_a, transfer_b, destination],
+        service_routes=[nominal, safe_a, safe_b, safe_c],
         disruption_plans=[plan],
     )
     shipment = _shipment(origin, destination)
@@ -124,11 +138,14 @@ def _qualifying_fixture(
         shipment,
         {
             "origin": origin,
-            "transfer": transfer,
+            "transfer": transfer_a,
+            "transfer_a": transfer_a,
+            "transfer_b": transfer_b,
             "destination": destination,
             "nominal": nominal,
             "safe_a": safe_a,
             "safe_b": safe_b,
+            "safe_c": safe_c,
             "plan": plan,
         },
     )
@@ -176,6 +193,27 @@ def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None
     assert _freeze((context, shipment)) == before
 
 
+def test_one_transfer_safe_path_delegates_without_mutation() -> None:
+    origin = _port("Origin")
+    transfer = _port("Transfer")
+    destination = _port("Destination")
+    nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
+    safe_a = _route("safe-a", [origin, transfer, origin], [1000.0, 1000.0])
+    safe_b = _route("safe-b", [transfer, destination, transfer], [1000.0, 1000.0])
+    context = SimpleNamespace(
+        ports=[origin, transfer, destination],
+        service_routes=[nominal, safe_a, safe_b],
+        disruption_plans=[_leg_plan(_leg(nominal))],
+    )
+    shipment = _shipment(origin, destination)
+    before = _freeze((context, shipment))
+
+    decision = _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment)
+
+    assert decision is None
+    assert _freeze((context, shipment)) == before
+
+
 def test_disruption_start_is_inclusive() -> None:
     context, _, shipment, _ = _qualifying_fixture()
     start = ANCHOR + dt.timedelta(days=10)
@@ -191,7 +229,9 @@ def test_disruption_end_is_exclusive() -> None:
 
 
 def test_exact_hold_detour_equality_delegates() -> None:
-    context, now, shipment, _ = _qualifying_fixture(safe_distance=80.0)
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(40.0, 40.0, 80.0)
+    )
 
     assert _decision(context, now, shipment) is None
 
@@ -246,18 +286,22 @@ def test_nominal_path_unaffected_by_active_disruption_delegates() -> None:
 def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
     origin = _port("Origin")
     closed = _port("Closed")
-    transfer = _port("Transfer")
+    transfer_a = _port("Transfer A")
+    transfer_b = _port("Transfer B")
     destination = _port("Destination")
     nominal = _route(
         "nominal",
         [origin, closed, destination, origin],
         [50.0, 50.0, 100.0],
     )
-    safe_a = _route("safe-a", [origin, transfer, origin], [1000.0, 1000.0])
-    safe_b = _route("safe-b", [transfer, destination, transfer], [1000.0, 1000.0])
+    safe_a = _route("safe-a", [origin, transfer_a, origin], [1000.0, 1000.0])
+    safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [1000.0, 1000.0])
+    safe_c = _route(
+        "safe-c", [transfer_b, destination, transfer_b], [1000.0, 1000.0]
+    )
     context = SimpleNamespace(
-        ports=[origin, closed, transfer, destination],
-        service_routes=[nominal, safe_a, safe_b],
+        ports=[origin, closed, transfer_a, transfer_b, destination],
+        service_routes=[nominal, safe_a, safe_b, safe_c],
         disruption_plans=[_berth_plan(closed)],
     )
 
@@ -274,7 +318,7 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
 def test_matching_deployed_alternative_routes_are_eligible() -> None:
     context, now, shipment, items = _qualifying_fixture()
     disruption_key = ((), (("origin", "destination"),))
-    for route in (items["safe_a"], items["safe_b"]):
+    for route in (items["safe_a"], items["safe_b"], items["safe_c"]):
         route.source_service_route = items["nominal"]
         route.disruption_key = disruption_key
 
@@ -285,7 +329,7 @@ def test_matching_deployed_alternative_routes_are_eligible() -> None:
 def test_unavailable_alternative_routes_delegate(failure: str) -> None:
     context, now, shipment, items = _qualifying_fixture()
     disruption_key = ((), (("origin", "destination"),))
-    for route in (items["safe_a"], items["safe_b"]):
+    for route in (items["safe_a"], items["safe_b"], items["safe_c"]):
         route.source_service_route = items["nominal"]
         route.disruption_key = disruption_key
     if failure == "wrong-key":
@@ -302,11 +346,12 @@ def test_single_service_indirect_safe_path_is_not_a_transfer() -> None:
         "safe-single",
         [
             items["origin"],
-            items["transfer"],
+            items["transfer_a"],
+            items["transfer_b"],
             items["destination"],
             items["origin"],
         ],
-        [1000.0, 1000.0, 1000.0],
+        [1000.0, 1000.0, 1000.0, 1000.0],
     )
     context.service_routes = [items["nominal"], safe_single_route]
 
@@ -314,23 +359,31 @@ def test_single_service_indirect_safe_path_is_not_a_transfer() -> None:
 
 
 def _tie_fixture(port_order: list[str]) -> tuple[SimpleNamespace, dt.datetime, Any]:
-    ports = {name: _port(name) for name in ["O", "X", "Y", "D"]}
+    ports = {name: _port(name) for name in ["O", "X1", "X2", "Y1", "Y2", "D"]}
     nominal = _route("nominal", [ports["O"], ports["D"], ports["O"]], [100.0, 100.0])
-    fast_a = _route("fast-a", [ports["O"], ports["X"], ports["O"]], [80.0, 80.0])
-    fast_b = _route("fast-b", [ports["X"], ports["D"], ports["X"]], [80.0, 80.0])
-    slow_a = _route("slow-a", [ports["O"], ports["Y"], ports["O"]], [80.0, 80.0], speed=1.0)
-    slow_b = _route("slow-b", [ports["Y"], ports["D"], ports["Y"]], [80.0, 80.0], speed=1.0)
+    fast_a = _route("fast-a", [ports["O"], ports["X1"], ports["O"]], [40.0, 40.0])
+    fast_b = _route("fast-b", [ports["X1"], ports["X2"], ports["X1"]], [40.0, 40.0])
+    fast_c = _route("fast-c", [ports["X2"], ports["D"], ports["X2"]], [80.0, 80.0])
+    slow_a = _route(
+        "slow-a", [ports["O"], ports["Y1"], ports["O"]], [40.0, 40.0], speed=1.0
+    )
+    slow_b = _route(
+        "slow-b", [ports["Y1"], ports["Y2"], ports["Y1"]], [40.0, 40.0], speed=1.0
+    )
+    slow_c = _route(
+        "slow-c", [ports["Y2"], ports["D"], ports["Y2"]], [80.0, 80.0], speed=1.0
+    )
     context = SimpleNamespace(
         ports=[ports[name] for name in port_order],
-        service_routes=[nominal, fast_a, fast_b, slow_a, slow_b],
+        service_routes=[nominal, fast_a, fast_b, fast_c, slow_a, slow_b, slow_c],
         disruption_plans=[_leg_plan(_leg(nominal))],
     )
     return context, ANCHOR + dt.timedelta(days=14.5), _shipment(ports["O"], ports["D"])
 
 
 def test_equal_distance_ties_follow_context_port_order() -> None:
-    fast_first = _tie_fixture(["O", "X", "Y", "D"])
-    slow_first = _tie_fixture(["O", "Y", "X", "D"])
+    fast_first = _tie_fixture(["O", "X1", "X2", "Y1", "Y2", "D"])
+    slow_first = _tie_fixture(["O", "Y1", "Y2", "X1", "X2", "D"])
 
     assert _decision(*fast_first) is None
     assert _decision(*slow_first) is False

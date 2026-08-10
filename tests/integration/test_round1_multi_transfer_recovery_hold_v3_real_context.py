@@ -1,4 +1,4 @@
-"""Real Round 1 context contract for the recovery-aware hold policy."""
+"""Real Round 1 context contract for the multi-transfer recovery-hold policy."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _prepare_imports(source: Path) -> None:
 def _load_participant_module() -> Any:
     participant_file = submission_strategies_dir() / "user_strategy.py"
     spec = importlib.util.spec_from_file_location(
-        "wsc_round1_recovery_hold_v2_participant", participant_file
+        "wsc_round1_multi_transfer_recovery_hold_v3_participant", participant_file
     )
     if spec is None or spec.loader is None:
         pytest.fail(f"cannot load participant strategy from {participant_file}")
@@ -226,6 +226,22 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
             after = _snapshot(context, shipment)
             assert after == before, "participant decision mutated real Round 1 state"
             if decision is False:
+                state = participant._active_state(context, now)
+                assert state is not None
+                graphs = participant._graphs(context, state)
+                assert graphs is not None
+                safe_path = participant._shortest_path(
+                    context,
+                    demand.origin_port,
+                    demand.destination_port,
+                    graphs[1],
+                )
+                assert safe_path is not None
+                route_changes = sum(
+                    left.route is not right.route
+                    for left, right in zip(safe_path, safe_path[1:], strict=False)
+                )
+                assert route_changes >= 2
                 qualifying = (context, now, shipment)
                 break
             assert decision is None

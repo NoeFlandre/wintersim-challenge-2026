@@ -16,24 +16,21 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: contiguous same-service recovery hold v5
+## Current strategy: multi-transfer recovery-hold experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
 During an active disruption, `assign_associated_bookings` may return `False`
 for a newly generated shipment only when all of the following are derived from
-the live context: its nominal shortest route is one disrupted service or a
-contiguous multi-edge path on one service route, the currently safe shortest
-route needs at least two changes between services (at least three service
-boardings), and the nominal service is estimated to recover and deliver sooner
-than that detour. Recovery is taken from every nominal edge, so a later edge is
-not ignored.
+the live context: its normal shortest route is one disrupted direct service,
+the currently safe shortest route needs at least two changes between services
+(at least three service boardings), and the direct service is estimated to
+recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a
 full-precision comparison, and otherwise delegates. Missing or ambiguous data
-also delegates without mutation. The v5 full-run result is recorded in the
-public experiment report after the one pre-registered candidate run; no output
-is used to tune this policy.
+also delegates without mutation. No performance result is claimed until the
+pre-registered full experiment finishes.
 
 ## Submission boundary
 

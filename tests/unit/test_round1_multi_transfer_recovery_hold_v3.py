@@ -198,36 +198,22 @@ def _same_service_path_fixture(
         [100.0, 100.0, 100.0],
     )
     safe_a = _route("safe-a", [origin, safe_transfer_a, origin], [1000.0, 1000.0])
-    safe_b = _route("safe-b", [safe_transfer_a, safe_transfer_b, safe_transfer_a], [1000.0, 1000.0])
-    safe_c = _route("safe-c", [safe_transfer_b, destination, safe_transfer_b], [1000.0, 1000.0])
+    safe_b = _route(
+        "safe-b", [safe_transfer_a, safe_transfer_b, safe_transfer_a], [1000.0, 1000.0]
+    )
+    safe_c = _route(
+        "safe-c", [safe_transfer_b, destination, safe_transfer_b], [1000.0, 1000.0]
+    )
 
     nominal_edges = strategy_module._route_data(nominal).edges  # type: ignore[attr-defined]
-    first = next(
-        edge
-        for edge in nominal_edges
-        if edge.departure is origin and edge.arrival is nominal_transfer
-    )
+    first = next(edge for edge in nominal_edges if edge.departure is origin and edge.arrival is nominal_transfer)
     second = next(
-        edge
-        for edge in nominal_edges
-        if edge.departure is nominal_transfer and edge.arrival is destination
+        edge for edge in nominal_edges if edge.departure is nominal_transfer and edge.arrival is destination
     )
     safe_paths = (
-        next(
-            edge
-            for edge in strategy_module._route_data(safe_a).edges
-            if edge.departure is origin and edge.arrival is safe_transfer_a
-        ),  # type: ignore[attr-defined]
-        next(
-            edge
-            for edge in strategy_module._route_data(safe_b).edges
-            if edge.departure is safe_transfer_a and edge.arrival is safe_transfer_b
-        ),  # type: ignore[attr-defined]
-        next(
-            edge
-            for edge in strategy_module._route_data(safe_c).edges
-            if edge.departure is safe_transfer_b and edge.arrival is destination
-        ),  # type: ignore[attr-defined]
+        next(edge for edge in strategy_module._route_data(safe_a).edges if edge.departure is origin and edge.arrival is safe_transfer_a),  # type: ignore[attr-defined]
+        next(edge for edge in strategy_module._route_data(safe_b).edges if edge.departure is safe_transfer_a and edge.arrival is safe_transfer_b),  # type: ignore[attr-defined]
+        next(edge for edge in strategy_module._route_data(safe_c).edges if edge.departure is safe_transfer_b and edge.arrival is destination),  # type: ignore[attr-defined]
     )
     target = first.legs[0] if disruption_edge == "first" else second.legs[0]
     context = SimpleNamespace(

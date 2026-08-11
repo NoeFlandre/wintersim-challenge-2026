@@ -1,9 +1,9 @@
 """Participant-owned response strategy for the WSC 2026 challenge.
 
 The active experiment is deliberately narrow: while a disruption is active,
-new cargo may remain at origin when an interrupted direct or contiguous
-same-service path is estimated to recover sooner than a safe detour requiring
-at least two changes between service routes.
+new cargo may remain at origin when an interrupted one-booking direct service
+is estimated to recover sooner than a safe detour requiring at least two
+changes between service routes.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -360,22 +360,6 @@ def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime |
     return max(recoveries) if recoveries else None
 
 
-def _path_constraint_recovery(path: tuple[_Edge, ...], state: _ActiveState) -> dt.datetime | None:
-    recoveries = [
-        recovery
-        for edge in path
-        if (recovery := _edge_constraint_recovery(edge, state)) is not None
-    ]
-    return max(recoveries) if recoveries else None
-
-
-def _is_contiguous_same_service(path: tuple[_Edge, ...]) -> bool:
-    if not path:
-        return False
-    route = path[0].route
-    return all(edge.route is route for edge in path)
-
-
 def _route_profile(route: Any) -> _RouteProfile | None:
     route_data = _route_data(route)
     if route_data is None:
@@ -443,7 +427,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     safe_path = _shortest_path(context, origin, destination, graphs[1])
     if nominal_path is None or safe_path is None:
         return False
-    if not _is_contiguous_same_service(nominal_path) or len(safe_path) < 2:
+    if len(nominal_path) != 1 or len(safe_path) < 2:
         return False
     route_change_count = sum(
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
@@ -451,7 +435,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if route_change_count < 2:
         return False
 
-    recovery = _path_constraint_recovery(nominal_path, state)
+    recovery = _edge_constraint_recovery(nominal_path[0], state)
     if recovery is None:
         return False
     nominal_hours = _path_service_hours(nominal_path)
@@ -487,7 +471,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a disrupted service instead of a two-transfer detour."""
+        """Hold a direct-service shipment instead of a two-transfer detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

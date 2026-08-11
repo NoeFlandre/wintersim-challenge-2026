@@ -16,18 +16,19 @@
 
 Start read-only.
 
-1. Read `README.md`, `docs/challenge-rules.md`, `docs/architecture.md`,
-   `pyproject.toml`, `uv.lock`, current experiment reports, and tooling under
-   `src/wsc2026_tools`.
+1. Read `README.md`, `docs/challenge-rules.md`, `docs/architecture.md`, the
+   active round readiness document, `pyproject.toml`, `uv.lock`, current
+   experiment reports, and tooling under `src/wsc2026_tools`.
 2. Read the local technical PDFs completely. Visually inspect pages that define
    the metric, interfaces, submission boundary, and evaluation.
 3. Verify current official information using primary sources. Start with the
    [official WSC 2026 challenge page](https://meetings.informs.org/wordpress/wsc2026/simulation-challenge/).
    Treat local executable organizer source as authoritative for runtime
    behavior and public organizer material as authoritative for public rules.
-4. Trace all four `UserStrategy` call sites, their exact `None`/boolean/object
-   semantics, strategy validation, default behavior, maritime entities,
-   disruption clock, scorer, sync, smoke, run, and package commands.
+4. Trace all four active-round `UserStrategy` call sites, their exact
+   `None`/boolean/object semantics, strategy validation, default behavior,
+   maritime entities, disruption clock, scorer, sync, smoke, run, and package
+   commands.
 5. Inspect branch, upstream, worktree cleanliness, ignored files, prior
    experiments, and any running simulator.
 6. Confirm restricted organizer archives, input/output trees, `main.py`,
@@ -39,10 +40,20 @@ without fresh evidence.
 
 ## 2. Baseline and experiment contract
 
-Create a new `codex/<experiment-name>` branch in an isolated worktree. If the
-private `.challenge` directory is shared by symlink, ignore the symlink and
-remember that repository-root containment may reject paths resolved into the
-owning checkout.
+Use a new `codex/<experiment-name>` branch in an isolated worktree by default.
+If the latest user or repository instruction explicitly requires one canonical
+folder, one worktree, or one branch, that constraint overrides the default:
+record it in the experiment contract and do not create conflicting Git state.
+The override must come from the active conversation or an applicable current
+repository instruction/policy; a historical experiment report alone is not
+authority.
+If the private `.challenge` directory is shared by symlink, ignore the symlink
+and remember that repository-root containment may reject paths resolved into
+the owning checkout.
+
+When selecting or comparing strategies, first read
+[autonomous-strategy-guide.md](autonomous-strategy-guide.md) completely. Keep
+strategy reasoning there and operational execution in this protocol.
 
 Before implementation, commit an experiment document containing:
 
@@ -51,7 +62,7 @@ Before implementation, commit an experiment document containing:
 - invariants and forbidden behavior;
 - starting commit and strategy SHA;
 - scenario, seed, warm-up, horizon, interval, and required period count;
-- pinned fallback score, ATT SHA, mean, and snapshot path;
+- pinned accepted-control score, ATT SHA, mean, and snapshot path;
 - historical reference as secondary evidence only;
 - exact full-precision acceptance expression;
 - ignored candidate ATT and metrics paths;
@@ -59,24 +70,23 @@ Before implementation, commit an experiment document containing:
 - explicit one-candidate/no-tuning rule;
 - no-push/no-submit/no-history-rewrite rule.
 
-For the current Round 0 checkout, verify rather than assume:
+Derive and verify the active round's values. Use this schema rather than copying
+values from an older report:
 
 ```text
-scenario: create_with_disruption
-seed: 2026
-warm-up: 140 days
-measured horizon: 360 days
-interval: 5 days
-periods: 72
-fallback loss: 18.673577819840556
-fallback ATT SHA-256:
-10234375865c4f481ec2d931372417af8156d605bf416783ce5f516392488658
+round: verified configured round
+scenario: verified scenario builder
+seed and PYTHONHASHSEED: verified values
+warm-up / measured horizon / interval / periods: verified values
+control loss: freshly scored full-precision value
+control ATT SHA-256 and path: freshly verified pinned evidence
+baseline ATT SHA-256 and path: authoritative round evidence
 acceptance:
-candidate < 18.673577819840556 - 1e-9
+candidate < control - 1e-9
 ```
 
-If current verified values differ, document the new environment; do not
-silently relabel historical evidence.
+Historical report values are leads only. If current verified values differ,
+document the new environment; do not silently relabel historical evidence.
 
 ## 3. Strategy design and TDD
 
@@ -101,13 +111,14 @@ participant import. Test the actual package early.
 
 TDD:
 
-1. Add synthetic contract tests and a real ignored Round 0 integration test.
+1. Add synthetic contract tests and a real ignored active-round integration
+   test.
 2. Run and capture RED caused by missing candidate behavior, not a broken
    fixture.
 3. Commit RED tests.
 4. Implement the minimum policy.
 5. Run focused GREEN.
-6. Run Ruff and mypy.
+6. Run Ruff, Ty, and mypy.
 7. Commit atomic implementation/correction steps.
 
 When an old integration test asserts the fallback behavior being intentionally
@@ -116,34 +127,41 @@ smoke coverage.
 
 ## 4. Mandatory preflight
 
-Run from the experiment worktree with failure-on-first-error semantics:
+Run from the approved repository workspace with failure-on-first-error
+semantics. In the commands below, `<round>` is documentation notation: replace
+it with the verified configured round such as `round1`; never paste the angle
+brackets literally.
 
 ```bash
 uv lock --check
-uv sync --locked --group dev --group simulation
+uv sync --locked --all-groups
 uv run ruff format --check .
 uv run ruff check .
+uv run ty check src/wsc2026_tools submission
 uv run mypy src/wsc2026_tools submission
 uv run pytest -m "not integration" \
   --cov=src/wsc2026_tools --cov=submission \
-  --cov-report=term --cov-fail-under=90
+  --cov-branch --cov-report=term-missing --cov-fail-under=90
 uv run pytest -m integration -q
-uv run wsc2026 sync --round round0
+uv run wsc2026 sync --round <round>
 cmp submission/response_strategies/user_strategy.py \
-  .challenge/round0/source/response_strategies/user_strategy.py
-uv run wsc2026 smoke --round round0
+  .challenge/<round>/source/response_strategies/user_strategy.py
+uv run wsc2026 smoke --round <round>
 git diff --check
 ```
 
 Require true coverage `>= 90.00%`; do not accept a rounded display below the
 configured threshold. Add tests only for meaningful behavior branches.
 
-Package twice using a non-placeholder validation team and a non-practice
-submission round:
+Package twice using a non-placeholder validation team and the verified current
+submission-round number:
 
 ```bash
-uv run wsc2026 package --team ValidationTeam --round 1
+uv run wsc2026 package --team ValidationTeam --round <submission-round-number>
 ```
+
+Replace `<submission-round-number>` with the verified integer; never pass the
+placeholder literally.
 
 Copy each generated archive to a temporary directory, compare bytes and
 SHA-256, inspect members, then move the generated validation archive out of the
@@ -159,15 +177,18 @@ Immediately before starting:
 
 - verify the exact candidate HEAD and strategy SHA;
 - verify the synchronized strategy copy;
-- verify fallback snapshot hash;
+- verify accepted-control snapshot hash;
 - record current Output ATT hash/mtime as stale-state evidence;
 - prove no `wsc2026 run` or organizer `main.py` process exists.
 
-Run exactly:
+Run exactly after substituting the verified values:
 
 ```bash
-uv run wsc2026 run --round round0 --full
+PYTHONHASHSEED=<verified-value> uv run wsc2026 run --round <round> --full
 ```
+
+`<verified-value>` and `<round>` are documentation placeholders and must never
+be passed literally to the shell.
 
 Use one managed process/session. Prefer an ignored or temporary log when live
 tables are extremely large. Poll at intervals below 60 seconds. Report measured
@@ -175,8 +196,9 @@ day/period, elapsed runtime, liveness, and first causal error. Never start a
 duplicate because `ps` output was ambiguous; confirm liveness with the process
 handle or `kill -0`.
 
-Wait for explicit completion, day 360, Period 72, and a fresh CSV write. A
-timeout or user interruption does not authorize a second strategy.
+Wait for explicit completion, the configured final measured day and period,
+and a fresh CSV write. A timeout or user interruption does not authorize a
+second candidate within this experiment.
 
 ## 6. Scoring and evidence
 
@@ -187,7 +209,7 @@ Before any restore or second command can overwrite Output:
 2. Record SHA-256, byte size, mtime, header, period count, and mean ATT.
 3. Score with `wsc2026 score --json` against the authoritative baseline ATT.
 4. Record full-precision cumulative loss and per-period loss.
-5. Compare candidate ATT values with the pinned fallback: better/equal/worse
+5. Compare candidate ATT values with the pinned control: better/equal/worse
    counts, delta, and relative percentage.
 6. Write ignored aggregate JSON and a tracked experiment report.
 
@@ -196,7 +218,7 @@ checkout or copy inputs into a root-contained ignored path. Never bypass the
 scorer's repository-root guard.
 
 Mean ATT is descriptive only. Acceptance uses the complete official loss
-formula over exactly 72 numbered periods.
+formula over exactly the verified required numbered periods.
 
 ## 7. Accept or reject
 
@@ -215,12 +237,14 @@ Rejected, equal, crashed, invalid, or incomplete:
 2. Commit the tracked rejection report first.
 3. Revert all candidate implementation/correction/test commits in reverse
    order with `git revert`; retain design and result history.
-4. Do not recreate the baseline files manually.
-5. Sync the restored no-op strategy.
-6. Restore Output ATT from the verified fallback snapshot.
-7. Verify byte-identical fallback SHA and exact fallback score.
+4. Do not recreate the accepted-control files manually.
+5. Sync the restored accepted control strategy.
+6. Restore Output ATT from the verified accepted-control snapshot.
+7. Verify byte-identical control SHA and exact control score.
 8. Run final gates.
-9. Do not attempt another candidate.
+9. Do not attempt another candidate inside this experiment. A persistent
+   program goal may proceed only through a newly named, separately designed and
+   frozen experiment after restoration is complete.
 
 Mixed commits complicate restoration. Prefer separate code, tests, design, and
 result commits. If a historical mixed commit must be reverted, preserve the
@@ -233,21 +257,22 @@ Run fresh:
 
 - lock/sync;
 - Ruff format/check;
+- Ty;
 - mypy;
 - unit tests with unrounded coverage threshold;
 - all integration tests;
 - strategy sync and byte comparison;
 - smoke;
 - deterministic packaging twice and member inspection;
-- active fallback ATT SHA and score after rejection;
+- active accepted-control ATT SHA and score after rejection;
 - `git diff --check`;
 - clean `git status`;
 - tracked and reachable restricted-material searches;
 - process check proving no simulator remains.
 
 Use `superpowers:verification-before-completion`. Then use
-`superpowers:finishing-a-development-branch`; by default keep the clean local
-experiment branch when push/merge/PR was not requested.
+`superpowers:finishing-a-development-branch`; retain the clean, explicitly
+approved Git layout when push/merge/PR was not requested.
 
 ## 9. Common failure modes
 

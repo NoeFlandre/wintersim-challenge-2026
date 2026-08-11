@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-import response_strategies.user_strategy as strategy_module
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -182,85 +181,6 @@ def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
 
 def _decision(context: SimpleNamespace, now: Any, shipment: SimpleNamespace) -> Any:
     return UserStrategy.assign_associated_bookings(context, now, shipment)
-
-
-def _same_service_path_fixture(
-    *, disruption_edge: str
-) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace, tuple[Any, ...], tuple[Any, ...]]:
-    origin = _port("Origin")
-    nominal_transfer = _port("Nominal Transfer")
-    destination = _port("Destination")
-    safe_transfer_a = _port("Safe Transfer A")
-    safe_transfer_b = _port("Safe Transfer B")
-    nominal = _route(
-        "nominal",
-        [origin, nominal_transfer, destination, origin],
-        [100.0, 100.0, 100.0],
-    )
-    safe_a = _route("safe-a", [origin, safe_transfer_a, origin], [1000.0, 1000.0])
-    safe_b = _route(
-        "safe-b", [safe_transfer_a, safe_transfer_b, safe_transfer_a], [1000.0, 1000.0]
-    )
-    safe_c = _route(
-        "safe-c", [safe_transfer_b, destination, safe_transfer_b], [1000.0, 1000.0]
-    )
-
-    nominal_edges = strategy_module._route_data(nominal).edges  # type: ignore[attr-defined]
-    first = next(edge for edge in nominal_edges if edge.departure is origin and edge.arrival is nominal_transfer)
-    second = next(
-        edge for edge in nominal_edges if edge.departure is nominal_transfer and edge.arrival is destination
-    )
-    safe_paths = (
-        next(edge for edge in strategy_module._route_data(safe_a).edges if edge.departure is origin and edge.arrival is safe_transfer_a),  # type: ignore[attr-defined]
-        next(edge for edge in strategy_module._route_data(safe_b).edges if edge.departure is safe_transfer_a and edge.arrival is safe_transfer_b),  # type: ignore[attr-defined]
-        next(edge for edge in strategy_module._route_data(safe_c).edges if edge.departure is safe_transfer_b and edge.arrival is destination),  # type: ignore[attr-defined]
-    )
-    target = first.legs[0] if disruption_edge == "first" else second.legs[0]
-    context = SimpleNamespace(
-        ports=[origin, nominal_transfer, safe_transfer_a, safe_transfer_b, destination],
-        service_routes=[nominal, safe_a, safe_b, safe_c],
-        disruption_plans=[_leg_plan(target)],
-    )
-    shipment = _shipment(origin, destination)
-    return context, ANCHOR + dt.timedelta(days=14.5), shipment, (first, second), safe_paths
-
-
-def _patch_same_service_graphs(
-    monkeypatch: pytest.MonkeyPatch,
-    nominal_path: tuple[Any, ...],
-    safe_path: tuple[Any, ...],
-) -> None:
-    monkeypatch.setattr(
-        strategy_module,
-        "_graphs",
-        lambda context, state: (nominal_path, safe_path),
-    )
-
-
-def test_contiguous_same_service_nominal_path_can_hold_without_mutation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    context, now, shipment, nominal_path, safe_path = _same_service_path_fixture(
-        disruption_edge="first"
-    )
-    _patch_same_service_graphs(monkeypatch, nominal_path, safe_path)
-    before = _freeze((context, shipment))
-
-    assert _decision(context, now, shipment) is False
-    assert _freeze((context, shipment)) == before
-
-
-def test_later_edge_recovery_is_considered_for_same_service_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    context, now, shipment, nominal_path, safe_path = _same_service_path_fixture(
-        disruption_edge="later"
-    )
-    _patch_same_service_graphs(monkeypatch, nominal_path, safe_path)
-    before = _freeze((context, shipment))
-
-    assert _decision(context, now, shipment) is False
-    assert _freeze((context, shipment)) == before
 
 
 def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None:

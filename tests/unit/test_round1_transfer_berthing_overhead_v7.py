@@ -8,6 +8,7 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
+
 ANCHOR = dt.datetime.min
 
 
@@ -33,7 +34,9 @@ def _route(name: str, ports: list[SimpleNamespace], distances: list[float]) -> S
         )
         for index, distance in enumerate(distances, start=1)
     ]
-    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))]
+    route.deployed_vessels = [
+        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))
+    ]
     return route
 
 
@@ -107,9 +110,7 @@ def test_existing_large_margin_v3_hold_is_unchanged() -> None:
 
 def test_non_transfer_safe_path_still_delegates() -> None:
     context, now, shipment = _fixture((1000.0, 1000.0, 1000.0))
-    direct = _route(
-        "direct", [context.ports[0], context.ports[3], context.ports[0]], [200.0, 200.0]
-    )
+    direct = _route("direct", [context.ports[0], context.ports[3], context.ports[0]], [200.0, 200.0])
     context.service_routes.append(direct)
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None

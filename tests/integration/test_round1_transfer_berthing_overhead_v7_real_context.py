@@ -110,9 +110,7 @@ def test_real_context_exposes_candidate_only_marginal_transfer_holds() -> None:
 
     import main  # noqa: F401, PLC0415
     import scenario_builders  # type: ignore[import-not-found]  # noqa: PLC0415
-    from maritime_data_context.shipment import (
-        Shipment,  # type: ignore[import-not-found]  # noqa: PLC0415
-    )
+    from maritime_data_context.shipment import Shipment  # type: ignore[import-not-found]  # noqa: PLC0415
     from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
         DefaultStrategy,
     )
@@ -146,7 +144,8 @@ def test_real_context_exposes_candidate_only_marginal_transfer_holds() -> None:
             if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
                 continue
             changes = sum(
-                left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
+                left.route is not right.route
+                for left, right in zip(safe, safe[1:], strict=False)
             )
             if changes < 2:
                 continue

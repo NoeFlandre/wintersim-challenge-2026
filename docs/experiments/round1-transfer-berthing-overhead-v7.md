@@ -52,6 +52,11 @@ The frozen command was run exactly once:
 PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache-0811 uv run wsc2026 run --round round1 --full
 ```
 
+The participant code was the reviewed code from `952772b`; the later
+`cb9f10f` commit only finalized the pre-run documentation/launch pin and was
+the actual repository HEAD when the command started. No participant behavior
+changed between those two commits.
+
 The first log write was observed at `2026-08-11T20:55:10+0200`; the process
 completed at `2026-08-11T21:37:11+0200`. The simulator reported runtime
 `00:41:31`, exit code `0`, Period 72 (Days 356-360), simulation day 360,
@@ -80,6 +85,8 @@ The immutable acceptance rule is
 `candidate_loss < 19.084638612143134 - 1e-9`. The candidate is therefore
 **REJECTED**; it is materially worse than the accepted v3 control. The raw
 scorer JSON is preserved in the same ignored result directory.
+The concise aggregate record is also preserved at
+`experiments/results/round1_transfer_berthing_overhead_v7_20260811.json`.
 
 No tuning, second candidate, or additional simulation was authorized.
 

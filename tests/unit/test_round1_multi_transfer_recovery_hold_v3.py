@@ -228,10 +228,10 @@ def test_disruption_end_is_exclusive() -> None:
     assert _decision(context, end, shipment) is None
 
 
-def test_transfer_berthing_overhead_turns_old_equality_into_hold() -> None:
+def test_exact_hold_detour_equality_delegates() -> None:
     context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
 
-    assert _decision(context, now, shipment) is False
+    assert _decision(context, now, shipment) is None
 
 
 def test_safe_direct_path_delegates() -> None:
@@ -375,7 +375,7 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
     fast_first = _tie_fixture(["O", "X1", "X2", "Y1", "Y2", "D"])
     slow_first = _tie_fixture(["O", "Y1", "Y2", "X1", "X2", "D"])
 
-    assert _decision(*fast_first) is False
+    assert _decision(*fast_first) is None
     assert _decision(*slow_first) is False
 
 

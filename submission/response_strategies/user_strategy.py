@@ -3,8 +3,7 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes. The detour estimate includes two
-organizer-defined three-hour berthing phases for every service-route change.
+changes between service routes.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -443,11 +442,6 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     detour_hours = _path_service_hours(safe_path)
     if nominal_hours is None or detour_hours is None:
         return False
-    # The organizer's BerthBerthing activity lasts three hours. A cargo
-    # transfer crosses the receiving and departing vessel's berthing phases,
-    # so include both fixed phases for every service-route change. This value
-    # is a runtime-derived physical duration, not a score-fitted threshold.
-    detour_hours += 2.0 * 3.0 * route_change_count
     wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
@@ -477,7 +471,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold direct cargo when recovery beats a transfer-time-aware detour."""
+        """Hold a direct-service shipment instead of a two-transfer detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

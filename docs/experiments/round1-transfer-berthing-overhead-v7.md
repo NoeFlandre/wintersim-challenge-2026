@@ -1,6 +1,7 @@
 # Round 1 transfer-berthing overhead v7
 
-**Status: PRE-RUN DESIGN FROZEN — no candidate simulation has started.**
+**Status: REJECTED — candidate run complete; fallback restoration and final gates
+pending at this report checkpoint.**
 
 The full contract, hypothesis, activation evidence, fixed run identity,
 acceptance rule, TDD requirements, and restoration procedure are recorded in
@@ -43,6 +44,41 @@ Fresh preflight gates passed before any candidate simulation:
 - restricted-material history/tracked-file scans, `git diff --check`, one
   worktree/one branch, clean tracked status, and no live simulator.
 
-No full run, candidate score, tuning, restore, package submission, push,
-merge, PR, or history rewrite has occurred at this checkpoint. Exactly one
-candidate run is now permitted by this experiment contract.
+## Full-run result (exactly one candidate run)
+
+The frozen command was run exactly once:
+
+```text
+PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache-0811 uv run wsc2026 run --round round1 --full
+```
+
+The first log write was observed at `2026-08-11T20:55:10+0200`; the process
+completed at `2026-08-11T21:37:11+0200`. The simulator reported runtime
+`00:41:31`, exit code `0`, Period 72 (Days 356-360), simulation day 360,
+`Simulation completed.`, and the expected CSV output path. The complete log
+is preserved privately at
+`.challenge/round1/results/transfer_berthing_overhead_v7_20260811/full_run.log`
+with SHA-256
+`2e7ecbf8551b199c01819d315f9a2015fed72ce2c4806e6eafd31fecf53f4f83`.
+
+The candidate CSV was preserved before scoring at
+`.challenge/round1/results/transfer_berthing_overhead_v7_20260811/ATT_By_Statistics_Interval.csv`.
+It contains 72 numbered periods, is 1,262 bytes, and has SHA-256
+`0e4cfe00a9fab8d16076e615bed32f167b36d69296f1f6363f684d396a75a90f`.
+Its mean ATT (Average Transport Time) is `20.50819444444444` days.
+
+Scoring against the authoritative Round 1 baseline produced:
+
+- cumulative resilience loss: `21.428353158559474`;
+- period count: `72`;
+- accepted v3 control: `19.084638612143134`;
+- delta versus control: `+2.34371454641634` (`+12.2806%`);
+- versus the control ATT, 20 periods improved, 18 were equal, and 34 were
+  worse (maximum per-period increase `1.56` days).
+
+The immutable acceptance rule is
+`candidate_loss < 19.084638612143134 - 1e-9`. The candidate is therefore
+**REJECTED**; it is materially worse than the accepted v3 control. The raw
+scorer JSON is preserved in the same ignored result directory.
+
+No tuning, second candidate, or additional simulation was authorized.

@@ -187,10 +187,32 @@ path is harmful in another scenario or seed.
 
 ## Rejection and restoration
 
-This result record is committed before any restoration. The candidate code,
-README, and candidate-only tests will be reverted in reverse order with
-`git revert`; the accepted v3 strategy will then be synchronized, its pinned
-ATT snapshot restored byte-for-byte, and its score rechecked at exactly
-`19.084638612143134`. All final gates will be rerun. No tuning, duplicate run,
-second candidate, package submission, push, merge, PR, or history rewrite is
-part of this experiment.
+The result record was committed first at `00d8eb6`. The candidate implementation
+and RED-test commits were then reverted in reverse order with `git revert`:
+
+- `913802d` reverted the v5 implementation;
+- `38fb114` reverted the real-context RED test;
+- `75c544c` reverted the synthetic RED tests.
+
+The accepted v3 strategy was synchronized from tracked participant files, and
+the pinned v3 ATT snapshot was restored byte-for-byte. Fresh verification
+reported the restored strategy SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`, active
+ATT SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and
+score `19.084638612143134` over 72 periods.
+
+The final restored gates passed:
+
+- locked uv check/sync, Ruff format/check, Ty, and mypy;
+- 227 non-integration tests with true branch coverage `90.84%`;
+- 8 integration tests;
+- Round 1 sync and byte identity, `SMOKE_OK`, and two deterministic
+  participant-only packages with SHA-256
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`;
+- restricted-material scans, `git diff --check`, one-worktree/one-branch
+  layout, clean tracked status, and no live simulator.
+
+Candidate ATT, raw log, activation audit, pre-run manifests, and aggregate
+score remain private ignored evidence. No tuning, duplicate run, second
+candidate, package submission, push, merge, PR, or history rewrite occurred.

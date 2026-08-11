@@ -321,15 +321,12 @@ def test_real_round1_same_service_path_extension_is_candidate_only() -> None:
                 continue
             same_service = all(edge.route is nominal[0].route for edge in nominal)
             safe_changes = sum(
-                left.route is not right.route
-                for left, right in zip(safe, safe[1:], strict=False)
+                left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
             )
             if not same_service or safe_changes < 2:
                 continue
             before = _snapshot(context, shipment)
-            decision = participant.UserStrategy.assign_associated_bookings(
-                context, now, shipment
-            )
+            decision = participant.UserStrategy.assign_associated_bookings(context, now, shipment)
             assert _snapshot(context, shipment) == before
             if decision is False:
                 found_same_service_candidate_only = True

@@ -1,7 +1,7 @@
 # Round 1 transfer-berthing overhead v7
 
-**Status: REJECTED — candidate run complete; fallback restoration and final gates
-pending at this report checkpoint.**
+**Status: REJECTED — complete; accepted v3 control restored and final gates
+passed.**
 
 The full contract, hypothesis, activation evidence, fixed run identity,
 acceptance rule, TDD requirements, and restoration procedure are recorded in
@@ -82,3 +82,45 @@ The immutable acceptance rule is
 scorer JSON is preserved in the same ignored result directory.
 
 No tuning, second candidate, or additional simulation was authorized.
+
+## Restoration and final verification
+
+Because the candidate failed the strict gate, its participant changes were
+reverted in reverse dependency order:
+
+- `cf7d913` reverts v7 test formatting;
+- `ae02d18` reverts the v7 participant README change;
+- `0b0c1bb` reverts the v7 implementation and real-context integration test;
+- `bd8e565` reverts the v7 RED test contract.
+
+The accepted v3 participant strategy is active again. Round 1 was synchronized
+and the participant/runtime copies are byte-identical at strategy SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`. The
+active ATT was restored from the pinned v3 snapshot, not regenerated; its
+SHA-256 is `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+Re-scoring it against the Round 1 baseline produced exactly
+`19.084638612143134` over 72 periods.
+
+Post-restoration gates all passed:
+
+- locked `uv` check and all-group synchronization;
+- Ruff format (21 files), Ruff lint, `ty check src/wsc2026_tools submission`,
+  and mypy (8 source files);
+- full pytest: 235 passed;
+- non-integration coverage: 227 passed, 8 deselected, 90.84% true branch
+  coverage (minimum 90%);
+- integration tests: 8 passed;
+- Round 1 sync and byte comparison;
+- Round 1 smoke: `SMOKE_OK`, with the restored strategy and ATT still
+  byte-identical afterward;
+- two deterministic participant-only packages, both SHA-256
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`,
+  5,923 bytes, containing only the participant README and
+  `user_strategy.py`;
+- `git diff --check` and restricted-material scans;
+- no live simulator or probe process.
+
+The candidate evidence remains private and ignored under
+`.challenge/round1/results/transfer_berthing_overhead_v7_20260811/`. No
+submission archive, push, merge, PR, or history rewrite was performed. This
+experiment is closed; no further run is authorized by this report.

@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; thirteen controlled Round 1
+**Status:** bootstrapped and smoke-tested; fourteen controlled Round 1
 experiments have valid scores and one earlier attempt was incomplete. The
 multi-transfer recovery-hold v3 policy is accepted and remains active.
 
@@ -69,6 +69,15 @@ tracked, copied into the public repository, or included in a submission.
   Its fresh ATT, raw log, score JSON, and activation audit remain in the
   ignored evidence directory; v3 was restored, synchronized, and rescored
   exactly at `19.084638612143134`.
+- The subsequent controlled experiment, documented in
+  [`docs/experiments/round1-transfer-berthing-overhead-v7.md`](experiments/round1-transfer-berthing-overhead-v7.md),
+  executed exactly once and completed all 72 periods. Its transfer-berthing
+  overhead extension scored `21.428353158559474`, which was `12.2806%` worse
+  than the active v3 control and `4.8525%` worse than the pinned fallback. It
+  was rejected by the strict aggregate gate; its candidate ATT, scorer JSON,
+  and full log remain in the ignored evidence directory. The v3 strategy and
+  ATT snapshot were restored, synchronized, and re-scored exactly at
+  `19.084638612143134`.
 - The preceding accepted experiment, documented in
   [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
   scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.

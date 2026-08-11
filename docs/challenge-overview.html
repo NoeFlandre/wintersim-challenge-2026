@@ -387,7 +387,7 @@
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context &amp; experiment log · 10 August 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 11 August 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -396,9 +396,11 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; eleven scored and one incomplete
+        Round 1 has its own private source tree; twelve scored and one incomplete
         controlled Round 1 strategy experiments are recorded below. The tenth
         scored candidate first beat fallback; the eleventh improved that result.
+        The twelfth tested a same-service extension, but was rejected, so the
+        eleventh remains active.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
@@ -596,10 +598,12 @@
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Nine Round 1 candidates were
+        fallback is <strong>20.4366687513</strong>. Ten Round 1 candidates were
         scored and rejected, one run was interrupted before measured output,
         the tenth scored candidate was accepted at <strong>19.8288033747</strong>,
-        and the eleventh improved it to <strong>19.0846386121</strong>.
+        and the eleventh improved it to <strong>19.0846386121</strong>. The
+        twelfth scored <strong>22.3925</strong> and was rejected, leaving v3
+        active.
       </div>
     </section>
 
@@ -611,9 +615,10 @@
         complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. Nine scored Round 1
+        Lower is better; equality is not an improvement. Ten scored Round 1
         trials were rejected and one was incomplete. Two were accepted in
-        sequence; the latest is 6.62% below fallback and remains active.
+        sequence; the eleventh remains active at 6.62% below fallback after the
+        twelfth was rejected.
       </p>
 
       <div class="table-wrap">
@@ -751,6 +756,11 @@
               <td>We refined the accepted waiting rule instead of replacing it. The earlier version held cargo whenever a disrupted direct service was predicted to recover sooner than a safe transfer path. Version 3 delegates simple detours with one service change and holds only when the safe path is fragmented across at least three service boardings. It still reads the live network without mutating routes or bookings, and all malformed or uncertain cases fall back to the organizer. This narrower rule improved the previous accepted score in its single complete run.</td>
               <td><strong>19.0846</strong><br><span class="status better">6.62% better than fallback and 3.75% better than accepted v2; accepted and active</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-contiguous-same-service-normalization-v5.md">Extend the recovery hold across one service's adjacent path edges</a></td>
+              <td>We kept the accepted recovery-hold rule but admitted a narrow gap: a nominal path made of several adjacent edges on the same service route. We also checked every edge for the latest recovery time. The real-context audit found six candidate-only cases, but the complete run increased loss substantially, so the extension was rejected and v3 was restored.</td>
+              <td><strong>22.3925</strong><br><span class="status worse">17.33% worse than the active v3 control; rejected and restored</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -760,10 +770,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, eleven scored Round 1
+    reports, nine completed Round 0 experiments, twelve scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-multi-transfer-recovery-hold-v3.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-contiguous-same-service-normalization-v5.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

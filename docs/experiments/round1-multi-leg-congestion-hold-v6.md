@@ -142,3 +142,49 @@ order, synchronize the accepted v3 strategy, restore its pinned ATT bytes,
 re-score exactly to `19.084638612143134`, rerun every final gate, and leave the
 canonical `main` checkout clean. No push, merge, PR, submission, archive
 upload, or history rewrite is authorized by this experiment.
+
+## Full-run result
+
+Exactly one candidate simulation ran from the frozen launch HEAD
+`8091b6eda8ba0bfef0ee472786a255d7755e4cd0` with the fixed command and
+configuration. The managed process exited `0`; the raw log contains Period 72
+(Days 356–360), Output Simulation Day 360, and `Simulation completed.`. The
+organizer-reported simulation runtime was `00:27:26`.
+
+Before scoring or any restoration, the fresh ATT bytes and raw log were copied
+to the predeclared ignored evidence directory:
+
+- candidate ATT SHA-256:
+  `12ddb90c5cdd3cf7a13f1c7945e5f3e13edefd72cc77939d7ffef36f92f12511`;
+- candidate ATT size/mtime: 1,262 bytes / epoch `1786473016`;
+- numbered periods: 72;
+- candidate mean ATT: `20.4675` days;
+- raw log SHA-256:
+  `00b5985477ea6a5f4a030fffd0b1fe724f20c19165b6a4b1fa57aecdbafbd35c`.
+
+The source ATT and preserved candidate snapshot were byte-identical at
+preservation time. No second simulation, replay, tuning, or duplicate process
+was launched.
+
+## Score and decision
+
+The official scorer evaluated only the preserved candidate ATT against the
+authoritative Round 1 baseline and reported 72 periods and cumulative
+resilience loss `20.810481217905384`. The accepted v3 control is
+`19.084638612143134`, so the exact delta is `+1.72584260576225`, or
+`+9.043098173544317%` (worse). The candidate ATT was better in 17 periods,
+equal in 28, and worse in 27 than v3; the candidate mean was also higher
+(`20.4675` vs `20.3675` days).
+
+The frozen gate is false:
+
+```text
+20.810481217905384 < 19.084638612143134 - 1e-9
+```
+
+**Decision: REJECTED.** This rejects the exact multi-leg pure-congestion
+one-transfer extension in the fixed public Round 1 scenario and seed. It does
+not prove that every structurally similar policy is harmful under hidden
+scenarios. The complete scorer JSON is preserved at
+`experiments/results/round1_multi_leg_congestion_hold_v6_20260811.json`, and
+the candidate ATT, log, and score JSON remain ignored private evidence.

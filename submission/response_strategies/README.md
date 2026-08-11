@@ -16,7 +16,7 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: multi-transfer recovery-hold experiment
+## Current strategy: transfer-time-aware multi-transfer recovery hold
 
 Three hooks return `None` and delegate completely to the organizer fallback.
 During an active disruption, `assign_associated_bookings` may return `False`
@@ -27,10 +27,11 @@ the currently safe shortest route needs at least two changes between services
 recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
-disruption windows, vessel speeds, and service-route headways, makes a
-full-precision comparison, and otherwise delegates. Missing or ambiguous data
-also delegates without mutation. No performance result is claimed until the
-pre-registered full experiment finishes.
+disruption windows, vessel speeds, and service-route headways, and includes the
+organizer's fixed three-hour berthing phase for both vessels at every service
+transfer. It makes a full-precision comparison and otherwise delegates.
+Missing or ambiguous data also delegates without mutation. No performance
+result is claimed until the pre-registered full experiment finishes.
 
 ## Submission boundary
 

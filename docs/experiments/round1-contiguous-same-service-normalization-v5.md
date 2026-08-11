@@ -97,6 +97,38 @@ at least 90%, integration tests, Round 1 sync and byte comparison, smoke, two
 byte-identical participant-only packages, restricted-material scans, one clean
 worktree/branch, and no live simulator.
 
+## Pre-run verification record
+
+The preflight completed before any candidate simulation on launch HEAD
+`5dfb1035cf39f08198e3dc34b8492712d004b41a`. The non-overwriting manifest is
+`.challenge/round1/results/contiguous_same_service_normalization_v5_20260811/pre_run_manifest.json`
+with SHA-256
+`9c71e6ae7a71e37c19f4cf8241722b9db23b12af39362b741d1bf805d9a77e21`.
+
+- candidate and synchronized runtime strategy: byte-identical,
+  SHA-256 `96c0820c3b2c2567213847afe6ea735bc665505e1d1e254003ccbc069f5a2fc8`;
+- control ATT snapshot and stale active Output: byte-identical,
+  SHA-256 `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`,
+  1,262 bytes;
+- authoritative Round 1 baseline ATT SHA-256:
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`;
+- `uv lock --check` and `uv sync --locked --all-groups`: passed;
+- Ruff format/check, Ty, and mypy: passed;
+- non-integration suite: 229 passed, 9 deselected, true branch coverage
+  `90.96%`;
+- integration suite: 9 passed;
+- Round 1 sync and participant/runtime comparison: passed;
+- Round 1 smoke: `SMOKE_OK` and `smoke: OK`;
+- two validation packages: byte-identical SHA-256
+  `2f80bc6760c1429cf6516f3f8761af53fa492d28785334688bf258567ae19b81`,
+  containing only the participant README and strategy;
+- tracked/reachable restricted-material scans, `git diff --check`, clean Git
+  status, one-worktree/one-branch layout, and no live simulator: passed.
+
+No full run, candidate Output write, scoring of candidate bytes, tuning,
+second candidate, package submission, push, merge, PR, or history rewrite had
+occurred at this stop point.
+
 ## One-run decision and restoration
 
 Exactly one full candidate run is allowed. After launch no code, tests,

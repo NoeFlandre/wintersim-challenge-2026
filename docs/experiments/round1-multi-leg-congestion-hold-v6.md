@@ -188,3 +188,40 @@ not prove that every structurally similar policy is harmful under hidden
 scenarios. The complete scorer JSON is preserved at
 `experiments/results/round1_multi_leg_congestion_hold_v6_20260811.json`, and
 the candidate ATT, log, and score JSON remain ignored private evidence.
+
+## Rejection and restoration
+
+The rejection record was committed before any restore. Candidate commits were
+reverted in the declared reverse order:
+
+- `26df110` reverted the participant README update `a64a22e`;
+- `c26d28b` reverted the v6 implementation `9dcce2a`;
+- `863e962` reverted the v6 RED tests `134a859`.
+
+The accepted v3 participant files were synchronized from the tracked source,
+and the pinned v3 ATT snapshot was copied byte-for-byte back to the active
+Round 1 Output. Independent verification then reported:
+
+- participant/runtime strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- active and pinned v3 ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- active Output re-score: `19.084638612143134` over 72 periods;
+- no candidate, replay, tuning, or restoration simulation was run.
+
+All final gates passed after restoration:
+
+- locked uv check/sync, Ruff format/check, Ty, and mypy;
+- 227 non-integration tests with true branch coverage `90.84%`;
+- 8 integration tests;
+- Round 1 sync and byte identity for both participant files;
+- one-day smoke: `SMOKE_OK`, with the restored ATT hash unchanged;
+- two final participant-only packages byte-identical at SHA-256
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`,
+  5,923 bytes;
+- `git diff --check`, one-worktree/one-branch layout, restricted-material
+  scans, clean tracked status, and no-live-simulator proof.
+
+The v6 candidate ATT, raw log, score JSON, activation audit, aggregate, and
+pre-run manifest remain ignored private evidence. No push, merge, pull request,
+submission archive, upload, or history rewrite occurred.

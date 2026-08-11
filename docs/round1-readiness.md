@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; twelve controlled Round 1
+**Status:** bootstrapped and smoke-tested; thirteen controlled Round 1
 experiments have valid scores and one earlier attempt was incomplete. The
 multi-transfer recovery-hold v3 policy is accepted and remains active.
 
@@ -61,6 +61,14 @@ tracked, copied into the public repository, or included in a submission.
   `17.33282986819197%` worse than the active v3 control, so it was rejected.
   Its fresh ATT, raw log, activation audit, and aggregate score remain in the
   ignored evidence directory; v3 was restored and rescored exactly.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-multi-leg-congestion-hold-v6.md`](experiments/round1-multi-leg-congestion-hold-v6.md),
+  also ran exactly once and completed all 72 periods. Its narrow pure-leg,
+  multi-leg one-transfer extension scored `20.810481217905384`, which was
+  `9.043098173544317%` worse than the active v3 control, so it was rejected.
+  Its fresh ATT, raw log, score JSON, and activation audit remain in the
+  ignored evidence directory; v3 was restored, synchronized, and rescored
+  exactly at `19.084638612143134`.
 - The preceding accepted experiment, documented in
   [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
   scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.

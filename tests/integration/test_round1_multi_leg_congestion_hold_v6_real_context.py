@@ -38,9 +38,7 @@ def _prepare_imports(source: Path) -> None:
         "simulation_model",
     )
     for module_name in list(sys.modules):
-        if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
-        ):
+        if any(module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes):
             sys.modules.pop(module_name, None)
 
 
@@ -71,7 +69,8 @@ def _times(context: Any) -> tuple[dt.datetime, ...]:
             first = math.ceil(start)
             last = math.floor(start + duration - 1e-12)
             values.extend(
-                dt.datetime.min + dt.timedelta(days=day + 0.5) for day in range(first, last + 1)
+                dt.datetime.min + dt.timedelta(days=day + 0.5)
+                for day in range(first, last + 1)
             )
     return tuple(sorted(set(values)))
 
@@ -120,16 +119,13 @@ def _qualifies(participant: Any, context: Any, now: dt.datetime, demand: Any) ->
     graphs = participant._graphs(context, state)
     if graphs is None:
         return False
-    nominal = participant._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[0]
-    )
-    safe = participant._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[1]
-    )
+    nominal = participant._shortest_path(context, demand.origin_port, demand.destination_port, graphs[0])
+    safe = participant._shortest_path(context, demand.origin_port, demand.destination_port, graphs[1])
     if nominal is None or safe is None or len(nominal) != 1 or len(nominal[0].legs) < 2:
         return False
     route_changes = sum(
-        left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
+        left.route is not right.route
+        for left, right in zip(safe, safe[1:], strict=False)
     )
     if route_changes != 1:
         return False
@@ -160,9 +156,7 @@ def test_real_round1_v6_has_candidate_only_activation_without_mutation() -> None
 
     import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
     import scenario_builders  # type: ignore[import-not-found]  # noqa: PLC0415
-    from maritime_data_context.shipment import (
-        Shipment,  # type: ignore[import-not-found]  # noqa: PLC0415
-    )
+    from maritime_data_context.shipment import Shipment  # type: ignore[import-not-found]  # noqa: PLC0415
     from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
         DefaultStrategy,
     )
@@ -184,9 +178,7 @@ def test_real_round1_v6_has_candidate_only_activation_without_mutation() -> None
                 generated_time=now,
             )
             before = _snapshot(context, shipment)
-            assert (
-                participant.UserStrategy.assign_associated_bookings(context, now, shipment) is False
-            )
+            assert participant.UserStrategy.assign_associated_bookings(context, now, shipment) is False
             assert _snapshot(context, shipment) == before
             found = True
             break

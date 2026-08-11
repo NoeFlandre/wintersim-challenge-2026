@@ -8,6 +8,7 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
+
 ANCHOR = dt.datetime.min
 
 
@@ -33,7 +34,9 @@ def _route(
         )
         for index, distance in enumerate(distances, start=1)
     ]
-    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))]
+    route.deployed_vessels = [
+        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))
+    ]
     return route
 
 
@@ -144,9 +147,7 @@ def test_single_leg_pure_congestion_one_transfer_still_delegates() -> None:
 
 def test_multi_leg_closed_port_one_transfer_delegates() -> None:
     context, now, shipment, items = _candidate_fixture()
-    context.disruption_plans = [
-        _berth_plan(items["nominal"].segments[0].associated_leg.arrival_port)
-    ]
+    context.disruption_plans = [_berth_plan(items["nominal"].segments[0].associated_leg.arrival_port)]
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 

@@ -140,3 +140,57 @@ the accepted v3 strategy, restore the pinned v3 ATT snapshot byte-for-byte,
 re-score it at `19.084638612143134`, and rerun all final gates. No second
 candidate, tuning, submission archive, push, merge, PR, or history rewrite is
 authorized by this report.
+
+## Full-run result
+
+Exactly one candidate simulation ran from launch HEAD
+`b504f0351ecfabced7b9d257651206d524c69f59` with the frozen configuration. The
+managed process exited `0`; the raw log contains `Period Result Output: Period
+72 (Days 356-360)`, `Output Simulation Day: 360`, and `Simulation completed.`.
+The organizer reported simulation runtime `00:24:56`.
+
+- candidate strategy SHA-256:
+  `96c0820c3b2c2567213847afe6ea735bc665505e1d1e254003ccbc069f5a2fc8`;
+- candidate ATT SHA-256:
+  `25827e3da6af17a54f54be88eedfa42924222ce9199f500236e4b5ae902d5f0b`;
+- candidate ATT size: 1,262 bytes;
+- numbered periods: 72;
+- candidate mean ATT: `20.56986111111111` days;
+- full-run log SHA-256:
+  `b233d6b464ac81c82e1eb021a646783a23a6815ce9d328bd5a0fb5f580edb5d5`.
+
+The fresh ATT and raw log were copied into the ignored evidence directory
+before scoring, synchronization, smoke, or restoration.
+
+## Score and decision
+
+The official scorer, using the preserved candidate ATT and the authoritative
+Round 1 baseline, reported 72 periods and cumulative resilience loss
+`22.392546553745177`. The accepted v3 control is
+`19.084638612143134`, so the exact delta is `+3.3079079416020427` and the
+relative change is `+17.33282986819197%` (worse).
+
+The candidate ATT was better in 12 periods, equal in 26, and worse in 34 than
+the control. Mean ATT is descriptive only; the unchanged acceptance expression
+was:
+
+```text
+22.392546553745177 < 19.084638612143134 - 1e-9
+```
+
+It is false. **Decision: REJECTED.** The aggregate scorer record is preserved
+in ignored `experiments/results/round1_contiguous_same_service_normalization_v5_20260811.json`.
+
+The result establishes that this exact same-service extension degraded the
+fixed Round 1 scenario. It does not prove that every contiguous same-route
+path is harmful in another scenario or seed.
+
+## Rejection and restoration
+
+This result record is committed before any restoration. The candidate code,
+README, and candidate-only tests will be reverted in reverse order with
+`git revert`; the accepted v3 strategy will then be synchronized, its pinned
+ATT snapshot restored byte-for-byte, and its score rechecked at exactly
+`19.084638612143134`. All final gates will be rerun. No tuning, duplicate run,
+second candidate, package submission, push, merge, PR, or history rewrite is
+part of this experiment.

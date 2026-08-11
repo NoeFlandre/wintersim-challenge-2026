@@ -13,7 +13,7 @@ permitted.
 
 ## Pre-run verification record
 
-The reviewed launch HEAD is `7550dd676258239c6b3ebdd0f85d32db92c96f4f` on the
+The reviewed launch HEAD is `952772be3a48447170faea5c74c0f6bdcc52070c` on the
 sole local `main` branch. The participant strategy and synchronized Round 1
 runtime copy are byte-identical at SHA-256
 `be8f36acb3d8c2ee6cb8fcd7c03d805e2ee5dbc7eb93c95b5cf6c0bd21d85e64`.
@@ -21,7 +21,7 @@ runtime copy are byte-identical at SHA-256
 The non-overwriting ignored manifest is
 `.challenge/round1/results/transfer_berthing_overhead_v7_20260811/pre_run_manifest.json`
 (SHA-256
-`5cd3b43f923e36e99a7e13ada3434d1386227539732272821137c034a3d12e2d`). It
+`268dc441ddd7a14f2a50a236bd207aac7e963d15a383ce14be4373c9d1f7282a`). It
 pins the launch identities, fixed configuration, package member list, and all
 preflight results.
 

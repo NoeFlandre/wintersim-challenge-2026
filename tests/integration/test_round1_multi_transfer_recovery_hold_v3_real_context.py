@@ -266,3 +266,77 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     before = _snapshot(context, delegated)
     assert participant.UserStrategy.assign_associated_bookings(context, earliest, delegated) is None
     assert _snapshot(context, delegated) == before
+
+
+def test_real_round1_same_service_path_extension_is_candidate_only() -> None:
+    source = _bootstrap_or_skip()
+    _prepare_imports(source)
+
+    import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    import scenario_builders  # type: ignore[import-not-found]  # noqa: PLC0415
+    from maritime_data_context.shipment import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        Shipment,
+    )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        DefaultStrategy,
+    )
+
+    participant = _load_participant_module()
+    template = scenario_builders.create_with_disruption()
+    found_same_service_candidate_only = False
+    for now in _candidate_times(template):
+        context = scenario_builders.create_with_disruption()
+        DefaultStrategy.create_alternative_service_routes(context, now)
+        for index, demand in enumerate(context.demands):
+            shipment = Shipment(
+                index=index,
+                teu_size=1,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            state = participant._active_state(context, now)
+            graphs = participant._graphs(context, state) if state is not None else None
+            nominal = (
+                participant._shortest_path(
+                    context,
+                    demand.origin_port,
+                    demand.destination_port,
+                    graphs[0],
+                )
+                if graphs is not None
+                else None
+            )
+            safe = (
+                participant._shortest_path(
+                    context,
+                    demand.origin_port,
+                    demand.destination_port,
+                    graphs[1],
+                )
+                if graphs is not None
+                else None
+            )
+            if nominal is None or safe is None or len(nominal) <= 1 or len(safe) < 2:
+                continue
+            same_service = all(edge.route is nominal[0].route for edge in nominal)
+            safe_changes = sum(
+                left.route is not right.route
+                for left, right in zip(safe, safe[1:], strict=False)
+            )
+            if not same_service or safe_changes < 2:
+                continue
+            before = _snapshot(context, shipment)
+            decision = participant.UserStrategy.assign_associated_bookings(
+                context, now, shipment
+            )
+            assert _snapshot(context, shipment) == before
+            if decision is False:
+                found_same_service_candidate_only = True
+                break
+        if found_same_service_candidate_only:
+            break
+
+    assert found_same_service_candidate_only, (
+        "real Round 1 context did not expose a same-service candidate-only hold"
+    )

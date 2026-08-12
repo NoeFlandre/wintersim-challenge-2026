@@ -360,22 +360,6 @@ def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime |
     return max(recoveries) if recoveries else None
 
 
-def _edge_constraint_kinds(edge: _Edge, state: _ActiveState) -> tuple[str, ...]:
-    leg_identities = frozenset(id(leg) for leg in edge.legs)
-    arrival_names = frozenset(
-        name
-        for name in (_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
-        if name is not None
-    )
-    kinds: list[str] = []
-    for constraint in state.constraints:
-        if constraint.kind == "leg" and constraint.target_identity in leg_identities:
-            kinds.append("leg")
-        elif constraint.kind == "port" and constraint.arrival_name in arrival_names:
-            kinds.append("port")
-    return tuple(kinds)
-
-
 def _route_profile(route: Any) -> _RouteProfile | None:
     route_data = _route_data(route)
     if route_data is None:
@@ -448,14 +432,8 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     route_change_count = sum(
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
     )
-    if route_change_count < 1:
+    if route_change_count < 2:
         return False
-    if route_change_count == 1:
-        if len(nominal_path[0].legs) != 1:
-            return False
-        constraint_kinds = _edge_constraint_kinds(nominal_path[0], state)
-        if not constraint_kinds or any(kind != "leg" for kind in constraint_kinds):
-            return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)
     if recovery is None:

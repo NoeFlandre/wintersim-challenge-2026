@@ -38,6 +38,22 @@ observed state was unchanged. Activation and exposure are structural evidence,
 not score predictions; the anonymous audit record will remain ignored at
 `.challenge/round1/results/pure_congestion_exclusion_v9_20260812/activation_audit.json`.
 
+## TDD and implementation review
+
+The RED contract was committed as `2d11a58`. Against untouched v3, the focused
+unit/real-context selection failed exactly five intended pure-leg assertions
+and passed 37 independent checks. The failures were all the missing v9
+delegation (`False` from v3 where v9 requires `None`), including one real
+derived pure-leg activation; there were no fixture, collection, import, or
+mutation errors.
+
+The minimum implementation was committed as `45bc7e3`. It adds one
+constraint-kind helper and one fail-closed gate; it does not alter path
+construction, timing, route state, any other hook, or package dependencies.
+Focused GREEN then passed `42` unit and real-context tests. Ruff format/check,
+Ty, and mypy passed on the changed surface. The candidate participant SHA-256
+is `d6e24a09904197959f225ca01a9b4964b36cce1697ee177522eb97ba190357b0`.
+
 ## Candidate contract
 
 Only `assign_associated_bookings` changes. The candidate must be RED before

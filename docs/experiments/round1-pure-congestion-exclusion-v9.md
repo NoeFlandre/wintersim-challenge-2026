@@ -169,3 +169,22 @@ synchronized back to the accepted v3 participant strategy; its SHA-256 is
 The pinned v3 ATT snapshot was restored byte-for-byte:
 `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and
 the scorer again returned exactly `19.084638612143134` over 72 periods.
+
+## Post-restoration verification
+
+The restored checkout passed the final gates without another full simulation:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, Ty, and mypy passed (`8` source files for mypy);
+- non-integration tests: `227 passed, 8 deselected`, true branch coverage
+  `90.84%`; integration tests: `8 passed`; broad suite: `235 passed`;
+- Round 1 smoke returned `SMOKE_OK` and `smoke: OK`;
+- participant/source `cmp` passed for both participant files, and the active
+  strategy SHA remained `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- two participant-only packages were byte-identical at SHA-256
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`,
+  containing only the required README and `user_strategy.py` members;
+- restricted reachable-history/path scans, `git diff --check`, one-worktree /
+  one-`main` layout, and no-live-simulation verification passed.
+
+The canonical working tree is restored; no candidate process remains.

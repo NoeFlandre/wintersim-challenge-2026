@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; fifteen controlled Round 1
+**Status:** bootstrapped and smoke-tested; sixteen controlled Round 1
 experiments have valid scores and one earlier attempt was incomplete. The
 multi-transfer recovery-hold v3 policy is accepted and remains active.
 
@@ -87,6 +87,17 @@ tracked, copied into the public repository, or included in a submission.
   raw log remain in the ignored evidence directory. The v3 participant and
   pinned ATT were restored byte-for-byte, synchronized, and re-scored at
   `19.084638612143134`; final quality and safety gates passed.
+- The subsequent controlled experiment, documented in
+  [`docs/experiments/round1-pure-congestion-exclusion-v9.md`](experiments/round1-pure-congestion-exclusion-v9.md),
+  executed exactly once and reached all 72 periods. Its subtraction of pure
+  leg-congestion recovery holds scored `22.38757990186231`, which was
+  `17.306805524824487%` worse than the active v3 control. It was rejected by
+  the strict aggregate gate; its candidate ATT SHA is
+  `b318b8e3ce2ff37e8d8f6c05834440b9af41539b5f2e43d9e366accee9048acd`, and its
+  ATT, log, launch manifest, activation audit, and scorer JSON remain in the
+  ignored evidence directories. The v3 participant and pinned ATT were
+  restored byte-for-byte, synchronized, and re-scored at
+  `19.084638612143134`.
 - The preceding accepted experiment, documented in
   [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
   scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.

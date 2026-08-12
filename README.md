@@ -56,15 +56,15 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`. Fifteen controlled experiments have valid scores
+  `.challenge/round1/source/`. Sixteen controlled experiments have valid scores
   and one earlier attempt was incomplete. The first nine scored candidates were
   rejected; recovery-aware direct-service hold v2 beat the fallback, and the
   multi-transfer refinement v3 improved the active best to
   `19.084638612143134`. This is `6.615707068353528%` below the
   `20.436668751255972` fallback. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 pure-congestion transfer-hold report`](docs/experiments/round1-pure-congestion-transfer-hold-v8.md).
-  That latest v8 trial scored `20.229520673897987`, was rejected as worse than
+  [`Round 1 pure-congestion exclusion report`](docs/experiments/round1-pure-congestion-exclusion-v9.md).
+  That latest v9 trial scored `22.38757990186231`, was rejected as worse than
   v3, and left the accepted v3 strategy active.
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
@@ -91,6 +91,10 @@ candidate evidence remains preserved in the ignored results directory.
   v2 result by `3.7529484181856874%`. Its ATT SHA-256 is
   `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
   the tested v3 candidate remains active.
+- The latest Round 1 pure-congestion exclusion experiment scored
+  `22.38757990186231` against the active v3 control
+  `19.084638612143134` and was rejected; its ignored candidate evidence is
+  preserved in the v9 results directory.
 
 ## Prerequisites
 

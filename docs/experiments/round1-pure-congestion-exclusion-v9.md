@@ -1,7 +1,6 @@
 # Round 1 pure-congestion exclusion v9
 
-**Status: DESIGN FROZEN — no candidate implementation or full simulation has
-started.**
+**Status: PRE-RUN VERIFIED — no full candidate simulation has started.**
 
 This report records the v9 hypothesis, fresh activation audit, fixed control,
 strict acceptance gate, evidence paths, and restoration procedure. The
@@ -92,3 +91,37 @@ stale Output metadata, exact command, and no-live-process proof.
 
 No push, merge, PR, upload, email, submission, history rewrite, post-run
 tuning, or second candidate is part of this experiment.
+
+## Pre-run verification
+
+The complete preflight passed before launch authorization on 2026-08-12. The
+reviewed implementation/report HEAD before this preflight record was
+`c7a390b`; the final launch HEAD will be pinned in the non-overwriting
+manifest.
+
+- participant and synchronized Round 1 strategy SHA-256:
+  `d6e24a09904197959f225ca01a9b4964b36cce1697ee177522eb97ba190357b0`;
+  `cmp` passed for both participant files;
+- `uv lock --check` and `uv sync --locked --all-groups`: passed;
+- Ruff format/check, Ty, and mypy: passed;
+- non-integration tests: `228 passed, 9 deselected`, true branch coverage
+  `90.40%` (minimum `90.00%`);
+- integration tests: `9 passed`;
+- Round 1 smoke: `SMOKE_OK` and `smoke: OK`;
+- two `ValidationTeam` participant-only packages: byte-identical SHA-256
+  `df32d82ae3de5520ade608482e02910090823f07f83540a10a405b06dcb12772`,
+  6,111 bytes, containing only
+  `Round1_ValidationTeam/response_strategies/README.md` and
+  `Round1_ValidationTeam/response_strategies/user_strategy.py`;
+- control participant/runtime and pinned v3 ATT identities were verified;
+  active Output remained byte-identical to the pinned control ATT
+  (`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`,
+  1,262 bytes, mtime `2026-08-12T09:54:19`), and fresh scoring returned exactly
+  `19.084638612143134` over 72 periods against baseline SHA-256
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`;
+- restricted reachable-history/path scans, `git diff --check`, one-worktree /
+  one-`main` layout, clean tracked status, and no live WSC simulator passed.
+
+The non-overwriting launch manifest is written under the predeclared ignored
+v9 evidence directory. No full simulation, candidate scoring, tuning, push,
+merge, PR, upload, or submission has occurred.

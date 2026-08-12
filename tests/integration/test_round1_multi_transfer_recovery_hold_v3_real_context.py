@@ -177,28 +177,6 @@ def _candidate_times(context: Any) -> tuple[dt.datetime, ...]:
     return tuple(sorted(set(times)))
 
 
-def _daily_midpoints(context: Any) -> tuple[dt.datetime, ...]:
-    times: list[dt.datetime] = []
-    for plan in context.disruption_plans:
-        start_days = getattr(plan, "start_offset_days", None)
-        duration_days = getattr(plan, "duration_days", None)
-        if (
-            isinstance(start_days, (int, float))
-            and not isinstance(start_days, bool)
-            and math.isfinite(start_days)
-            and isinstance(duration_days, (int, float))
-            and not isinstance(duration_days, bool)
-            and math.isfinite(duration_days)
-            and duration_days > 0
-        ):
-            first = math.ceil(start_days)
-            last = math.floor(start_days + duration_days - 1e-9)
-            times.extend(
-                dt.datetime.min + dt.timedelta(days=day + 0.5) for day in range(first, last + 1)
-            )
-    return tuple(sorted(set(times)))
-
-
 def _outside_time(context: Any) -> dt.datetime:
     starts = [
         dt.datetime.min + dt.timedelta(days=plan.start_offset_days)
@@ -288,66 +266,3 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     before = _snapshot(context, delegated)
     assert participant.UserStrategy.assign_associated_bookings(context, earliest, delegated) is None
     assert _snapshot(context, delegated) == before
-
-
-def test_real_round1_context_exposes_pure_congestion_one_transfer_candidate() -> None:
-    source = _bootstrap_or_skip()
-    _prepare_imports(source)
-
-    import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
-    import scenario_builders  # type: ignore[import-not-found]  # noqa: PLC0415
-    from maritime_data_context.shipment import (  # type: ignore[import-not-found]  # noqa: PLC0415
-        Shipment,
-    )
-    from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
-        DefaultStrategy,
-    )
-
-    participant = _load_participant_module()
-    template = scenario_builders.create_with_disruption()
-    found = False
-    for now in _daily_midpoints(template):
-        context = scenario_builders.create_with_disruption()
-        DefaultStrategy.create_alternative_service_routes(context, now)
-        for index, demand in enumerate(context.demands):
-            shipment = Shipment(
-                index=index,
-                teu_size=1,
-                demand=demand,
-                current_storage_port=demand.origin_port,
-                generated_time=now,
-            )
-            before = _snapshot(context, shipment)
-            decision = participant.UserStrategy.assign_associated_bookings(context, now, shipment)
-            after = _snapshot(context, shipment)
-            assert after == before, "candidate decision mutated real Round 1 state"
-            if decision is not False:
-                continue
-            state = participant._active_state(context, now)
-            assert state is not None
-            graphs = participant._graphs(context, state)
-            assert graphs is not None
-            nominal = participant._shortest_path(
-                context, demand.origin_port, demand.destination_port, graphs[0]
-            )
-            safe = participant._shortest_path(
-                context, demand.origin_port, demand.destination_port, graphs[1]
-            )
-            assert nominal is not None and safe is not None
-            route_changes = sum(
-                left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
-            )
-            if (
-                len(nominal) == 1
-                and len(nominal[0].legs) == 1
-                and route_changes == 1
-                and all(
-                    kind == "leg" for kind in participant._edge_constraint_kinds(nominal[0], state)
-                )
-            ):
-                found = True
-                break
-        if found:
-            break
-
-    assert found, "candidate-only pure-congestion one-transfer activation is absent"

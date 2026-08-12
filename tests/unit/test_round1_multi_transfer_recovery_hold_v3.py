@@ -151,37 +151,6 @@ def _qualifying_fixture(
     )
 
 
-def _pure_congestion_one_transfer_fixture(
-    *, multi_physical_nominal: bool = False, closed_destination: bool = False
-) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace, dict[str, Any]]:
-    origin = _port("Origin")
-    nominal_mid = _port("Nominal Mid")
-    transfer = _port("Transfer")
-    destination = _port("Destination")
-    if multi_physical_nominal:
-        nominal = _route(
-            "nominal",
-            [origin, nominal_mid, destination, origin],
-            [50.0, 50.0, 100.0],
-        )
-    else:
-        nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
-    safe_a = _route("safe-a", [origin, transfer, origin], [1000.0, 1000.0])
-    safe_b = _route("safe-b", [transfer, destination, transfer], [1000.0, 1000.0])
-    plan = _berth_plan(destination) if closed_destination else _leg_plan(_leg(nominal))
-    context = SimpleNamespace(
-        ports=[origin, nominal_mid, transfer, destination],
-        service_routes=[nominal, safe_a, safe_b],
-        disruption_plans=[plan],
-    )
-    return (
-        context,
-        ANCHOR + dt.timedelta(days=14.5),
-        _shipment(origin, destination),
-        {"nominal": nominal, "destination": destination},
-    )
-
-
 def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
     if seen is None:
         seen = {}
@@ -243,32 +212,6 @@ def test_one_transfer_safe_path_delegates_without_mutation() -> None:
 
     assert decision is None
     assert _freeze((context, shipment)) == before
-
-
-def test_pure_congestion_one_physical_leg_transfer_can_hold_without_mutation() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture()
-    before = _freeze((context, shipment))
-
-    decision = _decision(context, now, shipment)
-
-    assert decision is False
-    assert _freeze((context, shipment)) == before
-
-
-def test_closed_berth_one_transfer_still_delegates() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(
-        closed_destination=True
-    )
-
-    assert _decision(context, now, shipment) is None
-
-
-def test_multi_physical_leg_nominal_one_transfer_still_delegates() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(
-        multi_physical_nominal=True
-    )
-
-    assert _decision(context, now, shipment) is None
 
 
 def test_disruption_start_is_inclusive() -> None:

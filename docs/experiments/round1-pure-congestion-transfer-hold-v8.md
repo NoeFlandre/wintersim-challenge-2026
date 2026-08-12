@@ -54,7 +54,7 @@ authorized:
 - Restricted-material, diff-hygiene, branch/worktree, and live-process checks
   were clean.
 
-The exact run identity is frozen: `PYTHONHASHSEED=0`, seed `2026`, Round 1
+The exact run identity was frozen: `PYTHONHASHSEED=0`, seed `2026`, Round 1
 `create_with_disruption`, 140-day warm-up, 360 measured days, 5-day ATT
 intervals, and one command only:
 
@@ -69,3 +69,39 @@ smoke, or restoration. If the candidate is equal, worse, or fails, its result
 will be committed first, then only the v8 implementation/test commits will be
 reverted, v3 will be synchronized and restored from its pinned ATT snapshot,
 and every final gate will be rerun.
+
+## Full-run result
+
+The one authorized full run was launched from HEAD
+`57b388697a92db691c53d78359ffbdc85f0a7ccd` with the frozen command and ran to
+completion without interruption:
+
+- `Simulation Progress: Day 360 / 360` and `Period Result Output: Period 72`
+  were present in the raw log.
+- `Simulation completed.` and `CSV output written` were present; the command
+  exited `0`. No Round 1 simulator process remained afterward.
+- Simulation-reported runtime was `00:28:58`.
+- The preserved raw log is
+  `.challenge/round1/results/pure_congestion_transfer_hold_v8_20260812/full_run.log`
+  (SHA-256 `4fee7a02ff78e79ede825d9f0a802a6c5c578c75004e2929738072d1901ebbf7`).
+- The preserved candidate ATT is
+  `.challenge/round1/results/pure_congestion_transfer_hold_v8_20260812/ATT_By_Statistics_Interval.csv`
+  (72 numbered rows, SHA-256
+  `7392bc6f3508c03ea23841e9eaf12d9bd759d7cb1d6a14058694ca709112de20`).
+
+Scoring that preserved file against the authoritative Round 1 baseline
+(`2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`) produced
+cumulative resilience loss `20.229520673897987`. Compared with the pinned v3
+control `19.084638612143134`, the delta is `+1.1448820617548527` (`+5.99897%`),
+so the candidate is **REJECTED** by the immutable rule
+`candidate_loss < 19.084638612143134 - 1e-9`.
+
+Against the byte-preserved v3 ATT, the candidate was better in 4 periods, equal
+in 50, and worse in 18. The candidate ATT was not substituted for the control.
+The ignored aggregate record is
+`experiments/results/round1_pure_congestion_transfer_hold_v8_20260812.json`.
+
+The next required action is the documented rejection path: commit this result,
+revert only the v8 implementation/test commits, synchronize the v3 participant,
+restore its pinned ATT bytes, re-score the active output, and rerun the final
+quality, integration, packaging, safety, and clean-state gates.

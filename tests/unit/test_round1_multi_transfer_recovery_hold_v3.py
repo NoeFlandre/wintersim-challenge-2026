@@ -224,7 +224,7 @@ def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None
     assert _freeze((context, shipment)) == before
 
 
-def test_one_transfer_safe_path_delegates_without_mutation() -> None:
+def test_one_transfer_pure_congestion_can_hold_without_mutation() -> None:
     origin = _port("Origin")
     transfer = _port("Transfer")
     destination = _port("Destination")
@@ -241,32 +241,18 @@ def test_one_transfer_safe_path_delegates_without_mutation() -> None:
 
     decision = _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment)
 
-    assert decision is None
-    assert _freeze((context, shipment)) == before
-
-
-def test_pure_congestion_one_physical_leg_transfer_can_hold_without_mutation() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture()
-    before = _freeze((context, shipment))
-
-    decision = _decision(context, now, shipment)
-
     assert decision is False
     assert _freeze((context, shipment)) == before
 
 
 def test_closed_berth_one_transfer_still_delegates() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(
-        closed_destination=True
-    )
+    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(closed_destination=True)
 
     assert _decision(context, now, shipment) is None
 
 
 def test_multi_physical_leg_nominal_one_transfer_still_delegates() -> None:
-    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(
-        multi_physical_nominal=True
-    )
+    context, now, shipment, _ = _pure_congestion_one_transfer_fixture(multi_physical_nominal=True)
 
     assert _decision(context, now, shipment) is None
 

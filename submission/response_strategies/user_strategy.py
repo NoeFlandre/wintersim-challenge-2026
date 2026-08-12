@@ -3,7 +3,8 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+changes between service routes. Pure leg-congestion cases delegate to the
+organizer; the hold remains available when a closed berth is also involved.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -360,6 +361,18 @@ def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime |
     return max(recoveries) if recoveries else None
 
 
+def _edge_constraint_kinds(edge: _Edge, state: _ActiveState) -> tuple[str, ...]:
+    leg_identities = {id(leg) for leg in edge.legs}
+    arrival_names = {_port_name(port) for port in (*edge.intermediate_ports, edge.arrival)}
+    kinds: set[str] = set()
+    for constraint in state.constraints:
+        if constraint.kind == "leg" and constraint.target_identity in leg_identities:
+            kinds.add("leg")
+        elif constraint.kind == "port" and constraint.arrival_name in arrival_names:
+            kinds.add("port")
+    return tuple(sorted(kinds))
+
+
 def _route_profile(route: Any) -> _RouteProfile | None:
     route_data = _route_data(route)
     if route_data is None:
@@ -433,6 +446,9 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
     )
     if route_change_count < 2:
+        return False
+
+    if _edge_constraint_kinds(nominal_path[0], state) == ("leg",):
         return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)

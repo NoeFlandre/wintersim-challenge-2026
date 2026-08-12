@@ -56,14 +56,16 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`. Eleven controlled experiments have valid scores
+  `.challenge/round1/source/`. Fifteen controlled experiments have valid scores
   and one earlier attempt was incomplete. The first nine scored candidates were
   rejected; recovery-aware direct-service hold v2 beat the fallback, and the
   multi-transfer refinement v3 improved the active best to
   `19.084638612143134`. This is `6.615707068353528%` below the
   `20.436668751255972` fallback. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 multi-transfer hold report`](docs/experiments/round1-multi-transfer-recovery-hold-v3.md).
+  [`Round 1 pure-congestion transfer-hold report`](docs/experiments/round1-pure-congestion-transfer-hold-v8.md).
+  That latest v8 trial scored `20.229520673897987`, was rejected as worse than
+  v3, and left the accepted v3 strategy active.
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).

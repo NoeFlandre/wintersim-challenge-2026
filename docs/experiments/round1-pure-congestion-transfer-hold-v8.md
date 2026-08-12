@@ -105,3 +105,29 @@ The next required action is the documented rejection path: commit this result,
 revert only the v8 implementation/test commits, synchronize the v3 participant,
 restore its pinned ATT bytes, re-score the active output, and rerun the final
 quality, integration, packaging, safety, and clean-state gates.
+
+## Rejection restoration and final state
+
+The result was committed before restoration. Candidate-only commits
+`9d0fe30`, `253ba62`, and `95f641e` were then reverted in reverse dependency
+order; the frozen design, pre-run, and result records remain in history. The
+active participant is again the accepted v3 strategy:
+
+- `submission/response_strategies/user_strategy.py` and the synchronized Round
+  1 runtime are byte-identical at SHA-256
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`.
+- The active ATT was restored by copying the pinned v3 snapshot, is
+  byte-identical at SHA-256
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and
+  re-scores to `19.084638612143134` over 72 periods.
+- The candidate ATT and raw log remain preserved only in the ignored v8
+  evidence directory; no candidate output was substituted for the control.
+
+Final gates after restoration all passed: lock check and locked sync; Ruff
+format/check; Ty; mypy; non-integration tests (`227 passed, 8 deselected`, true
+branch coverage `90.84%`); integration tests (`8 passed, 227 deselected`);
+Round 1 sync and `cmp`; `SMOKE_OK`; two deterministic participant-only
+packages (final SHA-256
+`a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`); diff
+hygiene; restricted-material scans; one worktree on `main`; and no live WSC
+process. The experiment is complete and rejected; v3 remains the active best.

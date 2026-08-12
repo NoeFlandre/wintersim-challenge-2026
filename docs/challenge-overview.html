@@ -396,11 +396,11 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; fourteen scored and one
+        Round 1 has its own private source tree; fifteen scored and one
         incomplete controlled Round 1 strategy experiments are recorded below.
         The tenth scored candidate first beat fallback; the eleventh improved
-        that result. The twelfth, thirteenth, and fourteenth extensions were
-        rejected, so the eleventh remains active.
+        that result. The twelfth through fifteenth extensions were rejected, so
+        the eleventh remains active.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
@@ -598,13 +598,14 @@
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Twelve Round 1 candidates
+        fallback is <strong>20.4366687513</strong>. Thirteen Round 1 candidates
         were scored and rejected, one run was interrupted before measured output,
         the tenth scored candidate was accepted at <strong>19.8288033747</strong>,
         and the eleventh improved it to <strong>19.0846386121</strong>. The
         twelfth scored <strong>22.3925</strong> and the thirteenth scored
         <strong>20.8105</strong>. The fourteenth scored
-        <strong>21.4284</strong>; all three were rejected, leaving v3 active.
+        <strong>21.4284</strong> and the fifteenth scored
+        <strong>20.2295</strong>; all four were rejected, leaving v3 active.
       </div>
     </section>
 
@@ -616,10 +617,10 @@
         complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. Twelve scored Round 1
+        Lower is better; equality is not an improvement. Fifteen scored Round 1
         trials were rejected and one was incomplete. Two were accepted in
         sequence; the eleventh remains active at 6.62% below fallback after
-        the twelfth, thirteenth, and fourteenth were rejected.
+        the twelfth through fifteenth were rejected.
       </p>
 
       <div class="table-wrap">
@@ -772,6 +773,11 @@
               <td>We kept the accepted v3 recovery hold and added a fixed berthing-overhead estimate for every transfer in the safe detour: two berthing phases at three hours each. The idea was to avoid choosing a transfer path whose extra port handling outweighed its sailing advantage. The complete run made the total result worse, so v3 was restored.</td>
               <td><strong>21.4284</strong><br><span class="status worse">4.85% worse than the 20.4367 Round 1 fallback and 12.28% worse than v3; rejected and restored</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-pure-congestion-transfer-hold-v8.md">Hold only pure one-leg congestion transfers</a></td>
+              <td>We kept the accepted v3 recovery-hold policy and added one tightly bounded case: a nominal direct booking spanning one physical leg, affected only by leg congestion, whose safe alternative required one service transfer. The real-context audit confirmed candidate-only activation and no mutation. The single complete run was worse overall, so the extension was rejected and v3 was restored byte-for-byte.</td>
+              <td><strong>20.2295</strong><br><span class="status worse">5.99897% worse than the active v3 control; rejected and restored</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -781,10 +787,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, fourteen scored Round 1
+    reports, nine completed Round 0 experiments, fifteen scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-transfer-berthing-overhead-v7.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-pure-congestion-transfer-hold-v8.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

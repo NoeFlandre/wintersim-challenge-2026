@@ -332,7 +332,8 @@ def test_real_round1_pure_leg_hold_is_candidate_only_and_mutation_free() -> None
             if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
                 continue
             route_changes = sum(
-                left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
+                left.route is not right.route
+                for left, right in zip(safe, safe[1:], strict=False)
             )
             if route_changes < 2:
                 continue
@@ -345,15 +346,19 @@ def test_real_round1_pure_leg_hold_is_candidate_only_and_mutation_free() -> None
             kinds = {
                 constraint.kind
                 for constraint in state.constraints
-                if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
-                or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+                if (
+                    constraint.kind == "leg"
+                    and constraint.target_identity in leg_ids
+                )
+                or (
+                    constraint.kind == "port"
+                    and constraint.arrival_name in arrival_names
+                )
             }
             if kinds != {"leg"}:
                 continue
             before = _snapshot(context, shipment)
-            assert (
-                participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None
-            )
+            assert participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None
             assert _snapshot(context, shipment) == before
             found = True
             break

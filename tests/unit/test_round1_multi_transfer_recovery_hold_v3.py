@@ -183,13 +183,13 @@ def _decision(context: SimpleNamespace, now: Any, shipment: SimpleNamespace) -> 
     return UserStrategy.assign_associated_bookings(context, now, shipment)
 
 
-def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None:
+def test_pure_leg_multitransfer_hold_delegates_without_mutation() -> None:
     context, now, shipment, _ = _qualifying_fixture()
     before = _freeze((context, shipment))
 
     result = _decision(context, now, shipment)
 
-    assert result is False
+    assert result is None
     assert _freeze((context, shipment)) == before
 
 
@@ -218,7 +218,7 @@ def test_disruption_start_is_inclusive() -> None:
     context, _, shipment, _ = _qualifying_fixture()
     start = ANCHOR + dt.timedelta(days=10)
 
-    assert _decision(context, start, shipment) is False
+    assert _decision(context, start, shipment) is None
 
 
 def test_disruption_end_is_exclusive() -> None:
@@ -311,6 +311,39 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
     )
 
 
+def test_mixed_leg_and_closed_port_hold_is_retained() -> None:
+    origin = _port("Origin")
+    closed = _port("Closed")
+    transfer_a = _port("Transfer A")
+    transfer_b = _port("Transfer B")
+    destination = _port("Destination")
+    nominal = _route(
+        "nominal",
+        [origin, closed, destination, origin],
+        [50.0, 50.0, 100.0],
+    )
+    safe_a = _route("safe-a", [origin, transfer_a, origin], [1000.0, 1000.0])
+    safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [1000.0, 1000.0])
+    safe_c = _route("safe-c", [transfer_b, destination, transfer_b], [1000.0, 1000.0])
+    context = SimpleNamespace(
+        ports=[origin, closed, transfer_a, transfer_b, destination],
+        service_routes=[nominal, safe_a, safe_b, safe_c],
+        disruption_plans=[
+            _berth_plan(closed),
+            _leg_plan(_leg(nominal, 0)),
+        ],
+    )
+
+    assert (
+        _decision(
+            context,
+            ANCHOR + dt.timedelta(days=14.5),
+            _shipment(origin, destination),
+        )
+        is False
+    )
+
+
 def test_matching_deployed_alternative_routes_are_eligible() -> None:
     context, now, shipment, items = _qualifying_fixture()
     disruption_key = ((), (("origin", "destination"),))
@@ -318,7 +351,7 @@ def test_matching_deployed_alternative_routes_are_eligible() -> None:
         route.source_service_route = items["nominal"]
         route.disruption_key = disruption_key
 
-    assert _decision(context, now, shipment) is False
+    assert _decision(context, now, shipment) is None
 
 
 @pytest.mark.parametrize("failure", ["wrong-key", "no-vessels"])
@@ -376,7 +409,7 @@ def test_equal_distance_ties_follow_context_port_order() -> None:
     slow_first = _tie_fixture(["O", "Y1", "Y2", "X1", "X2", "D"])
 
     assert _decision(*fast_first) is None
-    assert _decision(*slow_first) is False
+    assert _decision(*slow_first) is None
 
 
 @pytest.mark.parametrize(

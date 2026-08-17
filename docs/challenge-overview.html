@@ -396,10 +396,10 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; sixteen scored and one
+        Round 1 has its own private source tree; seventeen scored and one
         incomplete controlled Round 1 strategy experiments are recorded below.
         The tenth scored candidate first beat fallback; the eleventh improved
-        that result. The twelfth through sixteenth extensions were rejected, so
+        that result. The twelfth through seventeenth extensions were rejected, so
         the eleventh remains active.
       </p>
 
@@ -598,7 +598,7 @@
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
         <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Fourteen Round 1 candidates
+        fallback is <strong>20.4366687513</strong>. Fifteen Round 1 candidates
         were scored and rejected, one run was interrupted before measured output,
         the tenth scored candidate was accepted at <strong>19.8288033747</strong>,
         and the eleventh improved it to <strong>19.0846386121</strong>. The
@@ -606,7 +606,8 @@
         <strong>20.8105</strong>. The fourteenth scored
         <strong>21.4284</strong>, the fifteenth scored
         <strong>20.2295</strong>, and the sixteenth scored
-        <strong>22.3876</strong>; all five were rejected, leaving v3 active.
+        <strong>22.3876</strong>. The seventeenth scored
+        <strong>22.0970</strong>; all six were rejected, leaving v3 active.
       </div>
     </section>
 
@@ -618,10 +619,10 @@
         complete 360-day disruption simulation. We compared its loss with the
         <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
         complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. Sixteen scored Round 1
-        trials included fourteen rejections and one incomplete attempt. Two were accepted in
+        Lower is better; equality is not an improvement. Seventeen scored Round 1
+        trials included fifteen rejections and one incomplete attempt. Two were accepted in
         sequence; the eleventh remains active at 6.62% below fallback after
-        the twelfth through sixteenth were rejected.
+        the twelfth through seventeenth were rejected.
       </p>
 
       <div class="table-wrap">
@@ -784,6 +785,11 @@
               <td>We tested the smallest subtraction suggested by the two preceding pure-congestion failures: keep v3's recovery hold when a closed port is involved, but delegate when the nominal direct edge is affected only by a slowed physical leg. The activation audit found 22 pure-leg holds and 26 retained port-involved holds. The complete 72-period run showed that the excluded pure-leg cases contained useful recovery opportunities, so total loss increased and v3 was restored.</td>
               <td><strong>22.3876</strong><br><span class="status worse">17.30681% worse than the active v3 control; rejected and restored</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-port-closure-exclusion-v10.md">Delegate port-involved recovery holds</a></td>
+              <td>We kept the accepted v3 recovery hold for pure leg congestion, but delegated a hold whenever the matching nominal direct edge also touched a closed port. The read-only audit found 26 port-involved control holds and 22 pure-leg holds retained. The complete run made the total loss worse, so v3 was restored byte-for-byte.</td>
+              <td><strong>22.0970</strong><br><span class="status worse">15.78412% worse than the active v3 control; rejected and restored</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -793,10 +799,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, sixteen scored Round 1
+    reports, nine completed Round 0 experiments, seventeen scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-pure-congestion-exclusion-v9.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-port-closure-exclusion-v10.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

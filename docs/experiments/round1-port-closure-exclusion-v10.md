@@ -138,3 +138,20 @@ After recording the result, the v10 implementation and test commits were
 reverted in reverse dependency order. The v3 runtime was synchronized and its
 pinned ATT snapshot restored. The final active strategy and ATT must match the
 control hashes in the fixed contract above; no candidate remains active.
+
+The restoration commits are `38ea8a9` (revert implementation), `502159c`
+(revert contract-test correction), and `0234f39` (revert RED tests). The active
+strategy SHA is again
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`; the
+active ATT and pinned control snapshot are both
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`. The
+restored ATT re-scored to `19.084638612143134` over 72 periods.
+
+Post-restoration gates all passed: locked uv lock/sync, Ruff format/check, Ty,
+mypy, 227 non-integration tests with 90.84% branch coverage, 8 integration
+tests, 235 broad tests, runtime sync/cmp, `SMOKE_OK`, and two deterministic
+packages (SHA-256
+`a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`). The
+package contained only the two participant files. Restricted-material scans,
+diff hygiene, one-worktree/main checks, and the no-live-simulator check also
+passed.

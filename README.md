@@ -56,15 +56,15 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`. Sixteen controlled experiments have valid scores
+  `.challenge/round1/source/`. Seventeen controlled experiments have valid scores
   and one earlier attempt was incomplete. The first nine scored candidates were
   rejected; recovery-aware direct-service hold v2 beat the fallback, and the
   multi-transfer refinement v3 improved the active best to
   `19.084638612143134`. This is `6.615707068353528%` below the
   `20.436668751255972` fallback. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 pure-congestion exclusion report`](docs/experiments/round1-pure-congestion-exclusion-v9.md).
-  That latest v9 trial scored `22.38757990186231`, was rejected as worse than
+  [`Round 1 port-closure exclusion report`](docs/experiments/round1-port-closure-exclusion-v10.md).
+  That latest v10 trial scored `22.096980694905298`, was rejected as worse than
   v3, and left the accepted v3 strategy active.
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
@@ -95,6 +95,11 @@ candidate evidence remains preserved in the ignored results directory.
   `22.38757990186231` against the active v3 control
   `19.084638612143134` and was rejected; its ignored candidate evidence is
   preserved in the v9 results directory.
+- The latest Round 1 port-closure exclusion experiment retained v3 holds only
+  for pure leg-congestion constraints and delegated port-involved holds. It
+  scored `22.096980694905298` against the active v3 control
+  `19.084638612143134` and was rejected; its candidate ATT and log remain in
+  the ignored v10 results directory, and v3 was restored byte-for-byte.
 
 ## Prerequisites
 

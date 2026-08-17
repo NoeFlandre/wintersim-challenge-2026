@@ -1,6 +1,7 @@
 # Round 1 port-involved margin guard v11
 
-**Status: PRE-RUN REVIEW — implementation complete; no full run authorized yet.**
+**Status: PRE-RUN READY — implementation and all preflight gates complete; the
+single full run is authorized by this frozen record and has not started.**
 
 This is one separately named Round 1 candidate from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; all
@@ -70,6 +71,22 @@ with SHA-256
 It confirms 48 v3 holds, 35 retained v11 holds, 13 low-margin delegations,
 9,876 annual-TEU exposure proxy, no mutation, and no model advancement. These
 counts are structural activation evidence only; no score has been observed.
+
+## Pre-run gate record
+
+The non-overwriting launch manifest is
+`.challenge/round1/results/port_involved_margin_guard_v11_20260817/pre_run_manifest.json`
+with SHA-256
+`008cd67651f164bb7ff6a78aabba8eb6fb5ecfe203b447da37efc0777ffd4a56`.
+It pins the candidate and runtime hashes, the v3 control ATT bytes and score,
+the authoritative baseline bytes, the deterministic package, the one-worktree
+`main` state, and the empty candidate evidence destination.
+
+All preflight gates passed: lock and locked sync, Ruff format/lint, Ty, mypy,
+230 non-integration tests with 90.84% branch coverage, 9 integration tests,
+Round 1 sync/cmp, `SMOKE_OK`, repeated package SHA equality, restricted scans,
+diff hygiene, and no live simulation process. No candidate score exists yet;
+the next operation is exactly one managed full run.
 
 ## Selection scorecard
 

@@ -75,9 +75,7 @@ counts are structural activation evidence only; no score has been observed.
 ## Pre-run gate record
 
 The non-overwriting launch manifest is
-`.challenge/round1/results/port_involved_margin_guard_v11_20260817/pre_run_manifest.json`
-with SHA-256
-`008cd67651f164bb7ff6a78aabba8eb6fb5ecfe203b447da37efc0777ffd4a56`.
+`.challenge/round1/results/port_involved_margin_guard_v11_20260817/pre_run_manifest.json`.
 It pins the candidate and runtime hashes, the v3 control ATT bytes and score,
 the authoritative baseline bytes, the deterministic package, the one-worktree
 `main` state, and the empty candidate evidence destination.

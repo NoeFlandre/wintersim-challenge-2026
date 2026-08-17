@@ -1,6 +1,6 @@
 # Round 1 port-closure exclusion v10
 
-**Status: DESIGN FROZEN — implementation and full run not yet started.**
+**Status: PRE-RUN VERIFIED — implementation complete; no full run has run.**
 
 This is one separately named Round 1 experiment from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; the
@@ -50,6 +50,30 @@ does not mutate state. The other three hooks remain unconditional `None`.
 The implementation must be standard-library-only, deterministic, identity-free
 except for existing structural object matching, free of I/O/environment/
 network/process/wall-clock/random access, and free of mutable cross-run state.
+
+## Implementation and pre-run verification
+
+The RED tests were committed in `f2172fb`, and the corrected delegation
+contract was committed in `6848cc2`. The minimal participant implementation and
+submission README update are in `0694754`. The candidate strategy SHA-256 is
+`359d48c120dfed776be71de97e2b40df7ffa7d57bdd6ee69aa5ea027e0577e44`.
+
+Focused RED/GREEN verification is complete: the final focused unit and real
+context integration selection passes 42 tests. Full pre-run gates also pass:
+`uv lock --check`, locked `uv sync --all-groups`, Ruff format/check, Ty, mypy,
+228 non-integration tests with 90.64% branch coverage, and 9 integration tests.
+Runtime sync produced byte-identical participant files. Round 1 smoke returned
+`SMOKE_OK`. Two packages were byte-identical at SHA-256
+`f470b1f584819638308356b70b9decd4d1680922ff28f3bf74b179202062d4d3` and
+contained only the two participant files.
+
+The non-mutating activation audit is preserved at
+`.challenge/round1/results/port_closure_exclusion_v10_20260817/activation_audit.json`
+(SHA-256
+`b2f24b190539031d67681ee79b187a905b177c517e902c3e29367ccb94dd51d1`). The
+non-overwriting pre-run manifest is at
+`.challenge/round1/results/port_closure_exclusion_v10_20260817/pre_run_manifest.json`.
+No candidate ATT or full-run log existed when the manifest was frozen.
 
 ## Fixed control and run contract
 

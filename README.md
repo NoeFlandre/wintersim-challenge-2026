@@ -56,15 +56,15 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
   or submitted.** Its controlled experiments and evidence remain documented
   under `docs/experiments/` as background only.
 - **Round 1:** the organizer archive is privately bootstrapped at
-  `.challenge/round1/source/`. Seventeen controlled experiments have valid scores
+  `.challenge/round1/source/`. Eighteen controlled experiments have valid scores
   and one earlier attempt was incomplete. The first nine scored candidates were
   rejected; recovery-aware direct-service hold v2 beat the fallback, and the
   multi-transfer refinement v3 improved the active best to
   `19.084638612143134`. This is `6.615707068353528%` below the
   `20.436668751255972` fallback. See
   [`docs/round1-readiness.md`](docs/round1-readiness.md) and the latest
-  [`Round 1 port-closure exclusion report`](docs/experiments/round1-port-closure-exclusion-v10.md).
-  That latest v10 trial scored `22.096980694905298`, was rejected as worse than
+  [`Round 1 port-involved margin-guard report`](docs/experiments/round1-port-involved-margin-guard-v11.md).
+  That latest v11 trial scored `20.548930262023504`, was rejected as worse than
   v3, and left the accepted v3 strategy active.
 - **Round 1 official window:** August 1-23, 2026 (20% weight).
 - **Round 2:** September 1-23, 2026 (30% weight).
@@ -100,6 +100,12 @@ candidate evidence remains preserved in the ignored results directory.
   scored `22.096980694905298` against the active v3 control
   `19.084638612143134` and was rejected; its candidate ATT and log remain in
   the ignored v10 results directory, and v3 was restored byte-for-byte.
+- The latest Round 1 port-involved margin-guard experiment delegated only
+  low-margin port-involved v3 holds when the timing advantage was below one
+  safe-route headway. Its single full run scored `20.548930262023504` against
+  the active v3 control, `7.672619218205541%` worse, so it was rejected. The
+  candidate ATT and log remain in the ignored v11 evidence directory, and v3
+  was restored byte-for-byte with score `19.084638612143134`.
 
 ## Prerequisites
 

@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; seventeen controlled Round 1
+**Status:** bootstrapped and smoke-tested; eighteen controlled Round 1
 experiments have valid scores and one earlier attempt was incomplete. The
 multi-transfer recovery-hold v3 policy is accepted and remains active.
 
@@ -108,6 +108,17 @@ tracked, copied into the public repository, or included in a submission.
   candidate ATT and log remain in the ignored v10 evidence directory. The v3
   participant and pinned ATT were restored byte-for-byte, synchronized, and
   re-scored at `19.084638612143134`.
+- The subsequent controlled experiment, documented in
+  [`docs/experiments/round1-port-involved-margin-guard-v11.md`](experiments/round1-port-involved-margin-guard-v11.md),
+  executed exactly once and completed all 72 periods. Its low-margin
+  port-involved guard scored `20.548930262023504`, which was
+  `7.672619218205541%` worse than the active v3 control, so it was rejected.
+  Its ATT SHA is
+  `65e3de3c01cde4af94103b42506d044d96ec10f1ce5413b5bb1e032f4c60203b`; the
+  candidate ATT, raw log, audit, manifest, and aggregate remain in the ignored
+  v11 evidence directories. The v3 participant and pinned ATT were restored
+  byte-for-byte, synchronized, and re-scored exactly at
+  `19.084638612143134`; final quality gates passed.
 - The preceding accepted experiment, documented in
   [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
   scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.

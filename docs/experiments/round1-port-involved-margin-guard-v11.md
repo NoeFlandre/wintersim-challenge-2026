@@ -1,6 +1,6 @@
 # Round 1 port-involved margin guard v11
 
-**Status: REJECTED — result recorded; control restoration is now required.**
+**Status: REJECTED — COMPLETE; v3 control restored and final gates passed.**
 
 This is one separately named Round 1 candidate from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; all
@@ -105,8 +105,30 @@ requires a strict decrease below `19.084638612143134 - 1e-9`, so v11 is
 with SHA-256
 `f90528a05107d7dcfc0d9e5f43ed5e3dd0986b3c278eab86d00b5d4e48d766b6`.
 
-The candidate evidence is retained until restoration completes. No second
-candidate, tuning, or altered acceptance rule is permitted.
+The candidate evidence is retained for audit. No second candidate, tuning, or
+altered acceptance rule is permitted.
+
+## Restoration and final state
+
+The result was committed before restoration. The v11 implementation was then
+reverted with `1be04f1` and its RED tests with `8cb9296`, in reverse dependency
+order. Round 1 was synchronized to the accepted v3 participant, and the
+control ATT snapshot was copied back byte-for-byte before the final checks.
+
+- active participant and runtime strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- active ATT and pinned v3 snapshot SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- restored score: `19.084638612143134` over 72 periods;
+- final gates: 235 tests passed, 90.84% non-integration branch coverage,
+  8 integration tests passed, Ruff format/lint, Ty, mypy, lock/sync, smoke
+  (`SMOKE_OK`), deterministic package twice (`a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`),
+  restricted scans, and no live WSC process;
+- final branch/worktree: `main`, clean, one worktree.
+
+The v11 evidence remains ignored and immutable for audit; the active runtime is
+the accepted v3 control. No push, merge, PR, submission, tuning, second
+candidate, or history rewrite occurred.
 
 ## Selection scorecard
 

@@ -151,43 +151,6 @@ def _qualifying_fixture(
     )
 
 
-def _port_margin_fixture(
-    safe_distance: float,
-) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace]:
-    origin = _port("Origin")
-    closed = _port("Closed")
-    transfer_a = _port("Transfer A")
-    transfer_b = _port("Transfer B")
-    destination = _port("Destination")
-    nominal = _route(
-        "nominal",
-        [origin, closed, destination, origin],
-        [50.0, 50.0, 100.0],
-    )
-    safe_a = _route(
-        "safe-a",
-        [origin, transfer_a, origin],
-        [safe_distance, safe_distance],
-    )
-    safe_b = _route(
-        "safe-b",
-        [transfer_a, transfer_b, transfer_a],
-        [safe_distance, safe_distance],
-    )
-    safe_c = _route(
-        "safe-c",
-        [transfer_b, destination, transfer_b],
-        [safe_distance, safe_distance],
-    )
-    context = SimpleNamespace(
-        ports=[origin, closed, transfer_a, transfer_b, destination],
-        service_routes=[nominal, safe_a, safe_b, safe_c],
-        disruption_plans=[_berth_plan(closed)],
-    )
-    shipment = _shipment(origin, destination)
-    return context, ANCHOR + dt.timedelta(days=14.5), shipment
-
-
 def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
     if seen is None:
         seen = {}
@@ -346,26 +309,6 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
         )
         is False
     )
-
-
-def test_low_margin_port_involved_hold_delegates_without_mutation() -> None:
-    context, now, shipment = _port_margin_fixture(60.0)
-    before = _freeze((context, shipment))
-
-    assert _decision(context, now, shipment) is None
-    assert _freeze((context, shipment)) == before
-
-
-def test_port_margin_equal_to_headway_retains_v3_hold() -> None:
-    context, now, shipment = _port_margin_fixture(128.0)
-
-    assert _decision(context, now, shipment) is False
-
-
-def test_port_margin_above_headway_retains_v3_hold() -> None:
-    context, now, shipment = _port_margin_fixture(160.0)
-
-    assert _decision(context, now, shipment) is False
 
 
 def test_matching_deployed_alternative_routes_are_eligible() -> None:

@@ -23,11 +23,8 @@ During an active disruption, `assign_associated_bookings` may return `False`
 for a newly generated shipment only when all of the following are derived from
 the live context: its normal shortest route is one disrupted direct service,
 the currently safe shortest route needs at least two changes between services
-(at least three service boardings), the matching disruption constraints are
-pure leg-congestion constraints, and the direct service is estimated to
-recover and deliver sooner than that detour. If a matching closed-port
-constraint is present (alone or alongside leg congestion), the hook delegates
-to the organizer fallback.
+(at least three service boardings), and the direct service is estimated to
+recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a

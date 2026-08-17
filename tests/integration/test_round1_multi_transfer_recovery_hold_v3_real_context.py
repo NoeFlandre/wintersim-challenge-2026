@@ -322,10 +322,7 @@ def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
             if recovery is None or nominal_hours is None or detour_hours is None:
                 continue
             wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
-            if (
-                not math.isfinite(wait_hours + nominal_hours)
-                or wait_hours + nominal_hours >= detour_hours
-            ):
+            if not math.isfinite(wait_hours + nominal_hours) or wait_hours + nominal_hours >= detour_hours:
                 continue
             edge = nominal[0]
             leg_ids = {id(leg) for leg in edge.legs}
@@ -340,15 +337,19 @@ def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
             kinds = {
                 constraint.kind
                 for constraint in state.constraints
-                if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
-                or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+                if (
+                    constraint.kind == "leg"
+                    and constraint.target_identity in leg_ids
+                )
+                or (
+                    constraint.kind == "port"
+                    and constraint.arrival_name in arrival_names
+                )
             }
             if kinds != {"leg", "port"}:
                 continue
             before = _snapshot(context, shipment)
-            assert (
-                participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None
-            )
+            assert participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None
             assert _snapshot(context, shipment) == before
             found = True
             break

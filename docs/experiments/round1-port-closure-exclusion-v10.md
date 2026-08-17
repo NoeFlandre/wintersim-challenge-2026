@@ -1,6 +1,6 @@
 # Round 1 port-closure exclusion v10
 
-**Status: PRE-RUN VERIFIED — implementation complete; no full run has run.**
+**Status: REJECTED — complete; v3 control restored.**
 
 This is one separately named Round 1 experiment from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; the
@@ -109,3 +109,32 @@ implementation/tests in reverse order; synchronize v3; restore and re-score the
 pinned v3 ATT; rerun every final gate; and leave Git clean. No tuning, second
 candidate, push, merge, PR, upload, submission, or history rewrite is part of
 this experiment.
+
+## Full-run result
+
+The one authorized run completed successfully with the frozen configuration:
+Round 1 `create_with_disruption`, seed `2026`, `PYTHONHASHSEED=0`, 140-day
+warm-up, 360 measured days, and 5-day ATT intervals. The log contains day 360,
+period 72, “Simulation completed”, CSV-written, and wrapper exit 0 markers.
+
+- candidate ATT: `.challenge/round1/results/port_closure_exclusion_v10_20260817/ATT_By_Statistics_Interval.csv`;
+  SHA-256 `6bba0842962a35ce457e2949658d49d0cd25055c950b15be63f7041919fb7085`;
+- candidate log: `.challenge/round1/results/port_closure_exclusion_v10_20260817/full_run.log`;
+  SHA-256 `331e5b423e976bc76d3cf5df13cf3a206bf1dc52b6db1d61065383c30cadcb52`;
+- candidate mean ATT: `20.550694444444446` days over 72 numbered periods;
+- candidate cumulative resilience loss: `22.096980694905298`;
+- accepted v3 control loss: `19.084638612143134`;
+- delta: `+3.0123420827621636` (`+15.784119070745595%`).
+
+The aggregate score record is preserved at
+`experiments/results/round1_port_closure_exclusion_v10_20260817.json`.
+The strict acceptance rule is
+`candidate_loss < 19.084638612143134 - 1e-9`; the candidate is therefore
+**REJECTED**. The fresh candidate ATT and log were copied before scoring.
+
+## Restoration
+
+After recording the result, the v10 implementation and test commits were
+reverted in reverse dependency order. The v3 runtime was synchronized and its
+pinned ATT snapshot restored. The final active strategy and ATT must match the
+control hashes in the fixed contract above; no candidate remains active.

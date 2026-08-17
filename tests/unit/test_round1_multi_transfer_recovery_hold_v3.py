@@ -281,7 +281,7 @@ def test_nominal_path_unaffected_by_active_disruption_delegates() -> None:
     assert _decision(context, now, shipment) is None
 
 
-def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
+def test_closed_intermediate_port_on_direct_service_delegates() -> None:
     origin = _port("Origin")
     closed = _port("Closed")
     transfer_a = _port("Transfer A")
@@ -301,14 +301,10 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
         disruption_plans=[_berth_plan(closed)],
     )
 
-    assert (
-        _decision(
-            context,
-            ANCHOR + dt.timedelta(days=14.5),
-            _shipment(origin, destination),
-        )
-        is False
-    )
+    shipment = _shipment(origin, destination)
+    before = _freeze((context, shipment))
+    assert _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment) is None
+    assert _freeze((context, shipment)) == before
 
 
 def test_mixed_leg_and_closed_port_hold_delegates_without_mutation() -> None:

@@ -1,6 +1,6 @@
 # Round 1 port-involved margin guard v11
 
-**Status: DESIGN FROZEN — implementation and full run not started.**
+**Status: PRE-RUN REVIEW — implementation complete; no full run authorized yet.**
 
 This is one separately named Round 1 candidate from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; all
@@ -50,6 +50,26 @@ model, writing Output, or retaining mutated state.
 Activation and exposure are structural evidence, not score predictions. The
 ignored audit JSON will be stored at
 `.challenge/round1/results/port_involved_margin_guard_v11_20260817/activation_audit.json`.
+
+## RED → GREEN implementation record
+
+The RED contract was committed as `8dd0781697935a08778f681f9dcdf37026894e2b`.
+Against untouched v3, exactly the new low-margin synthetic assertion and the
+real-context low-margin assertion failed; the rest of the focused suite passed.
+The GREEN implementation was committed as
+`c61a7ce360ffd50343bc8d5f25023fa4f714ab57`. It adds one read-only
+constraint-kind helper and applies the strict margin/headway guard after every
+existing v3 predicate. The equality boundary retains the hold. Focused unit
+and integration verification is `43 passed`; Ruff format/check, Ty, and mypy
+are clean.
+
+The activation audit is preserved at
+`.challenge/round1/results/port_involved_margin_guard_v11_20260817/activation_audit.json`
+with SHA-256
+`ad4bc3c55529bb6da42bd71515954f4b9c646af89f0bd49e681398223b4f8ec1`.
+It confirms 48 v3 holds, 35 retained v11 holds, 13 low-margin delegations,
+9,876 annual-TEU exposure proxy, no mutation, and no model advancement. These
+counts are structural activation evidence only; no score has been observed.
 
 ## Selection scorecard
 

@@ -1,7 +1,6 @@
 # Round 1 port-involved margin guard v11
 
-**Status: PRE-RUN READY — implementation and all preflight gates complete; the
-single full run is authorized by this frozen record and has not started.**
+**Status: REJECTED — result recorded; control restoration is now required.**
 
 This is one separately named Round 1 candidate from the accepted v3 control.
 The participant boundary remains only `submission/response_strategies/`; all
@@ -83,8 +82,31 @@ the authoritative baseline bytes, the deterministic package, the one-worktree
 All preflight gates passed: lock and locked sync, Ruff format/lint, Ty, mypy,
 230 non-integration tests with 90.84% branch coverage, 9 integration tests,
 Round 1 sync/cmp, `SMOKE_OK`, repeated package SHA equality, restricted scans,
-diff hygiene, and no live simulation process. No candidate score exists yet;
-the next operation is exactly one managed full run.
+diff hygiene, and no live simulation process. These gates were completed before
+the single managed full run below.
+
+## Full-run result and strict decision
+
+Exactly one managed full run was executed with the frozen Round 1 configuration.
+The log reached Period 72 (Days 356–360), simulation day 360, and
+`Simulation completed.` The fresh ATT was preserved before scoring at
+`.challenge/round1/results/port_involved_margin_guard_v11_20260817/ATT_By_Statistics_Interval.csv`:
+
+- ATT SHA-256: `65e3de3c01cde4af94103b42506d044d96ec10f1ce5413b5bb1e032f4c60203b`;
+- 72 numbered periods; mean ATT: `20.46` days;
+- raw log SHA-256: `21da09aa5ad20ddf094e75e1dbb1f54830f9c83255f40527a3e041da69606f82`;
+- cumulative resilience loss: `20.548930262023504`.
+
+Against the pinned v3 control (`19.084638612143134`), the delta is
+`+1.4642916498803693` (`+7.672619218205541%`). The immutable acceptance rule
+requires a strict decrease below `19.084638612143134 - 1e-9`, so v11 is
+**REJECTED**. The ignored aggregate record is
+`experiments/results/round1_port_involved_margin_guard_v11_20260817.json`
+with SHA-256
+`f90528a05107d7dcfc0d9e5f43ed5e3dd0986b3c278eab86d00b5d4e48d766b6`.
+
+The candidate evidence is retained until restoration completes. No second
+candidate, tuning, or altered acceptance rule is permitted.
 
 ## Selection scorecard
 

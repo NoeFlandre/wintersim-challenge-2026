@@ -266,3 +266,80 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     before = _snapshot(context, delegated)
     assert participant.UserStrategy.assign_associated_bookings(context, earliest, delegated) is None
     assert _snapshot(context, delegated) == before
+
+
+def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
+    source = _bootstrap_or_skip()
+    _prepare_imports(source)
+
+    import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    import scenario_builders  # type: ignore[import-not-found]  # noqa: PLC0415
+    from maritime_data_context.shipment import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        Shipment,
+    )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        DefaultStrategy,
+    )
+
+    participant = _load_participant_module()
+    template = scenario_builders.create_with_disruption()
+    times = _candidate_times(template)
+    assert times, "real Round 1 context must expose at least one valid disruption window"
+
+    found = False
+    for now in times:
+        context = scenario_builders.create_with_disruption()
+        DefaultStrategy.create_alternative_service_routes(context, now)
+        for index, demand in enumerate(context.demands):
+            shipment = Shipment(
+                index=index,
+                teu_size=1,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            state = participant._active_state(context, now)
+            if state is None or not participant._should_hold(context, now, shipment):
+                continue
+            graphs = participant._graphs(context, state)
+            assert graphs is not None
+            nominal = participant._shortest_path(
+                context, demand.origin_port, demand.destination_port, graphs[0]
+            )
+            safe = participant._shortest_path(
+                context, demand.origin_port, demand.destination_port, graphs[1]
+            )
+            assert nominal is not None and safe is not None and len(nominal) == 1
+            edge = nominal[0]
+            leg_ids = {id(leg) for leg in edge.legs}
+            arrival_names = {
+                name
+                for name in (
+                    participant._port_name(port)
+                    for port in (*edge.intermediate_ports, edge.arrival)
+                )
+                if name is not None
+            }
+            kinds = {
+                constraint.kind
+                for constraint in state.constraints
+                if (
+                    constraint.kind == "leg"
+                    and constraint.target_identity in leg_ids
+                )
+                or (
+                    constraint.kind == "port"
+                    and constraint.arrival_name in arrival_names
+                )
+            }
+            if "port" not in kinds:
+                continue
+            before = _snapshot(context, shipment)
+            assert participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None
+            assert _snapshot(context, shipment) == before
+            found = True
+            break
+        if found:
+            break
+
+    assert found, "no derived real Round 1 mixed leg+port v3 hold was found"

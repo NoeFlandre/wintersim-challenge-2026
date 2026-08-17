@@ -311,6 +311,15 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
     )
 
 
+def test_mixed_leg_and_closed_port_hold_delegates_without_mutation() -> None:
+    context, now, shipment, items = _qualifying_fixture()
+    context.disruption_plans.append(_berth_plan(items["destination"]))
+    before = _freeze((context, shipment))
+
+    assert _decision(context, now, shipment) is None
+    assert _freeze((context, shipment)) == before
+
+
 def test_matching_deployed_alternative_routes_are_eligible() -> None:
     context, now, shipment, items = _qualifying_fixture()
     disruption_key = ((), (("origin", "destination"),))

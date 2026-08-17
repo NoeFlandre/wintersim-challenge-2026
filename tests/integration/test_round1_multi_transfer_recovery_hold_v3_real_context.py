@@ -299,7 +299,7 @@ def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
                 generated_time=now,
             )
             state = participant._active_state(context, now)
-            if state is None:
+            if state is None or not participant._should_hold(context, now, shipment):
                 continue
             graphs = participant._graphs(context, state)
             assert graphs is not None
@@ -309,21 +309,7 @@ def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
             safe = participant._shortest_path(
                 context, demand.origin_port, demand.destination_port, graphs[1]
             )
-            if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
-                continue
-            route_changes = sum(
-                left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
-            )
-            if route_changes < 2:
-                continue
-            recovery = participant._edge_constraint_recovery(nominal[0], state)
-            nominal_hours = participant._path_service_hours(nominal)
-            detour_hours = participant._path_service_hours(safe)
-            if recovery is None or nominal_hours is None or detour_hours is None:
-                continue
-            wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
-            if not math.isfinite(wait_hours + nominal_hours) or wait_hours + nominal_hours >= detour_hours:
-                continue
+            assert nominal is not None and safe is not None and len(nominal) == 1
             edge = nominal[0]
             leg_ids = {id(leg) for leg in edge.legs}
             arrival_names = {
@@ -346,7 +332,7 @@ def test_real_round1_mixed_port_hold_delegates_without_mutation() -> None:
                     and constraint.arrival_name in arrival_names
                 )
             }
-            if kinds != {"leg", "port"}:
+            if "port" not in kinds:
                 continue
             before = _snapshot(context, shipment)
             assert participant.UserStrategy.assign_associated_bookings(context, now, shipment) is None

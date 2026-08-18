@@ -1,11 +1,10 @@
 # Round 1 mixed-constraint one-transfer recovery hold v12
 
-**Status: AUDIT PASSED / IMPLEMENTATION IN PROGRESS / NO RUN AUTHORIZED.**
+**Status: PRE-RUN REVIEW / NO FULL RUN AUTHORIZED.**
 
 This record freezes one candidate from the accepted Round 1 multi-transfer
-recovery-hold v3 control. The private activation audit passed; TDD and all
-pre-run gates remain outstanding. No simulation has been authorized by this
-record.
+recovery-hold v3 control. The private activation audit, RED/GREEN TDD, and all
+pre-run gates passed. No full simulation has been authorized by this record.
 
 ## Frozen hypothesis and policy
 
@@ -69,6 +68,47 @@ matching helper must preserve v3 recovery semantics. The full test, coverage,
 integration, sync, smoke, deterministic packaging, restricted-material, and
 clean-state gates are mandatory.
 
+## Implementation and verification record
+
+- design/specification commit: `b469b6e`;
+- RED test commit: `0b1dfbe` (the untouched v3 implementation failed only the
+  exact mixed leg-and-port one-transfer expectation; retained and negative
+  cases passed);
+- GREEN implementation commit: `da80d03`;
+- candidate strategy SHA-256:
+  `384b30a43a6cf0dbf39fb45df9ee21c1ff97b220f09adda4471638b592172ccd`;
+- participant and Round 1 runtime strategy files are byte-identical;
+- participant and Round 1 runtime README files are byte-identical.
+
+The implementation is limited to the participant strategy and README. It adds
+one shared matching helper, preserves v3 graph/recovery/timing behavior, and
+returns `False` only for the exact mixed one-transfer case; all other hooks and
+non-qualifying states still delegate with `None`. It has no mutable module
+state, identity/date/index lookup, organizer imports, output writes, or model
+advancement.
+
+Pre-run verification passed:
+
+- `uv lock --check` and locked `uv sync --all-groups`;
+- Ruff format and lint;
+- Ty and mypy;
+- non-integration tests: `233 passed, 9 deselected`, branch coverage
+  `90.82%` (the configured `>=90%` gate);
+- integration tests: `9 passed`;
+- one-day Round 1 smoke: `SMOKE_OK`;
+- two deterministic packages, each containing only
+  `response_strategies/README.md` and `response_strategies/user_strategy.py`,
+  with SHA-256
+  `d9c523274aea6d97ff95b3ea0708c40f49531b863c3d79b2cdb4b79087c7a720`;
+- active Output ATT remains byte-identical to the pinned v3 control
+  (`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`),
+  with 72 numbered periods and mean ATT `20.3675` days;
+- restricted-material scans and `git diff --check` are clean.
+
+The non-overwriting pre-run manifest is written after this report commit in
+the ignored evidence directory and pins the reviewed HEAD, hashes, audit
+proof, package, control, and exact fixed-run contract.
+
 ## Evidence and authorization
 
 Private audit and, only if a later run is authorized, candidate evidence belong
@@ -79,3 +119,7 @@ No candidate ATT, score, run log, or result exists at this freeze point. No push
 merge, PR, upload, submission, history rewrite, tuning, or second candidate is
 part of this experiment. The workflow must stop after the pre-run manifest for
 senior review before any full simulation.
+
+**Current decision:** implementation is ready, but the official Round 1 full
+run is intentionally blocked pending explicit senior authorization. This is a
+pre-run record, not a performance result.

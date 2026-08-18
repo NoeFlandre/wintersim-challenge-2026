@@ -156,3 +156,27 @@ official cumulative score still governs. The strict rule
 **Decision: REJECTED.** The candidate must not remain active, and no tuning or
 second run is authorized. The frozen v3 restoration procedure follows this
 record.
+
+## Restoration checkpoint
+
+The rejection report was committed before restoration. The candidate commits
+were reverted in reverse order:
+
+- `897dff8` reverts the v12 implementation;
+- `77b0946` reverts the v12 RED tests.
+
+Round 1 was synchronized from the restored participant files. The participant
+and runtime strategy files are byte-identical with SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`; the
+README files are also byte-identical. The active ATT was restored from the
+pinned v3 snapshot and is byte-identical with SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+Re-scoring the restored active ATT against the authoritative baseline produced
+exactly 72 periods and cumulative loss `19.084638612143134`, matching the
+accepted control exactly.
+
+No simulator is running. The checkout is clean on `main`; the result, candidate
+ATT, completed log, launch-failure log, and score aggregate remain preserved in
+ignored evidence paths. No second candidate, tuning, submission, or history
+rewrite occurred. Final static/runtime gates are the only remaining optional
+verification before pausing this experiment.

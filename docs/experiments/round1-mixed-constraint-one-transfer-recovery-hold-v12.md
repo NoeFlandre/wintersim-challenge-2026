@@ -120,6 +120,39 @@ merge, PR, upload, submission, history rewrite, tuning, or second candidate is
 part of this experiment. The workflow must stop after the pre-run manifest for
 senior review before any full simulation.
 
-**Current decision:** implementation is ready, but the official Round 1 full
-run is intentionally blocked pending explicit senior authorization. This is a
-pre-run record, not a performance result.
+## Full-run outcome
+
+Senior authorization was received for exactly one full run from HEAD
+`5779152696ecbf73d61f2dcfc933b6d7bad10c71`. The first literal invocation did
+not reach the simulator because the default uv cache was permission-blocked;
+that launch-failure log is preserved separately. The one simulation was then
+started with the same manifest-pinned command and `UV_CACHE_DIR` moved to the
+already validated temporary cache. No strategy, seed, horizon, or threshold
+changed, and no duplicate simulation was launched.
+
+The run completed with exit `0` and the required markers: Period 72, Day 360,
+`Simulation completed.`, and a fresh CSV write. The preserved evidence is:
+
+- ATT snapshot:
+  `.challenge/round1/results/mixed_constraint_one_transfer_recovery_hold_v12_20260818/ATT_By_Statistics_Interval.csv`;
+  SHA-256 `095fbaefba3e9049d2e1e80947bc34631a9d601ac0411ba33c05ba11d3043646`;
+- completed raw log:
+  `.challenge/round1/results/mixed_constraint_one_transfer_recovery_hold_v12_20260818/full_run.log`;
+  SHA-256 `3239c49e1136e1bac52f315ebda10dd70ac2fb66d35a69a87235d6909090786a`;
+- launch-failure log:
+  `.challenge/round1/results/mixed_constraint_one_transfer_recovery_hold_v12_20260818/launch_failure_default_uv_cache.log`;
+  SHA-256 `428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`;
+- score aggregate:
+  `experiments/results/round1_mixed_constraint_one_transfer_recovery_hold_v12_20260818.json`;
+  SHA-256 `28a4c6dedc194a66e5862dd826030b4fcb276f916a86a47de112566c6556f591`.
+
+The scorer reported exactly 72 periods and cumulative resilience loss
+`19.313383619092`. Against the pinned accepted control
+`19.084638612143134`, the delta is `+0.22874500694886635` (`+1.19858181020688%`).
+The candidate ATT was better in 26 periods, equal in 20, and worse in 26; the
+official cumulative score still governs. The strict rule
+`candidate_loss < 19.084638612143134 - 1e-9` therefore rejects this candidate.
+
+**Decision: REJECTED.** The candidate must not remain active, and no tuning or
+second run is authorized. The frozen v3 restoration procedure follows this
+record.

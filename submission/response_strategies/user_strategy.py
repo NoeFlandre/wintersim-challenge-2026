@@ -348,16 +348,22 @@ def _shortest_path(
 
 
 def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime | None:
-    leg_identities = tuple(id(leg) for leg in edge.legs)
-    arrival_names = tuple(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
-    recoveries: list[dt.datetime] = []
-    for constraint in state.constraints:
-        if constraint.kind == "leg":
-            if constraint.target_identity in leg_identities:
-                recoveries.append(constraint.recovery)
-        elif constraint.arrival_name in arrival_names:
-            recoveries.append(constraint.recovery)
+    recoveries = tuple(
+        constraint.recovery for constraint in _matching_edge_constraints(edge, state)
+    )
     return max(recoveries) if recoveries else None
+
+
+def _matching_edge_constraints(edge: _Edge, state: _ActiveState) -> tuple[_Constraint, ...]:
+    """Return active constraints matching an edge under the v3 semantics."""
+    leg_identities = frozenset(id(leg) for leg in edge.legs)
+    arrival_names = frozenset(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
+    return tuple(
+        constraint
+        for constraint in state.constraints
+        if (constraint.kind == "leg" and constraint.target_identity in leg_identities)
+        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+    )
 
 
 def _route_profile(route: Any) -> _RouteProfile | None:
@@ -432,7 +438,13 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     route_change_count = sum(
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
     )
-    if route_change_count < 2:
+    if route_change_count == 1:
+        matching_kinds = {
+            constraint.kind for constraint in _matching_edge_constraints(nominal_path[0], state)
+        }
+        if matching_kinds != {"leg", "port"}:
+            return False
+    elif route_change_count < 2:
         return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)

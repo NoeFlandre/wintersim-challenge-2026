@@ -1,7 +1,7 @@
 # Round 1 TEU-weighted recovery hold v18
 
-**Status: DESIGN FROZEN — implementation and audit only; no full simulation
-has run for v18.**
+**Status: REJECTED — one authorized full simulation completed; the pinned v3
+control was restored.**
 
 ## Hypothesis
 
@@ -114,3 +114,41 @@ the v3 participant files, restore the pinned v3 ATT byte-for-byte, re-score
 exactly, rerun every final gate, and leave v3 active. No tuning, duplicate
 run, second candidate inside v18, push, merge, PR, upload, submission, or
 history rewrite is authorized.
+
+## Full-run result (2026-08-19)
+
+The pre-run manifest was rechecked after its README hash correction and before
+launch. The single permitted command was attempted literally first; it exited
+before simulation because the default uv cache was not writable (log SHA
+`428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`). The
+same pinned command was then run once with the predeclared writable temporary
+uv cache. No simulator had started during the failed literal attempt, so this
+was the only operational candidate run.
+
+The authorized run exited `0` and reached every required completion marker:
+Period 72 (Days 356–360), Output Simulation Day 360, `Simulation completed`,
+and a fresh ATT write. The raw log is preserved at
+`.challenge/round1/results/teu_weighted_recovery_hold_v18_20260819/full_run.log`
+(SHA-256
+`cc0abb4a4904312c6eb7113c3d9dbbcd1693e9081519b6a713b87ad85a486c03`). The
+fresh ATT was copied before scoring to
+`.challenge/round1/results/teu_weighted_recovery_hold_v18_20260819/ATT_By_Statistics_Interval.csv`
+(SHA-256
+`07abd2668852b8c7b3c59904178f125774561f33d6c5905548a509ef4b4413c8`). It
+contains exactly 72 numbered periods and has mean ATT `20.468055555555555`
+days.
+
+Scoring the preserved ATT against the authoritative Round 1 baseline produced
+cumulative resilience loss `20.744602632173724` over 72 periods. The pinned
+v3 control is `19.084638612143134`, so the candidate delta is
+`+1.6599640200305898` (`+8.695%`); 10 periods improved and 62 worsened, with
+none equal. The strict acceptance rule therefore rejects v18. It did not beat
+the control or the historical target.
+
+The complete machine-readable result is retained (ignored/private) at
+`experiments/results/round1_teu_weighted_recovery_hold_v18_20260819.json`.
+The candidate implementation and test commits were then reverted in reverse
+order (`1deccfc`, `0d3702b`, `f69c79e`), the v3 participant files were synced,
+and the pinned v3 ATT snapshot was restored and re-scored exactly at
+`19.084638612143134`. The final active participant strategy is therefore the
+accepted v3 control, not the rejected v18 variant.

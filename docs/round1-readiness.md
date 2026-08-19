@@ -1,6 +1,6 @@
 # Round 1 readiness
 
-**Status:** bootstrapped and smoke-tested; eighteen controlled Round 1
+**Status:** bootstrapped and smoke-tested; twenty-five controlled Round 1
 experiments have valid scores and one earlier attempt was incomplete. The
 multi-transfer recovery-hold v3 policy is accepted and remains active.
 
@@ -119,6 +119,14 @@ tracked, copied into the public repository, or included in a submission.
   v11 evidence directories. The v3 participant and pinned ATT were restored
   byte-for-byte, synchronized, and re-scored exactly at
   `19.084638612143134`; final quality gates passed.
+- The latest controlled experiment, documented in
+  [`docs/experiments/round1-pending-alternative-activation-v26.md`](experiments/round1-pending-alternative-activation-v26.md),
+  ran exactly once, completed all 72 periods in `00:56:38`, and scored
+  `19.084638612143134`, exactly equal to the active v3 control. Its strict
+  equality decision was rejection; the candidate ATT was byte-identical to v3,
+  and the v3 participant, runtime, and pinned ATT were restored and re-scored
+  exactly. The structural audit found 28 candidate-only selector activations,
+  but the full run produced no measurable trajectory difference.
 - The preceding accepted experiment, documented in
   [`docs/experiments/round1-recovery-aware-direct-service-hold-v2.md`](experiments/round1-recovery-aware-direct-service-hold-v2.md),
   scored `19.828803374740612`, which was `2.9743858155845607%` below fallback.

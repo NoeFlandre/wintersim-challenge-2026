@@ -796,6 +796,11 @@
               <td>We narrowed the previous port experiment instead of removing every port-involved hold. A hold was delegated only when its recovery advantage was smaller than the first safe route's full headway; equality and higher-margin holds stayed active. The audit found 13 live low-margin cases, but the single complete run still worsened total loss, so v3 was restored byte-for-byte.</td>
               <td><strong>20.5489</strong><br><span class="status worse">7.67262% worse than the active v3 control; rejected and restored</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round1-pending-alternative-activation-v26.md">Activate vessels already reserved for disruption alternatives</a></td>
+              <td>We kept v3's proven cargo-holding rule and changed only berth selection. During an active disruption, the participant selected the first empty waiting vessel whose existing pending alternative route started at that berth and matched the active disruption. A structural audit showed 28 live cases, but the complete 72-period run produced an ATT file byte-identical to v3, so the candidate was rejected by strict equality and v3 was restored.</td>
+              <td><strong>19.0846</strong><br><span class="status equal">No change versus v3; rejected by strict equality and restored</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -805,10 +810,10 @@
 
   <footer>
     Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, eighteen scored Round 1
+    reports, nine completed Round 0 experiments, twenty-five scored Round 1
     experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
     the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-port-involved-margin-guard-v11.md">latest Round 1 result</a>.
+    and the <a href="experiments/round1-pending-alternative-activation-v26.md">latest Round 1 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

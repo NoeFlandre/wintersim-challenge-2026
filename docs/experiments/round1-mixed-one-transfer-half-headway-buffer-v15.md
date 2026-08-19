@@ -1,6 +1,6 @@
 # Round 1 mixed one-transfer half-headway-buffer recovery hold v15
 
-**Status: PRE-RUN REVIEW — no full simulation authorized yet.**
+**Status: REJECTED — complete; v3 restored.**
 
 The accepted v3 policy holds only safe detours requiring at least two service
 route changes. V12 added six mixed leg+port one-transfer cases and scored
@@ -68,18 +68,58 @@ consumes no simulation.
 
 ## TDD and pre-run contract
 
-Add RED tests for the exact mixed one-transfer case below, at equality, above
-the half-headway buffer, and for malformed/invalid headway data; retain all v3
-tests and no-mutation/public-hook/forbidden-capability checks. GREEN must be a
-small local read-only guard with no mutable module state, organizer imports,
-I/O, randomness, dates, identifiers, or changes to other hooks. Synchronize
-only participant-owned `README.md` and `user_strategy.py` into the ignored
-Round 1 runtime.
+The RED contract covered the mixed one-transfer case below, equality, below
+and above the half-headway buffer, invalid headway data, and preservation of a
+v3 multi-transfer hold. GREEN added only a local read-only guard with no
+mutable module state, organizer imports, I/O, randomness, dates, identifiers,
+or changes to other hooks. The candidate was synchronized only through the
+participant-owned `README.md` and `user_strategy.py` files.
 
 Before a full run, locked `uv` resolution/sync, Ruff, Ty, mypy, unit coverage
 at least 90%, integrations, sync/cmp, one-day smoke, deterministic participant-
 only packages, unchanged control score/ATT, restricted-material scans, clean
 Git state, and no-live-process checks must pass. Freeze a non-overwriting
 manifest with all hashes and the exact run command. Preserve raw log and ATT
-before scoring or restoration. No push, merge, PR, upload, submission archive,
-history rewrite, or second candidate is part of v15.
+before scoring or restoration. These gates passed before the run. No push,
+merge, PR, upload, submission archive, history rewrite, or second candidate
+was part of v15.
+
+## Full-run result
+
+The literal manifest command was attempted once and stopped before simulation
+because the sandbox denied the default UV cache; the launch error is preserved
+at `.challenge/round1/results/mixed_one_transfer_half_headway_buffer_v15_20260819/launch_failure_default_uv_cache.log`
+(SHA-256 `428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`).
+The one actual simulation used the same command with only `UV_CACHE_DIR` set to
+a writable temporary cache. It exited `0`, reached Period 72 / Day 360, and
+printed `Simulation completed.`. The raw log is preserved at
+`.challenge/round1/results/mixed_one_transfer_half_headway_buffer_v15_20260819/full_run.log`
+(SHA-256
+`90420e57b38397a039a8476793b654ceea2f0ad2496ecb7f6e6c572f7abe87d3`). The
+fresh ATT was copied before scoring to
+`.challenge/round1/results/mixed_one_transfer_half_headway_buffer_v15_20260819/ATT_By_Statistics_Interval.csv`
+(SHA-256
+`112aa548445b940ad0510952fdc1af36785fb842afc4b0204bd9f0ad283930fd`).
+
+| Metric | Candidate | v3 control |
+| --- | ---: | ---: |
+| Cumulative resilience loss | `21.713670841302392` | `19.084638612143134` |
+| Difference vs control | `+2.629032229159258` | — |
+| Mean ATT (72 periods, days) | `20.531388888888888` | `20.3675` |
+| Periods better / equal / worse | `17 / 21 / 34` | — |
+
+The strict acceptance rule was not met, so the candidate is **REJECTED**.
+Complete machine-readable evidence is in
+`.challenge/round1/results/mixed_one_transfer_half_headway_buffer_v15_20260819/result.json`.
+
+## Restoration
+
+The rejected implementation commit `aa8f8d6` was reverted without rewriting
+history. The temporary v15 test was removed, participant and ignored runtime
+files were synchronized back to v3, and the active ATT was restored from the
+pinned v3 snapshot. Final active hashes are the v3 strategy
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`, v3
+README `0590ba5bb34ffc9bf0e7f368b552f8f26c71eb7314a00fa221e0c5e8f4225595`, and
+ATT `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+The ignored candidate artifacts remain available for audit; no candidate
+output is active.

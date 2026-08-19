@@ -2,7 +2,7 @@
 
 ## Status
 
-**IMPLEMENTED — PRE-RUN PREFLIGHT; no candidate simulation has run.**
+**INVALID — complete; v3 control restored after an environment disk-full failure.**
 
 This experiment is a separately named, single-candidate trial from the
 accepted v3 control. The design and implementation plan are:
@@ -116,3 +116,29 @@ The complete preflight passed on the candidate implementation:
 
 The package, hashes, stale Output metadata, control score, and exact launch
 command are pinned in the ignored non-overwriting manifest before launch.
+
+## Full-run outcome
+
+The one authorized command was launched exactly once with the frozen manifest.
+It exited with status `1` after reaching only Period 36 (Day 180); the log has
+no Day 360, Period 72, CSV-write, or `Simulation completed` marker. The final
+exception is `OSError: [Errno 28] No space left on device` while the organizer
+was printing its completed-TEU statistics matrix. This is an invalid run, not
+a performance result and not evidence that the hypothesis helped or hurt.
+
+The raw log was preserved before restoration at
+`.challenge/round1/results/equal_distance_one_transfer_tie_v27_20260819/full_run.log`
+with SHA-256
+`15756551bf0af65ad8d1a11015eb3bb2826333bb990fd60256e877085e1a5745`.
+The current Output ATT was preserved allocation-free at
+`.challenge/round1/results/equal_distance_one_transfer_tie_v27_20260819/ATT_By_Statistics_Interval.csv`
+with SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, size
+`1262`, and the unchanged pre-run mtime. It is byte-identical to the pinned v3
+ATT, proving that no fresh candidate output existed; it was not scored as a
+candidate.
+
+The candidate is therefore **INVALID/REJECTED** under the immutable protocol.
+The v27 implementation and RED tests must be reverted, Round 1 synchronized to
+the accepted v3 participant, and the pinned v3 ATT restored and rescored before
+the final gates. No tuning, duplicate run, or second candidate is part of v27.

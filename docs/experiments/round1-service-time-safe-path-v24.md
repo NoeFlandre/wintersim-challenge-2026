@@ -1,6 +1,6 @@
 # Round 1 service-time safe-path refinement v24
 
-**Status: RUN COMPLETE — candidate rejected; v3 restoration is in progress.**
+**Status: RUN COMPLETE — candidate rejected; v3 restored and final gates passed.**
 
 This is one separately named experiment from the accepted Round 1 v3 control.
 It tests whether v3 sometimes holds cargo only because it measures the safe
@@ -63,6 +63,34 @@ v24 is **REJECTED**. The candidate changed the measured trajectory, so this
 is evidence that the exact service-time path policy degraded this scenario;
 it does not establish a causal explanation for every changed period or for
 other scenarios.
+
+## Final restoration and verification
+
+The rejection record was committed before restoration. The candidate was then
+removed only through Git reverts, in reverse dependency order:
+
+- result record: `a934d4e`;
+- revert v24 test/integration corrections: `f673453`;
+- revert v24 implementation and participant README: `c652818`;
+- revert v24 RED tests: `2074c9d`.
+
+The restored v3 participant files were synchronized to the Round 1 runtime and
+are byte-identical with strategy SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`. The
+active Output ATT was restored byte-for-byte from the pinned v3 snapshot:
+
+- active ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- restored score: `19.084638612143134` over 72 periods;
+- final deterministic validation package SHA-256:
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`,
+  containing only `README.md` and `user_strategy.py`.
+
+After restoration, locked dependencies, Ruff format/check, Ty, mypy, 227
+non-integration tests with 90.84% true branch coverage, 8 integration tests,
+Round 1 smoke (`SMOKE_OK`), deterministic packaging, diff hygiene, and
+restricted-material scans all passed. No second candidate, tuning, push, PR,
+upload, submission, or history rewrite occurred.
 
 ## Control and decision rule
 

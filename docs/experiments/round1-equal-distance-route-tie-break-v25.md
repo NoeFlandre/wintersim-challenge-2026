@@ -1,7 +1,7 @@
 # Round 1 equal-distance fewer-transfer tie-break v25
 
-**Status: PRE-RUN REVIEW — implementation and activation gates are green; no
-full simulation has been authorized yet.**
+**Status: REJECTED — complete; v3 control restoration is pending in this
+working state.**
 
 This report is the tracked audit contract for one candidate from the accepted
 Round 1 v3 control. The design and executable plan are recorded in the linked
@@ -76,3 +76,39 @@ scoring, synchronization, smoke, packaging, or restoration. On rejection,
 commit the result first, revert only v25 tests/code in reverse order,
 synchronize and restore v3, re-score exactly to the control, rerun every final
 gate, and leave `main` clean. No tuning or second candidate is allowed.
+
+## Full-run result
+
+The single frozen run completed the required horizon:
+
+- command: `PYTHONHASHSEED=0 uv run wsc2026 run --round round1 --full` with a
+  writable temporary `UV_CACHE_DIR` only for the launcher;
+- organizer markers: `Period 72 (Days 356-360)`, `Output Simulation Day: 360`,
+  `Simulation completed`;
+- simulator runtime: `01:05:33`;
+- preserved ATT:
+  `.challenge/round1/results/equal_distance_route_tie_break_v25_20260819/ATT_By_Statistics_Interval.csv`;
+- candidate ATT SHA-256:
+  `f7150c4a544856dde96c0130d6071df3b4b4587cec94c3a02292f46598f7e63b`;
+- raw log SHA-256:
+  `9187e17568727af5088802e27600a2c2b696b514ac1a4254fb3379e458ee4710`;
+- scorer JSON:
+  `.challenge/round1/results/equal_distance_route_tie_break_v25_20260819/score.json`;
+- period count: `72`;
+- mean ATT: `20.53013888888889` days;
+- candidate cumulative resilience loss:
+  `21.779788584660977`;
+- delta versus v3 control: `+2.695149972517843` loss, or `+14.122090689226%`;
+- period comparison versus the pinned v3 ATT: 18 better, 19 equal, 35 worse;
+  first divergence at Period 19.
+
+The candidate is therefore **REJECTED** under the unchanged strict rule
+`candidate_loss < 19.084638612143134 - 1e-9`. The candidate path tie-break
+made the result materially worse despite its structural 100-activation audit.
+The organizer simulation completed successfully; the shell wrapper's optional
+post-run `UV_EXIT` bookkeeping used zsh's read-only `status` name and emitted
+an error after completion, so no wrapper exit code is claimed. This does not
+change the rejection or the preserved evidence.
+
+The ignored aggregate record is
+`experiments/results/round1_equal_distance_route_tie_break_v25_20260819.json`.

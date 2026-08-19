@@ -87,7 +87,9 @@ def _fixture(
         associated_bookings=[],
         current_booking_index=None,
     )
-    return context, ANCHOR + dt.timedelta(days=14.5), shipment
+    # The organizer's exclusive end is start + duration (day 16 here); use a
+    # timestamp just before it so the recovery wait remains small and active.
+    return context, ANCHOR + dt.timedelta(days=15.5), shipment
 
 
 def _decision(context: Any, now: dt.datetime, shipment: Any) -> Any:
@@ -95,20 +97,20 @@ def _decision(context: Any, now: dt.datetime, shipment: Any) -> Any:
 
 
 def test_mixed_one_transfer_above_half_headway_is_held() -> None:
-    context, now, shipment = _fixture(safe_distance=100.0)
+    context, now, shipment = _fixture(safe_distance=120.0)
 
     # RED: v3 delegates this one-transfer mixed case; v15 must return False.
     assert _decision(context, now, shipment) is False
 
 
 def test_mixed_one_transfer_below_half_headway_delegates() -> None:
-    context, now, shipment = _fixture(safe_distance=80.0)
+    context, now, shipment = _fixture(safe_distance=100.0)
 
     assert _decision(context, now, shipment) is None
 
 
 def test_mixed_one_transfer_at_half_headway_delegates() -> None:
-    context, now, shipment = _fixture(safe_distance=90.0)
+    context, now, shipment = _fixture(safe_distance=106.66666666666667)
 
     assert _decision(context, now, shipment) is None
 

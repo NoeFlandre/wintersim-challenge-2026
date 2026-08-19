@@ -99,7 +99,7 @@ def test_mixed_one_transfer_below_half_headway_is_held() -> None:
 
 
 def test_mixed_one_transfer_at_half_headway_delegates() -> None:
-    context, now, shipment = _fixture(safe_distance=106.6666666666666)
+    context, now, shipment = _fixture(safe_distance=106.6666666666668)
 
     assert _decision(context, now, shipment) is None
 

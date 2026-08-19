@@ -3,9 +3,10 @@
 **Status: IMPLEMENTED — PRE-RUN REVIEW; no full simulation has run for v19.**
 
 Implementation is committed as `ce8929e` after the RED checkpoint
-`31e2a57`. The candidate changes only the participant strategy, its participant
-README, and the v19 unit/integration contracts. The working tree must be
-revalidated before any operational launch.
+`31e2a57`; fail-closed coverage and full-suite isolation follow in
+`adbbf7c`, `51c0c26`, and `26322c3`. The candidate changes only the
+participant strategy, its participant README, and the v19 unit/integration
+contracts. The working tree must be revalidated before any operational launch.
 
 ## Selection and hypothesis
 
@@ -120,6 +121,25 @@ not predict the score.
 The immutable audit record also records its candidate-definition hash
 `dcc50bd00d75560e94d82fa5d59a2c435020e508b8a745602af9de65fd76960d`, control
 strategy hash, configuration, limitations, and the complete audit method.
+
+## Pre-run verification
+
+At the frozen candidate checkpoint, locked `uv` resolution/sync, Ruff format
+and lint, Ty, and mypy all pass. The non-integration gate is `241 passed` with
+`90.21%` coverage; integration is `9 passed`; the complete suite is `250
+passed`. Round 1 sync leaves participant source and ignored runtime byte
+identical. Smoke returns `SMOKE_OK`. Two participant-only packages are
+byte-identical (SHA-256
+`da2fe347095ab7832d8ba9f362a21eccfcb7ac3dde36ca7b14cdf950a5481134`) and
+contain only `response_strategies/README.md` and
+`response_strategies/user_strategy.py`. Restricted-material scans are clean,
+the Git tree is clean, and no Round 1 simulator process is live.
+
+The pinned v3 snapshot still scores `19.084638612143134` over 72 periods and
+has the expected ATT SHA. The active ignored Output ATT is byte-identical to
+that snapshot before the candidate run. A non-overwriting launch manifest is
+kept with the exact hashes, stale-Output metadata, package identity, command,
+acceptance threshold, and gate results.
 
 ## Fixed control and run contract
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-**PRE-TDD AUDIT GO — no candidate code or full simulation has run.**
+**IMPLEMENTED — PRE-RUN PREFLIGHT; no candidate simulation has run.**
 
 This experiment is a separately named, single-candidate trial from the
 accepted v3 control. The design and implementation plan are:
@@ -62,12 +62,57 @@ Ignored audit JSON:
 Audit SHA-256:
 `e31f0582870f0ed6fa02b6ff2d929d1ec8a928736b1ba5ec9a4799b05329abd6`.
 
-## Next gate
+After the RED→GREEN implementation, a second audit invoked the actual public
+participant hook on the same 19,000 disposable observations. It recorded 48
+`False` v3 holds, 50 transactional `True` installs, and 18,902 `None`
+delegates. Every install had exactly the declared `2→1` service-route-change
+shape; all delegate/hold calls were mutation-free, reverse booking references
+were present, and the Round 1 Output ATT remained byte-identical. This is still
+structural evidence, not a score prediction.
 
-RED tests must be added and observed against untouched v3. Only after valid
-RED, minimal GREEN, all quality/integration/package/smoke gates, a fresh v3
-control score check, and a non-overwriting launch manifest may the single full
-Round 1 run start. The candidate ATT and raw log must be preserved before
-scoring or restoration. Rejection requires a report-first Git revert, v3
-synchronization, byte-identical ATT restoration, exact re-score, and all final
-gates.
+The actual-hook audit is stored privately at
+`.challenge/round1/results/equal_distance_one_transfer_tie_v27_20260819/candidate_activation_audit.json`.
+Its evidence SHA-256 is
+`51858120df56696a3b05dbb851c23a773e6f7f5655c01724427eff9fae3c9d44`.
+Its candidate strategy SHA-256 is
+`f073e5b140f30d013eb5faaebefb7eeea629b85243d8c40ab685c586c29db3d1`; its
+Output-before/after ATT SHA is
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+
+## Implementation and next gate
+
+The RED contract was committed as `e956e8c`; the minimal GREEN implementation,
+README update, and real-context contract correction were committed as
+`3a9227d`. Focused GREEN, full non-integration coverage (90.67%), integration,
+Ruff, Ty, and mypy checks pass. Only the complete preflight, immutable launch
+manifest, and one full candidate run remain. The candidate ATT and raw log must
+be preserved before scoring or restoration. Rejection requires a report-first
+Git revert, v3 synchronization, byte-identical ATT restoration, exact re-score,
+and all final gates.
+
+## Preflight identity record
+
+The complete preflight passed on the candidate implementation:
+
+- `uv lock --check` and `uv sync --locked --all-groups` passed;
+- Ruff format/check, Ty, and mypy passed;
+- 235 non-integration tests passed with 90.67% branch coverage;
+- 8 integration tests passed;
+- Round 1 sync produced byte-identical participant/runtime files;
+- Round 1 smoke returned `SMOKE_OK`;
+- two `Round1_ValidationTeam.zip` packages were byte-identical at SHA-256
+  `5249d839fa5e43934a0a97132c0a207dbd9022e65a2fc9c73fd39c908fa929bc`, with
+  only `response_strategies/README.md` and `response_strategies/user_strategy.py`;
+- the active pre-run Output ATT and pinned v3 ATT are both
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and
+  the authoritative baseline at
+  `.challenge/round1/source/Output/Baseline_ATT_By_Statistics_Interval.csv` is
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`;
+- the active control re-scored to `19.084638612143134` over 72 periods;
+- the participant and synchronized runtime strategy SHA-256 is
+  `f073e5b140f30d013eb5faaebefb7eeea629b85243d8c40ab685c586c29db3d1`;
+- restricted-material scans were empty, there is one `main` worktree, and no
+  simulator, smoke, or audit process remained live.
+
+The package, hashes, stale Output metadata, control score, and exact launch
+command are pinned in the ignored non-overwriting manifest before launch.

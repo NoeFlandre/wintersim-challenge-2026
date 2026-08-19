@@ -16,20 +16,23 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: multi-transfer recovery-hold experiment
+## Current strategy: v25 equal-distance route tie-break experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `assign_associated_bookings` may return `False`
-for a newly generated shipment only when all of the following are derived from
-the live context: its normal shortest route is one disrupted direct service,
-the currently safe shortest route needs at least two changes between services
-(at least three service boardings), and the direct service is estimated to
-recover and deliver sooner than that detour.
+The booking hook preserves the v3 recovery hold for a newly generated shipment.
+Otherwise, during an active disruption, it may install a complete booking chain
+only when the fallback's disruption-safe shortest path has exactly the same
+total sailing distance as another safe path with strictly fewer service-route
+changes. The path is derived from the live context and installed only after all
+segments and booking objects are validated; any uncertainty delegates without
+mutation.
 
-The strategy does not create or edit bookings. It reads runtime topology,
-disruption windows, vessel speeds, and service-route headways, makes a
-full-precision comparison, and otherwise delegates. Missing or ambiguous data
-also delegates without mutation. No performance result is claimed until the
+The strategy reads runtime topology and active disruption state, uses exact
+full-precision distance equality, and preserves deterministic context-order
+tie-breaking when no strictly better transfer count exists. It uses only
+standard-library code plus the organizer's runtime `maritime_data_context`
+`Booking` class, has no filesystem/network/randomness/clock access, and keeps
+all temporary state inside a call. No performance result is claimed until the
 pre-registered full experiment finishes.
 
 ## Submission boundary

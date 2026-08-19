@@ -1,7 +1,7 @@
 # Round 1 multi-TEU missed-connection buffer v20
 
-**Status: PRE-RUN GATES COMPLETE — exactly one full candidate run is permitted
-after the immutable manifest is written and revalidated.**
+**Status: REJECTED — one full run completed; result preserved; v3 restoration
+is pending.**
 
 The accepted v3 policy remains the control at cumulative resilience loss
 `19.084638612143134` over 72 periods and ATT SHA-256
@@ -80,3 +80,42 @@ The next step is to commit this pre-run record, write a non-overwriting ignored
 manifest pinned to that final documentation HEAD, revalidate every pinned
 identity, and run only the frozen command once. No tuning or second candidate
 is authorized.
+
+## Full-run result
+
+The non-overwriting pre-run manifest had SHA-256
+`3b3764ba055028b2ac367e8f201d462b9e6c49e99c2cd2f81cabf4f45ff19ed6`
+and pinned launch HEAD `2b13a35398efb1f57f03cadaaa7745a284f6256d`.
+Every pinned identity, the stale Output metadata, clean Git state, and the
+no-live-process gate were revalidated immediately before launch.
+
+Exactly one full candidate run started at `2026-08-19T12:15:57Z`. It exited
+`0`; the log contains Day 360/360, Period 72 (Days 356-360), Output Simulation
+Day 360, `Simulation completed.`, and the fresh CSV marker. The organizer's
+final reported runtime was `00:23:54`.
+
+The fresh ATT and raw log were copied to the predeclared ignored evidence
+directory before scoring or any sync, smoke, package, or restoration action:
+
+- candidate ATT SHA-256:
+  `b3bdf7b59e477b1adfcb732e2a09f03d9c80ccb7bb83dc6acdedb88273ac3128`;
+- raw-log SHA-256:
+  `b747e03db841654245c7dc69e4ec3df71ebe9840179257c1d25ae0ecd740075a`;
+- numbered periods: 72; candidate mean ATT: `20.68861111111111` days;
+- candidate cumulative resilience loss: `24.207356508382723`;
+- accepted v3 control loss: `19.084638612143134`;
+- delta: `+5.122717896239589` (`+26.842100604305475%`, worse);
+- candidate periods better/equal/worse than v3: `15 / 20 / 37`.
+
+The immutable acceptance expression is
+`candidate_loss < 19.084638612143134 - 1e-9`; it is false. **Decision:
+REJECTED.** The result shows that the added capacity-risk holds delayed enough
+multi-TEU cargo to outweigh their 15 improved periods. This conclusion applies
+to the exact frozen policy and fixed scenario/seed; the activation audit alone
+did not predict it.
+
+No tuning, duplicate run, second candidate, score threshold change, push,
+submission, or history rewrite occurred. The next required step is the frozen
+rejection restoration: commit this result, revert candidate implementation and
+tests in reverse order, restore/sync v3 and its pinned ATT, re-score exactly,
+then rerun every final gate without another simulation.

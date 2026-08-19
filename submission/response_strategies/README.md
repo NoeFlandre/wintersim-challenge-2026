@@ -16,7 +16,7 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: v22 multi-TEU v3 hold suppression experiment
+## Current strategy: multi-transfer recovery-hold experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
 During an active disruption, `assign_associated_bookings` may return `False`
@@ -25,12 +25,6 @@ the live context: its normal shortest route is one disrupted direct service,
 the currently safe shortest route needs at least two changes between services
 (at least three service boardings), and the direct service is estimated to
 recover and deliver sooner than that detour.
-
-The current v22 experiment preserves that v3 hold for one-TEU and ambiguous
-cargo sizes, but delegates the same hold when `teu_size` is a finite,
-non-boolean real greater than one. This is a measured, reversible test of
-whether multi-TEU origin holds create more capacity pressure than delay relief;
-it is not a permanent performance claim.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a

@@ -11,7 +11,6 @@ import pytest
 
 from wsc2026_tools.paths import round_source_dir, submission_strategies_dir
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -62,9 +61,7 @@ def test_real_pending_alternative_is_selected_without_mutation() -> None:
 
     context = scenario_builders.create_with_disruption()
     plan = min(context.disruption_plans, key=lambda item: item.start_offset_days)
-    now = dt.datetime.min + dt.timedelta(
-        days=plan.start_offset_days + plan.duration_days / 2.0
-    )
+    now = dt.datetime.min + dt.timedelta(days=plan.start_offset_days + plan.duration_days / 2.0)
     DefaultStrategy.create_alternative_service_routes(context, now, None)
     pending = next(
         (vessel for vessel in context.vessels if vessel.pending_assigned_service_route is not None),
@@ -77,9 +74,7 @@ def test_real_pending_alternative_is_selected_without_mutation() -> None:
     before = (
         tuple(context.vessels),
         tuple(context.service_routes),
-        tuple(
-            (vessel, vessel.pending_assigned_service_route) for vessel in context.vessels
-        ),
+        tuple((vessel, vessel.pending_assigned_service_route) for vessel in context.vessels),
         tuple(context.disruption_plans),
     )
 
@@ -89,8 +84,8 @@ def test_real_pending_alternative_is_selected_without_mutation() -> None:
     assert result is pending
     assert tuple(context.vessels) == before[0]
     assert tuple(context.service_routes) == before[1]
-    assert tuple(
-        (vessel, vessel.pending_assigned_service_route) for vessel in context.vessels
-    ) == before[2]
+    assert (
+        tuple((vessel, vessel.pending_assigned_service_route) for vessel in context.vessels)
+        == before[2]
+    )
     assert tuple(context.disruption_plans) == before[3]
-

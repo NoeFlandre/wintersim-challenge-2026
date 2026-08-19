@@ -6,9 +6,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-
 from response_strategies.user_strategy import UserStrategy
-
 
 ANCHOR = datetime.min
 
@@ -96,9 +94,7 @@ def test_queue_order_selects_first_matching_vessel() -> None:
     ("day", "expected"),
     [(10.0, True), (14.999999, True), (15.0, False), (9.999999, False)],
 )
-def test_active_window_is_start_inclusive_and_end_exclusive(
-    day: float, expected: bool
-) -> None:
+def test_active_window_is_start_inclusive_and_end_exclusive(day: float, expected: bool) -> None:
     plan = _plan()
     port = _port("departure")
     vessel = _vessel(port=port, key=_matching_key(plan))
@@ -155,8 +151,22 @@ def test_wrong_port_and_inactive_window_delegate() -> None:
 @pytest.mark.parametrize(
     "plan",
     [
-        SimpleNamespace(close_berth=False, multiplier=2.0, start_offset_days=None, duration_days=5.0, target_leg=object(), target_berth=None),
-        SimpleNamespace(close_berth=False, multiplier=float("nan"), start_offset_days=10.0, duration_days=5.0, target_leg=object(), target_berth=None),
+        SimpleNamespace(
+            close_berth=False,
+            multiplier=2.0,
+            start_offset_days=None,
+            duration_days=5.0,
+            target_leg=object(),
+            target_berth=None,
+        ),
+        SimpleNamespace(
+            close_berth=False,
+            multiplier=float("nan"),
+            start_offset_days=10.0,
+            duration_days=5.0,
+            target_leg=object(),
+            target_berth=None,
+        ),
         object(),
     ],
 )
@@ -180,10 +190,20 @@ def test_selection_does_not_mutate_inputs() -> None:
     context = _context(plan)
     waiting = [vessel]
     route = vessel.pending_assigned_service_route
-    before = (list(context.disruption_plans), list(waiting), list(route.segments), vessel.carried_shipments)
+    before = (
+        list(context.disruption_plans),
+        list(waiting),
+        list(route.segments),
+        vessel.carried_shipments,
+    )
 
     assert _select(context, port, waiting, 12.0) is vessel
-    assert (context.disruption_plans, waiting, route.segments, vessel.carried_shipments) == before
+    assert (
+        context.disruption_plans,
+        waiting,
+        route.segments,
+        vessel.carried_shipments,
+    ) == before
 
 
 def test_other_hooks_preserve_v3_delegation_contract() -> None:

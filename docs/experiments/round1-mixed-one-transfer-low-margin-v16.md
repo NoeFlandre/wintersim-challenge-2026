@@ -1,7 +1,6 @@
 # Round 1 mixed one-transfer low-margin recovery hold v16
 
-**Status: PRE-RUN REVIEW — implementation and audit only; no full simulation
-authorized yet.**
+**Status: REJECTED — complete; v3 restored.**
 
 ## Hypothesis
 
@@ -74,15 +73,15 @@ and before any run. The immutable audit passed with SHA-256
 
 ## TDD and gates
 
-RED tests cover below-buffer hold, equality delegation, above-buffer
+RED tests covered below-buffer hold, equality delegation, above-buffer
 delegation, invalid headway delegation, and unchanged v3 multi-transfer hold.
-GREEN is the smallest local extension of the v3 timing guard. Before any full
-run, locked `uv` resolution/sync, Ruff, Ty, mypy, unit coverage at least 90%,
-integration tests, participant/runtime `cmp`, one-day smoke, deterministic
+GREEN was the smallest local extension of the v3 timing guard. Before the
+full run, locked `uv` resolution/sync, Ruff, Ty, mypy, unit coverage at least
+90%, integration tests, participant/runtime `cmp`, one-day smoke, deterministic
 participant-only packages, unchanged control score/ATT, restricted-material
-scans, a clean Git state, and no live process are mandatory. Freeze a
-non-overwriting manifest. Preserve the raw log and fresh ATT before scoring or
-restoration.
+scans, a clean Git state, and no live process all passed. A non-overwriting
+manifest was frozen and the raw log and fresh ATT were preserved before
+scoring.
 
 ## Evidence paths
 
@@ -92,3 +91,51 @@ aggregate belongs under
 `experiments/results/round1_mixed_one_transfer_low_margin_v16_20260819.json`.
 This document must be updated with the immutable audit, run, score, decision,
 restoration, and final-gate hashes only after each corresponding action.
+
+## Full-run result
+
+The literal manifest command was attempted once and stopped before simulation
+because the sandbox denied the default UV cache; the launch error is preserved
+at `.challenge/round1/results/mixed_one_transfer_low_margin_v16_20260819/launch_failure_default_uv_cache.log`
+(SHA-256 `428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`).
+The one actual simulation used the same command with only `UV_CACHE_DIR` set to
+a writable temporary cache. It exited `0`, reached Period 72 / Day 360, and
+printed `Simulation completed.`. The raw log is preserved at
+`.challenge/round1/results/mixed_one_transfer_low_margin_v16_20260819/full_run.log`
+(SHA-256
+`c6bfd00a14f2989ab79955ef6afd6eb8317af79189b5f14881c37f7855889051`). The
+fresh ATT was copied before scoring to
+`.challenge/round1/results/mixed_one_transfer_low_margin_v16_20260819/ATT_By_Statistics_Interval.csv`
+(SHA-256
+`adbd031f37d1ba8722561760cf155be315e10836ea3185f31233bef5077c1a79`).
+
+| Metric | Candidate | v3 control |
+| --- | ---: | ---: |
+| Cumulative resilience loss | `22.39069050026446` | `19.084638612143134` |
+| Difference vs control | `+3.306051888121326` | — |
+| Mean ATT (72 periods, days) | `20.57236111111111` | `20.3675` |
+| Periods better / equal / worse | `16 / 21 / 35` | — |
+
+The strict acceptance rule was not met, so v16 is **REJECTED**. Complete
+machine-readable evidence is in
+`.challenge/round1/results/mixed_one_transfer_low_margin_v16_20260819/result.json`.
+
+## Restoration
+
+The rejected implementation commit `ebf2903` was reverted without rewriting
+history. The v16 test was removed, participant and ignored runtime files were
+synchronized back to v3, and the active ATT was restored from the pinned v3
+snapshot. Final active hashes are the v3 strategy
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`, v3
+README `0590ba5bb34ffc9bf0e7f368b552f8f26c71eb7314a00fa221e0c5e8f4225595`, and
+ATT `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+Ignored candidate artifacts remain available for audit; no candidate output is
+active.
+
+## Final verification after restoration
+
+The final post-restoration gate run must repeat locked UV resolution/sync,
+Ruff, Ty, mypy, tests and coverage, serial integrations, smoke, deterministic
+participant-only packaging, active v3 scoring, restricted-material scans, and
+the no-live-process/clean-tree checks. Its exact results and hashes will be
+added here before the experiment is closed.

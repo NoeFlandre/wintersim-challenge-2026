@@ -1,6 +1,6 @@
 # Round 1 in-transit direct recovery hold v19
 
-**Status: REJECTED — full run complete; v3 restoration pending final gates.**
+**Status: REJECTED — complete; v3 control restored and verified.**
 
 Implementation is committed as `ce8929e` after the RED checkpoint
 `31e2a57`; fail-closed coverage and full-suite isolation follow in
@@ -165,6 +165,23 @@ the preserved candidate ATT, `full_run.log`, `full_run_preserved.log`, and
 `experiments/results/round1_in_transit_direct_recovery_hold_v19_20260819.json`.
 The 48 structural candidate-only activations therefore produced no scored
 divergence in this pinned run; no causal gain is claimed.
+
+## Final restored state
+
+The v19 implementation and tests were reverted in reverse order after the
+result record was committed. Round 1 was synchronized back to the v3
+participant source, and the pinned v3 ATT snapshot was restored byte-for-byte.
+The active strategy SHA is again
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`; the
+active ATT SHA is again
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`; and the
+restored score is exactly `19.084638612143134` over 72 periods.
+
+After restoration, locked uv, Ruff, Ty, mypy, the non-integration gate
+(`227 passed`, `90.84%` coverage), integration (`8 passed`), full suite (`235
+passed`), smoke (`SMOKE_OK`), deterministic participant-only packaging, and
+restricted-material scans passed. No simulator process is live. The repository
+is intentionally paused here; no further experiment or optimization was run.
 
 ## Fixed control and run contract
 

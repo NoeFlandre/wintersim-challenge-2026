@@ -8,6 +8,7 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
+
 ANCHOR = dt.datetime.min
 
 
@@ -73,12 +74,8 @@ def _fixture(
     destination = _port("Destination")
     nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
     safe_a = _route("safe-a", [origin, transfer_a, origin], [safe_distances[0], safe_distances[0]])
-    safe_b = _route(
-        "safe-b", [transfer_a, transfer_b, transfer_a], [safe_distances[1], safe_distances[1]]
-    )
-    safe_c = _route(
-        "safe-c", [transfer_b, destination, transfer_b], [safe_distances[2], safe_distances[2]]
-    )
+    safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [safe_distances[1], safe_distances[1]])
+    safe_c = _route("safe-c", [transfer_b, destination, transfer_b], [safe_distances[2], safe_distances[2]])
     context = SimpleNamespace(
         ports=[origin, transfer_a, transfer_b, destination],
         service_routes=[nominal, safe_a, safe_b, safe_c],
@@ -104,22 +101,16 @@ def _fixture(
     vessel.current_segment.current_vessels.append(vessel)
     vessel.carried_shipments.append(shipment)
     shipment.carrying_vessel = vessel
-    return (
-        context,
-        now,
-        shipment,
-        vessel,
-        {
-            "origin": origin,
-            "destination": destination,
-            "nominal": nominal,
-            "safe_a": safe_a,
-            "safe_b": safe_b,
-            "safe_c": safe_c,
-            "shipment": shipment,
-            "vessel": vessel,
-        },
-    )
+    return context, now, shipment, vessel, {
+        "origin": origin,
+        "destination": destination,
+        "nominal": nominal,
+        "safe_a": safe_a,
+        "safe_b": safe_b,
+        "safe_c": safe_c,
+        "shipment": shipment,
+        "vessel": vessel,
+    }
 
 
 def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
@@ -196,3 +187,4 @@ def test_nonqualifying_active_direct_edge_delegates() -> None:
     context, now, _, vessel, _ = _fixture(safe_distances=(40.0, 40.0, 80.0))
 
     assert _decision(context, now, vessel) is None
+

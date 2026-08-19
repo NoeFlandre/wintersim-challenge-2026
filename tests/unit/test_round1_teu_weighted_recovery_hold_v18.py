@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 from response_strategies.user_strategy import UserStrategy
 
-
 ANCHOR = dt.datetime.min
 
 

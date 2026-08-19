@@ -123,3 +123,16 @@ README `0590ba5bb34ffc9bf0e7f368b552f8f26c71eb7314a00fa221e0c5e8f4225595`, and
 ATT `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
 The ignored candidate artifacts remain available for audit; no candidate
 output is active.
+
+## Final verification after restoration
+
+After restoration, the repository passed `uv lock --check`, locked `uv sync`,
+Ruff format and lint, Ty, mypy, the full suite (`235 passed`), non-integration
+coverage (`227 passed`, `90.84%`), and the integration suite run serially
+(`8 passed`). Round 1 smoke returned `SMOKE_OK`. Two participant-only package
+runs were byte-identical (SHA-256
+`a8caf7f755a880ceb239c774887f29a489f07d2fe3b51b7d84d60d6891d04747`) and
+contained only `README.md` and `user_strategy.py`. The v3 ATT and runtime
+hashes above remained unchanged after smoke and packaging. Restricted-history
+and tracked-path scans were clean, no simulation process remained, and the
+working tree is clean on `main`.

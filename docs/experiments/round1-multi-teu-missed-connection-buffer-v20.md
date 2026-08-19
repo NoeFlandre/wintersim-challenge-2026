@@ -1,6 +1,7 @@
 # Round 1 multi-TEU missed-connection buffer v20
 
-**Status: IMPLEMENTED AND AUDITED — full-run preflight is pending.**
+**Status: PRE-RUN GATES COMPLETE — exactly one full candidate run is permitted
+after the immutable manifest is written and revalidated.**
 
 The accepted v3 policy remains the control at cumulative resilience loss
 `19.084638612143134` over 72 periods and ATT SHA-256
@@ -47,6 +48,35 @@ The audit JSON and private path/demand details remain ignored under
 `.challenge/round1/results/multi_teu_missed_connection_buffer_v20_20260819/`.
 These counts prove reachability only; the complete 72-period score decides.
 
-No full candidate simulation is permitted until all remaining quality,
-runtime, package, safety, control-identity gates, and the non-overwriting
-pre-run manifest are complete.
+## Pre-run verification
+
+No full candidate simulation has started. Fresh gates passed from the committed
+candidate:
+
+- `uv lock --check` and locked all-group sync: passed (29 packages resolved);
+- Ruff format and lint: passed (21 files);
+- `ty` and mypy: passed;
+- non-integration tests: 241 passed, 9 deselected, true branch coverage
+  `90.50%` (minimum `90%`);
+- integration tests: 9 passed; complete suite: 250 passed;
+- Round 1 sync and participant/runtime byte comparisons: passed;
+- one-day smoke: `SMOKE_OK`, with the active ATT bytes unchanged;
+- two participant-only packages: byte-identical SHA-256
+  `c3b96018bca7b8f52569eb39ddc76e20e371f08fedbc970b5a8d7d127131cff9`,
+  6,272 bytes, containing only `README.md` and `user_strategy.py`;
+- participant/runtime strategy SHA-256:
+  `0ae8fe79212040a9a7384755cfd633783a77620d00b871808c851cfdc1f29134`;
+- participant/runtime README SHA-256:
+  `7c24bf691ec8223c48b244db63a3a91439fc6160b893e34679381f93a555f2bc`;
+- pinned and active v3 control ATT: byte-identical SHA-256
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`,
+  1,262 bytes, freshly re-scored to `19.084638612143134` over 72 periods;
+- authoritative baseline ATT SHA-256:
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`;
+- diff/restricted-material checks, one-worktree/one-branch layout, clean tracked
+  state, and no-live-simulator check: passed.
+
+The next step is to commit this pre-run record, write a non-overwriting ignored
+manifest pinned to that final documentation HEAD, revalidate every pinned
+identity, and run only the frozen command once. No tuning or second candidate
+is authorized.

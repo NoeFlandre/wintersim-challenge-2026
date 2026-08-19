@@ -1,7 +1,6 @@
 # Round 1 multi-TEU mixed one-transfer recovery hold v21
 
-**Status: DESIGN FROZEN — activation audit passed; no candidate code or full
-simulation has started.**
+**Status: REJECTED — candidate run complete; control restoration in progress.**
 
 This report freezes one candidate from the accepted v3 control. The design is
 in [`the specification`](../superpowers/specs/2026-08-19-round1-multi-teu-mixed-one-transfer-v21-design.md)
@@ -64,3 +63,30 @@ If the run is rejected or invalid, evidence is preserved first, the result is
 committed, v21 code/tests are reverted in reverse order, and v3's participant
 files and pinned ATT are restored and re-scored. No tuning or second run is
 allowed inside v21.
+
+## Run result
+
+The candidate passed the frozen pre-run gates and exactly one full run was
+launched with `PYTHONHASHSEED=0` and the pinned Round 1 command. It exited `0`
+and the raw log contains Period 72 (Days 356–360), Output Simulation Day 360,
+`Simulation completed.`, and a fresh CSV write. The fresh ATT and raw log were
+copied into the ignored evidence directory before scoring or restoration.
+
+- candidate strategy SHA-256: `196f49c741b8906806d4fbde52ed680c1e6a228d752c0d35947ba810e6b47c34`;
+- candidate ATT SHA-256: `adbd031f37d1ba8722561760cf155be315e10836ea3185f31233bef5077c1a79`;
+- candidate ATT: `20.57236111111111` mean days across exactly 72 numbered rows;
+- candidate cumulative resilience loss: `22.39069050026446`;
+- pinned v3 control loss: `19.084638612143134`;
+- delta: `+3.306051888121326` (`+17.31578875514049%`);
+- period comparison: `16` better, `21` equal, `35` worse than control;
+- decision: **REJECTED** because the candidate is strictly worse than the
+  unchanged control under `candidate_loss < 19.084638612143134 - 1e-9`;
+- evidence aggregate:
+  `experiments/results/round1_multi_teu_mixed_one_transfer_v21_20260819.json`;
+- raw log SHA-256:
+  `6323a51534e8581cca8c572dbe96a43a7f48f93ff5d44f88a55c26fccfa52b0f`.
+
+The result is evidence about this exact multi-TEU mixed one-transfer policy.
+It does not prove that every cargo-size policy is harmful. The candidate-only
+activation audit was valid, but its six structural activations did not predict
+the official score.

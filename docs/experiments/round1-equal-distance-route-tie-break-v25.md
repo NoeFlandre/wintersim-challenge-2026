@@ -1,7 +1,6 @@
 # Round 1 equal-distance fewer-transfer tie-break v25
 
-**Status: REJECTED — complete; v3 control restoration is pending in this
-working state.**
+**Status: REJECTED — complete; v3 control restored and verified.**
 
 This report is the tracked audit contract for one candidate from the accepted
 Round 1 v3 control. The design and executable plan are recorded in the linked
@@ -112,3 +111,33 @@ change the rejection or the preserved evidence.
 
 The ignored aggregate record is
 `experiments/results/round1_equal_distance_route_tie_break_v25_20260819.json`.
+
+## Restoration and final state
+
+The rejection report was committed before restoration. Candidate commits were
+reverted in reverse order:
+
+- `483b372` reverts the v25 participant implementation and README;
+- `3dd2608` reverts the v25 tests and integration assertion adjustment.
+
+The active participant/runtime files were then synchronized from the restored
+v3 submission and compared byte-for-byte. The pinned v3 ATT snapshot was copied
+back from
+`.challenge/round1/results/multi_transfer_recovery_hold_v3_20260810/` and
+compared byte-for-byte. Final proof:
+
+- v3 strategy SHA-256 (submission and runtime):
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- active ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- final re-score: `19.084638612143134`, `72` periods;
+- final smoke: `SMOKE_OK`;
+- deterministic restored package SHA-256:
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`, with
+  only `README.md` and `user_strategy.py` in the archive;
+- final quality gates: lock/sync, Ruff, Ty, mypy, 227 non-integration tests at
+  90.84% coverage, and 8 integration tests all passed;
+- restricted-material scans passed and no simulator process remains.
+
+No tuning, duplicate run, second candidate, push, merge, PR, submission, or
+history rewrite occurred.

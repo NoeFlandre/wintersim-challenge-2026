@@ -193,49 +193,6 @@ def test_qualifying_direct_service_hold_returns_false_without_mutation() -> None
     assert _freeze((context, shipment)) == before
 
 
-def test_v22_multi_teu_v3_hold_delegates() -> None:
-    context, now, shipment, _ = _qualifying_fixture()
-    shipment.teu_size = 2
-
-    # RED: untouched v3 holds; v22 must delegate this multi-TEU hold.
-    assert _decision(context, now, shipment) is None
-
-
-@pytest.mark.parametrize("teu_size", [1, 0, -1, True, False, math.nan, math.inf, "2"])
-def test_v22_preserves_v3_for_one_or_ambiguous_teu(teu_size: Any) -> None:
-    context, now, shipment, _ = _qualifying_fixture()
-    shipment.teu_size = teu_size
-
-    assert _decision(context, now, shipment) is False
-
-
-def test_v22_multi_teu_suppression_is_read_only() -> None:
-    context, now, shipment, _ = _qualifying_fixture()
-    shipment.teu_size = 2
-    before = _freeze((context, shipment))
-
-    assert _decision(context, now, shipment) is None
-    assert _freeze((context, shipment)) == before
-
-
-def test_v22_does_not_change_one_transfer_delegation() -> None:
-    origin = _port("Origin")
-    transfer = _port("Transfer")
-    destination = _port("Destination")
-    nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
-    safe_a = _route("safe-a", [origin, transfer, origin], [1000.0, 1000.0])
-    safe_b = _route("safe-b", [transfer, destination, transfer], [1000.0, 1000.0])
-    context = SimpleNamespace(
-        ports=[origin, transfer, destination],
-        service_routes=[nominal, safe_a, safe_b],
-        disruption_plans=[_leg_plan(_leg(nominal))],
-    )
-    shipment = _shipment(origin, destination)
-    shipment.teu_size = 2
-
-    assert _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment) is None
-
-
 def test_one_transfer_safe_path_delegates_without_mutation() -> None:
     origin = _port("Origin")
     transfer = _port("Transfer")

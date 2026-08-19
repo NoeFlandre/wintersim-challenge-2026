@@ -134,8 +134,13 @@ active.
 
 ## Final verification after restoration
 
-The final post-restoration gate run must repeat locked UV resolution/sync,
-Ruff, Ty, mypy, tests and coverage, serial integrations, smoke, deterministic
-participant-only packaging, active v3 scoring, restricted-material scans, and
-the no-live-process/clean-tree checks. Its exact results and hashes will be
-added here before the experiment is closed.
+After restoration, locked UV resolution/sync, Ruff format/lint, Ty, mypy, the
+full suite (`235 passed`), non-integration coverage (`227 passed`, `90.84%`),
+and serial integrations (`8 passed`) all passed. Round 1 smoke returned
+`SMOKE_OK` and left the v3 ATT unchanged. Two participant-only packages were
+byte-identical (SHA-256
+`192425705a65d070845e05517fecf5bfe917b217a374d58e72cc93a7e54eaa79`) and
+contained only `README.md` and `user_strategy.py`. Active v3 scoring returned
+exactly `19.084638612143134` over 72 periods. Restricted-history and
+tracked-path scans were clean, no WSC process remained, and the working tree
+is clean on `main`.

@@ -266,3 +266,59 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     before = _snapshot(context, delegated)
     assert participant.UserStrategy.assign_associated_bookings(context, earliest, delegated) is None
     assert _snapshot(context, delegated) == before
+
+
+def test_real_round1_v22_suppresses_multi_teu_v3_hold_only() -> None:
+    source = _bootstrap_or_skip()
+    _prepare_imports(source)
+
+    import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    import scenario_builders  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    from maritime_data_context.shipment import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        Shipment,
+    )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        DefaultStrategy,
+    )
+
+    participant = _load_participant_module()
+    template = scenario_builders.create_with_disruption()
+    found = False
+    for now in _candidate_times(template):
+        context = scenario_builders.create_with_disruption()
+        DefaultStrategy.create_alternative_service_routes(context, now)
+        for index, demand in enumerate(context.demands):
+            one_teu = Shipment(
+                index=index,
+                teu_size=1,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            two_teu = Shipment(
+                index=index,
+                teu_size=2,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            one_before = _snapshot(context, one_teu)
+            two_before = _snapshot(context, two_teu)
+            one_decision = participant.UserStrategy.assign_associated_bookings(
+                context, now, one_teu
+            )
+            two_decision = participant.UserStrategy.assign_associated_bookings(
+                context, now, two_teu
+            )
+            if one_decision is not False:
+                continue
+            # RED: untouched v3 also returns False for the two-TEU hold.
+            assert two_decision is None
+            assert _snapshot(context, one_teu) == one_before
+            assert _snapshot(context, two_teu) == two_before
+            found = True
+            break
+        if found:
+            break
+
+    assert found, "no real v3 multi-TEU hold was derived"

@@ -1,6 +1,6 @@
 # Round 1 three-change mixed low-margin delegation v23
 
-**Status: IMPLEMENTED — PRE-RUN REVIEW; no full run yet.**
+**Status: REJECTED — full run complete; v3 control restoration pending.**
 
 V23 tests one narrow subtraction from the accepted Round 1 v3 recovery-hold
 control. The exact policy, alternatives, tests, one-run protocol, and restore
@@ -58,8 +58,8 @@ unchanged control ATT metadata. Its private JSON is
 with SHA-256
 `6f72ed9e2d8d13349419d52aff2a9483f5be6f94f01c951a6b3015842d779a07`.
 
-The audit is a GO for RED→GREEN implementation and preflight. No full run is
-authorized until those gates and a fresh control identity check pass.
+The audit was a GO for RED→GREEN implementation and preflight. Those gates and
+the fresh control identity check passed before the run.
 
 ## RED→GREEN implementation review
 
@@ -84,6 +84,29 @@ no mutable module state or organizer imports.
 - participant README SHA-256:
   `901b43183886b41681758d38065b496f7ef082af17c58ab2be27baa3f799080f`.
 
-No operational simulation has run. The next gate is the complete locked
-preflight and a non-overwriting manifest check immediately before one
-authorized full run.
+The complete locked preflight and non-overwriting manifest check passed before
+the one authorized full run.
+
+## Full-run result
+
+The pre-run manifest matched immediately before launch. Exactly one fixed full
+simulation ran with the manifest-pinned command and exited `0`. Its log proves
+Period 72 (Days 356–360), simulation day 360, `Simulation completed`, and a
+fresh CSV write. The raw log and ATT were preserved before scoring at:
+
+- `.challenge/round1/results/three_change_mixed_low_margin_v23_20260819/full_run.log`
+  (SHA-256 `e09eb240ad43e9320eb41062b7e9995cf12d5e6ff049be97e0ee78f1e670def0`);
+- `.challenge/round1/results/three_change_mixed_low_margin_v23_20260819/ATT_By_Statistics_Interval.csv`
+  (SHA-256 `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`).
+
+The candidate scorer returned `19.084638612143134` over exactly 72 periods,
+identical to the pinned v3 control. The strict acceptance rule requires a
+value below `19.084638612143134 - 1e-9`; equality is therefore **REJECTED**.
+The candidate ATT is byte-identical to control, so the experiment produced no
+measurable improvement. The immutable aggregate is
+`experiments/results/round1_three_change_mixed_low_margin_v23_20260819.json`.
+
+The candidate implementation and tests must now be reverted in reverse order,
+Round 1 synchronized back to the accepted v3 participant, the pinned v3 ATT
+restored byte-for-byte, and the final gates rerun. No tuning, duplicate run,
+or second candidate is permitted.

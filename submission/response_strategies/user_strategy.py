@@ -411,6 +411,9 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
         return False
     if getattr(shipment, "current_booking_index", None) is not None:
         return False
+    teu_size = _finite_real(getattr(shipment, "teu_size", None))
+    if teu_size is not None and teu_size > 1.0:
+        return False
     demand = getattr(shipment, "demand", None)
     origin = getattr(demand, "origin_port", None)
     destination = getattr(demand, "destination_port", None)

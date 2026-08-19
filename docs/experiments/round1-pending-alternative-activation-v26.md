@@ -2,7 +2,7 @@
 
 ## Status
 
-`REJECTED — EQUALITY; V3 RESTORATION IN PROGRESS`.
+`REJECTED — EQUALITY; V3 RESTORED`.
 
 The one authorized full simulation completed and its evidence was preserved.
 The candidate was not retained because the official score tied the accepted v3
@@ -111,8 +111,21 @@ rewrite is part of this experiment.
 
 ## Restoration record
 
-The rejection report is committed before restoration. The next steps are to
-revert the v26 implementation and candidate-only tests in reverse order,
-synchronize the restored participant adapter, restore the pinned v3 ATT
-snapshot, re-score it exactly, and rerun all final gates. The v26 design,
-activation audit, aggregate, and this result record remain as the audit trail.
+The rejection report was committed before restoration. The v26 implementation
+and test-module correction were reverted in provenance-preserving commits
+`b831174` (revert implementation) and `5b15a08` (revert test rename); the
+v26-only RED tests were removed in `27373da`. The design, audit, aggregate, and
+result history remain tracked or ignored as appropriate.
+
+After synchronization, the active participant and Round 1 runtime strategy
+SHA-256 is the accepted v3 value
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`. The
+active ATT is byte-identical to the pinned v3 snapshot with SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`; it was
+re-scored at `19.084638612143134` over 72 periods. Post-restoration lock,
+format, Ruff, Ty, mypy, coverage (`227` tests, `90.84%` branch coverage),
+integration (`8` passed), sync/byte comparison, smoke, deterministic package,
+restricted-material, diff, and process gates passed. The final package contains
+only `response_strategies/README.md` and `response_strategies/user_strategy.py`
+and has SHA-256
+`a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`.

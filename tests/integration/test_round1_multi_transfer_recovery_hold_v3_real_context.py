@@ -1,4 +1,4 @@
-"""Real Round 1 context contract for the v24 service-time refinement."""
+"""Real Round 1 context contract for the multi-transfer recovery-hold policy."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _prepare_imports(source: Path) -> None:
 def _load_participant_module() -> Any:
     participant_file = submission_strategies_dir() / "user_strategy.py"
     spec = importlib.util.spec_from_file_location(
-        "wsc_round1_service_time_safe_path_v24_participant", participant_file
+        "wsc_round1_multi_transfer_recovery_hold_v3_participant", participant_file
     )
     if spec is None or spec.loader is None:
         pytest.fail(f"cannot load participant strategy from {participant_file}")
@@ -177,30 +177,6 @@ def _candidate_times(context: Any) -> tuple[dt.datetime, ...]:
     return tuple(sorted(set(times)))
 
 
-def _integer_midpoint_times(context: Any) -> tuple[dt.datetime, ...]:
-    times: list[dt.datetime] = []
-    for plan in context.disruption_plans:
-        start_days = getattr(plan, "start_offset_days", None)
-        duration_days = getattr(plan, "duration_days", None)
-        if (
-            not isinstance(start_days, (int, float))
-            or isinstance(start_days, bool)
-            or not math.isfinite(start_days)
-            or not isinstance(duration_days, (int, float))
-            or isinstance(duration_days, bool)
-            or not math.isfinite(duration_days)
-            or duration_days <= 0
-        ):
-            continue
-        start = dt.datetime.min + dt.timedelta(days=start_days)
-        end = start + dt.timedelta(days=duration_days)
-        for day in range(math.floor(start_days), math.ceil(start_days + duration_days)):
-            midpoint = dt.datetime.min + dt.timedelta(days=day, hours=12)
-            if start <= midpoint < end:
-                times.append(midpoint)
-    return tuple(sorted(set(times)))
-
-
 def _outside_time(context: Any) -> dt.datetime:
     starts = [
         dt.datetime.min + dt.timedelta(days=plan.start_offset_days)
@@ -215,7 +191,7 @@ def _outside_time(context: Any) -> dt.datetime:
     return earliest - dt.timedelta(microseconds=1)
 
 
-def test_real_round1_context_contains_v3_hold_and_service_time_veto() -> None:
+def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     source = _bootstrap_or_skip()
     _prepare_imports(source)
 
@@ -230,11 +206,10 @@ def test_real_round1_context_contains_v3_hold_and_service_time_veto() -> None:
 
     participant = _load_participant_module()
     template = scenario_builders.create_with_disruption()
-    times = tuple(sorted({*_candidate_times(template), *_integer_midpoint_times(template)}))
+    times = _candidate_times(template)
     assert times, "real Round 1 context must expose at least one valid disruption window"
 
     qualifying: tuple[Any, Any, Any] | None = None
-    service_time_veto: tuple[Any, Any, Any] | None = None
     for now in times:
         context = scenario_builders.create_with_disruption()
         DefaultStrategy.create_alternative_service_routes(context, now)
@@ -255,7 +230,7 @@ def test_real_round1_context_contains_v3_hold_and_service_time_veto() -> None:
                 assert state is not None
                 graphs = participant._graphs(context, state)
                 assert graphs is not None
-                safe_path = participant._fastest_path(
+                safe_path = participant._shortest_path(
                     context,
                     demand.origin_port,
                     demand.destination_port,
@@ -268,60 +243,14 @@ def test_real_round1_context_contains_v3_hold_and_service_time_veto() -> None:
                 )
                 assert route_changes >= 2
                 qualifying = (context, now, shipment)
-            elif service_time_veto is None:
-                state = participant._active_state(context, now)
-                if state is None:
-                    continue
-                graphs = participant._graphs(context, state)
-                if graphs is None:
-                    continue
-                nominal_path = participant._shortest_path(
-                    context,
-                    demand.origin_port,
-                    demand.destination_port,
-                    graphs[0],
-                )
-                distance_path = participant._shortest_path(
-                    context,
-                    demand.origin_port,
-                    demand.destination_port,
-                    graphs[1],
-                )
-                fastest_path = participant._fastest_path(
-                    context,
-                    demand.origin_port,
-                    demand.destination_port,
-                    graphs[1],
-                )
-                if nominal_path is None or distance_path is None or fastest_path is None:
-                    continue
-                distance_changes = sum(
-                    left.route is not right.route
-                    for left, right in zip(distance_path, distance_path[1:], strict=False)
-                )
-                fastest_changes = sum(
-                    left.route is not right.route
-                    for left, right in zip(fastest_path, fastest_path[1:], strict=False)
-                )
-                if (
-                    len(nominal_path) == 1
-                    and distance_changes >= 2
-                    and len(fastest_path) >= 2
-                    and fastest_changes < 2
-                ):
-                    service_time_veto = (context, now, shipment)
-            assert decision is None or decision is False
-            if qualifying is not None and service_time_veto is not None:
                 break
-        if qualifying is not None and service_time_veto is not None:
+            assert decision is None
+        if qualifying is not None:
             break
 
     assert qualifying is not None, (
         "approved policy is dormant in the real Round 1 context at every "
         "derived active-window sample"
-    )
-    assert service_time_veto is not None, (
-        "service-time refinement did not find a distance-only control hold that should delegate"
     )
 
     context = scenario_builders.create_with_disruption()

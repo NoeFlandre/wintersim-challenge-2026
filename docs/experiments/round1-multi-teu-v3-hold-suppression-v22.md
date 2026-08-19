@@ -30,9 +30,10 @@ also produced materially worse results when adding multi-TEU holds. V22 tests
 the unmeasured complement: keep one-TEU v3 holds and delegate multi-TEU v3
 holds. These counts are reachability evidence, not a score prediction.
 
-The fresh v22 audit must be stored privately at
+The fresh v22 audit is stored privately at
 `.challenge/round1/results/multi_teu_v3_hold_suppression_v22_20260819/activation_audit.json`.
-No simulation is authorized until RED/GREEN and every pre-run gate pass.
+The audit was completed before implementation and the candidate was frozen
+only after RED/GREEN and every pre-run gate passed.
 
 ## Fresh pre-code audit
 
@@ -43,3 +44,23 @@ control-only two-TEU cases. It observed `no_mutation: true`, no model advance,
 no Output write, and unchanged control ATT metadata. The immutable audit JSON
 SHA-256 is
 `6314bb30c4c57dd7d745f47f75bc20a443eb4ecde83f14d8df4d4f876bf7f1da`.
+
+## Full-run result (2026-08-19)
+
+The one authorized full run used the manifest-pinned command with
+`PYTHONHASHSEED=0` and completed successfully at Day 360 / Period 72. The
+fresh ATT (Average Transport Time) CSV and raw log were preserved before
+scoring or restoration.
+
+- candidate ATT SHA-256: `ed0e19de9a725c9577767f8a3f592e8f8bca4ba1b1796ab7a50c27f8a0f9021e`;
+- mean ATT: `20.816111111111113` days;
+- candidate cumulative resilience loss: `26.25449609374837`;
+- control loss: `19.084638612143134`;
+- delta: `+7.169857481605236` (`+37.55807884247853%`);
+- period comparison: 0 better, 0 equal, 72 worse;
+- raw-log SHA-256: `4761e2da101e14c163076780d05402c32f8b6a76f80a7a328ed140b4b2aced56`.
+
+Decision: **REJECTED**. The candidate was materially worse than the frozen
+v3 control and did not satisfy the strict acceptance rule. Complete machine-
+readable evidence is in
+`experiments/results/round1_multi_teu_v3_hold_suppression_v22_20260819.json`.

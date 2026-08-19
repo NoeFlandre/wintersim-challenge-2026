@@ -152,3 +152,21 @@ order (`1deccfc`, `0d3702b`, `f69c79e`), the v3 participant files were synced,
 and the pinned v3 ATT snapshot was restored and re-scored exactly at
 `19.084638612143134`. The final active participant strategy is therefore the
 accepted v3 control, not the rejected v18 variant.
+
+## Post-rejection verification
+
+Restoration commits are `27f9c5c` (implementation), `fc97ed0` (formatting),
+and `434969a` (RED tests), following result commit `3576bd5`. After the
+restoration, all checks passed: locked uv check/sync, Ruff format and lint,
+Ty, mypy, the full suite (`235 passed`), non-integration coverage (`227
+passed`, `90.84%` branch coverage), and serial integration tests (`8 passed`).
+Round 1 sync and participant/runtime comparisons are byte-identical; smoke is
+`SMOKE_OK`; two participant-only packages are byte-identical with SHA-256
+`a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`.
+
+The active Output ATT and pinned v3 snapshot both hash to
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a` and
+re-score to `19.084638612143134` over 72 periods. Restricted-material scans,
+`git diff --check`, and the no-live-process check are clean. The worktree is
+clean on `main`; no push, merge, PR, upload, submission, tuning, duplicate
+run, or history rewrite was performed.

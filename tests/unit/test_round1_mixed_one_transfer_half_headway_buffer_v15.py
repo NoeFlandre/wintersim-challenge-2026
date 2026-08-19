@@ -40,9 +40,7 @@ def _route(
         )
         for index, distance in enumerate(distances, start=1)
     ]
-    route.deployed_vessels = [
-        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))
-    ]
+    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))]
     return route
 
 

@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -43,9 +42,7 @@ def _route(
         )
         for index, distance in enumerate(distances, start=1)
     ]
-    route.deployed_vessels = [
-        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))
-    ]
+    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))]
     return route
 
 
@@ -184,7 +181,7 @@ def test_equal_mixed_hold_and_detour_delegates_for_multi_teu() -> None:
 
 
 def test_mixed_extension_respects_disruption_boundaries() -> None:
-    context, _, shipment, _ = _mixed_fixture(teu_size=2.0)
+    context, _, shipment, _ = _mixed_fixture(teu_size=2.0, safe_distance=1000.0)
 
     assert _decision(context, ANCHOR + dt.timedelta(days=10), shipment) is False
     assert _decision(context, ANCHOR + dt.timedelta(days=15), shipment) is None
@@ -221,4 +218,3 @@ def test_existing_v3_multi_transfer_hold_is_preserved_for_one_teu() -> None:
     )
 
     assert _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment) is False
-

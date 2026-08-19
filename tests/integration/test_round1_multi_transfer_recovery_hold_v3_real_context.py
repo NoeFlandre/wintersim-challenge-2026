@@ -200,7 +200,9 @@ def _all_disruption_midpoints(context: Any) -> tuple[dt.datetime, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _mixed_one_transfer_shape(participant: Any, context: Any, now: dt.datetime, demand: Any) -> bool:
+def _mixed_one_transfer_shape(
+    participant: Any, context: Any, now: dt.datetime, demand: Any
+) -> bool:
     state = participant._active_state(context, now)
     if state is None:
         return False
@@ -222,7 +224,8 @@ def _mixed_one_transfer_shape(participant: Any, context: Any, now: dt.datetime, 
         return False
     leg_ids = {id(leg) for leg in nominal[0].legs}
     arrival_names = {
-        participant._port_name(port) for port in (*nominal[0].intermediate_ports, nominal[0].arrival)
+        participant._port_name(port)
+        for port in (*nominal[0].intermediate_ports, nominal[0].arrival)
     }
     kinds = {
         constraint.kind
@@ -370,8 +373,12 @@ def test_real_round1_multi_teu_mixed_extension_is_live_and_identity_free() -> No
             )
             one_before = _snapshot(context, one_teu)
             two_before = _snapshot(context, two_teu)
-            assert participant.UserStrategy.assign_associated_bookings(context, now, one_teu) is None
-            assert participant.UserStrategy.assign_associated_bookings(context, now, two_teu) is False
+            assert (
+                participant.UserStrategy.assign_associated_bookings(context, now, one_teu) is None
+            )
+            assert (
+                participant.UserStrategy.assign_associated_bookings(context, now, two_teu) is False
+            )
             assert _snapshot(context, one_teu) == one_before
             assert _snapshot(context, two_teu) == two_before
             found = True

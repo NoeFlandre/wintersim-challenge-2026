@@ -8,7 +8,6 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
-
 ANCHOR = dt.datetime.min
 
 

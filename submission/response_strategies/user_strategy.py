@@ -1,9 +1,9 @@
 """Participant-owned response strategy for the WSC 2026 challenge.
 
 The active experiment is deliberately narrow: while a disruption is active,
-new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+multi-TEU cargo may remain at origin when an interrupted one-booking direct
+service is estimated to recover sooner than a safe detour requiring at least
+two changes between service routes.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -411,6 +411,9 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
         return False
     if getattr(shipment, "current_booking_index", None) is not None:
         return False
+    teu_size = _finite_real(getattr(shipment, "teu_size", None))
+    if teu_size is None or teu_size <= 1.0:
+        return False
     demand = getattr(shipment, "demand", None)
     origin = getattr(demand, "origin_port", None)
     destination = getattr(demand, "destination_port", None)
@@ -471,7 +474,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Hold multi-TEU cargo instead of a two-transfer detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

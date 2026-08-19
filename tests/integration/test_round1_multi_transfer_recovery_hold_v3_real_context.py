@@ -177,6 +177,70 @@ def _candidate_times(context: Any) -> tuple[dt.datetime, ...]:
     return tuple(sorted(set(times)))
 
 
+def _all_disruption_midpoints(context: Any) -> tuple[dt.datetime, ...]:
+    values: list[dt.datetime] = []
+    for plan in context.disruption_plans:
+        start_days = getattr(plan, "start_offset_days", None)
+        duration_days = getattr(plan, "duration_days", None)
+        if (
+            isinstance(start_days, (int, float))
+            and not isinstance(start_days, bool)
+            and math.isfinite(start_days)
+            and isinstance(duration_days, (int, float))
+            and not isinstance(duration_days, bool)
+            and math.isfinite(duration_days)
+            and duration_days > 0
+        ):
+            start = dt.datetime.min + dt.timedelta(days=start_days)
+            end = start + dt.timedelta(days=duration_days)
+            for integer_day in range(math.floor(start_days), math.ceil(start_days + duration_days)):
+                midpoint = dt.datetime.min + dt.timedelta(days=integer_day + 0.5)
+                if start <= midpoint < end:
+                    values.append(midpoint)
+    return tuple(dict.fromkeys(values))
+
+
+def _mixed_one_transfer_shape(participant: Any, context: Any, now: dt.datetime, demand: Any) -> bool:
+    state = participant._active_state(context, now)
+    if state is None:
+        return False
+    graphs = participant._graphs(context, state)
+    if graphs is None:
+        return False
+    nominal = participant._shortest_path(
+        context, demand.origin_port, demand.destination_port, graphs[0]
+    )
+    safe = participant._shortest_path(
+        context, demand.origin_port, demand.destination_port, graphs[1]
+    )
+    if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
+        return False
+    route_changes = sum(
+        left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
+    )
+    if route_changes != 1:
+        return False
+    leg_ids = {id(leg) for leg in nominal[0].legs}
+    arrival_names = {
+        participant._port_name(port) for port in (*nominal[0].intermediate_ports, nominal[0].arrival)
+    }
+    kinds = {
+        constraint.kind
+        for constraint in state.constraints
+        if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
+        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+    }
+    if kinds != {"leg", "port"}:
+        return False
+    recovery = participant._edge_constraint_recovery(nominal[0], state)
+    nominal_hours = participant._path_service_hours(nominal)
+    detour_hours = participant._path_service_hours(safe)
+    if recovery is None or nominal_hours is None or detour_hours is None:
+        return False
+    hold_hours = max(0.0, (recovery - now).total_seconds() / 3600.0) + nominal_hours
+    return math.isfinite(hold_hours) and 0.0 < hold_hours < detour_hours
+
+
 def _outside_time(context: Any) -> dt.datetime:
     starts = [
         dt.datetime.min + dt.timedelta(days=plan.start_offset_days)
@@ -266,3 +330,53 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
     before = _snapshot(context, delegated)
     assert participant.UserStrategy.assign_associated_bookings(context, earliest, delegated) is None
     assert _snapshot(context, delegated) == before
+
+
+def test_real_round1_multi_teu_mixed_extension_is_live_and_identity_free() -> None:
+    source = _bootstrap_or_skip()
+    _prepare_imports(source)
+
+    import main  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    import scenario_builders  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+    from maritime_data_context.shipment import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        Shipment,
+    )
+    from response_strategies.default_strategy import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        DefaultStrategy,
+    )
+
+    participant = _load_participant_module()
+    template = scenario_builders.create_with_disruption()
+    found = False
+    for now in _all_disruption_midpoints(template):
+        context = scenario_builders.create_with_disruption()
+        DefaultStrategy.create_alternative_service_routes(context, now)
+        for index, demand in enumerate(context.demands):
+            if not _mixed_one_transfer_shape(participant, context, now, demand):
+                continue
+            one_teu = Shipment(
+                index=index,
+                teu_size=1,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            two_teu = Shipment(
+                index=index,
+                teu_size=2,
+                demand=demand,
+                current_storage_port=demand.origin_port,
+                generated_time=now,
+            )
+            one_before = _snapshot(context, one_teu)
+            two_before = _snapshot(context, two_teu)
+            assert participant.UserStrategy.assign_associated_bookings(context, now, one_teu) is None
+            assert participant.UserStrategy.assign_associated_bookings(context, now, two_teu) is False
+            assert _snapshot(context, one_teu) == one_before
+            assert _snapshot(context, two_teu) == two_before
+            found = True
+            break
+        if found:
+            break
+
+    assert found, "no identity-free multi-TEU mixed one-transfer case was derived"

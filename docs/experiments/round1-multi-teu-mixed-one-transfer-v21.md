@@ -90,3 +90,29 @@ The result is evidence about this exact multi-TEU mixed one-transfer policy.
 It does not prove that every cargo-size policy is harmful. The candidate-only
 activation audit was valid, but its six structural activations did not predict
 the official score.
+
+## Restoration and final state
+
+The rejected implementation and its RED tests were reverted in reverse order
+(`e242844`, `4df0269`, `3c22bfa`). The accepted v3 participant files were then
+synchronized and the pinned control ATT was restored byte-for-byte before the
+final checks.
+
+- final branch/HEAD: `main` / `3c22bfa34e595cc9d5dbff67183306bbbff32a98`;
+- participant and runtime strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- active and pinned control ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- final control re-score: `19.084638612143134`, exactly 72 periods;
+- `uv lock --check`, locked sync, Ruff format/check, Ty, and mypy: passed;
+- non-integration tests: `227 passed`, branch coverage `90.84%`;
+- integration tests: `8 passed`;
+- Round 1 sync/cmp and smoke: passed (`SMOKE_OK`);
+- deterministic validation package: `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`,
+  containing only the README and `user_strategy.py`;
+- restricted-history/path scans: clean; no live simulation process remains;
+- final Git working tree: clean.
+
+No tuning, duplicate run, second candidate, push, submission, or history
+rewrite occurred. The v21 experiment is complete and the repository is ready
+for a separately designed experiment.

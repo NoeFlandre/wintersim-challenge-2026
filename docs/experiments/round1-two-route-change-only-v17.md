@@ -82,3 +82,44 @@ belongs under
 `experiments/results/round1_two_route_change_only_v17_20260819.json`.
 This record is updated with immutable audit, run, score, restoration, and
 final-gate hashes only after each action.
+
+## Full-run result
+
+The one authorized full run used the frozen `round1` configuration and
+completed successfully: the literal default-uv-cache launch failed before a
+simulator started (log SHA-256
+`428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`), then the
+same command ran once with the predeclared writable `UV_CACHE_DIR`. The run
+ended with exit `0`, Period `72` (Days `356-360`), Day `360`, and
+`Simulation completed`.
+
+The fresh candidate ATT was preserved before scoring at
+`.challenge/round1/results/two_route_change_only_v17_20260819/ATT_By_Statistics_Interval.csv`
+(SHA-256
+`c051850daf539e76158ebd9fc6af1b114d38e70abef79d16dce7694bf543c5fc`). The raw
+log is preserved at
+`.challenge/round1/results/two_route_change_only_v17_20260819/full_run.log`
+(SHA-256
+`08c6c4df1befa7997b1b80b73318b009741d64fb8fdcd2be7f5d3a41766572a1`), with
+simulation runtime `00:22:34`. The scorer accepted exactly `72` numbered
+periods and returned cumulative resilience loss
+`19.824783028123303`.
+
+| Metric | Candidate | v3 control |
+| --- | ---: | ---: |
+| Cumulative resilience loss | `19.824783028123303` | `19.084638612143134` |
+| Difference vs control | `+0.7401444159801684` | — |
+| Relative change | `+3.878220756610151%` | — |
+| Mean ATT (days) | `20.412222222222223` | `20.3675` |
+| Periods better / equal / worse | `4 / 58 / 10` | — |
+
+The strict rule was not met (`19.824783028123303` is not below
+`19.084638612143134 - 1e-9`), so v17 is **REJECTED**. The exact policy
+activated in the audit, but suppressing the 14 three-change v3 holds did not
+improve the official score. This result does not establish why those holds
+were harmful; it only rejects this frozen route-change subset.
+
+The machine-readable result is retained in the ignored aggregate
+`experiments/results/round1_two_route_change_only_v17_20260819.json`. The
+candidate code and RED test must now be reverted and the pinned v3 participant,
+runtime, and ATT restored before final verification.

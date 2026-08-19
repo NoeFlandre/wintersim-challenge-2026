@@ -16,22 +16,21 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: v23 mixed three-change low-margin delegation
+## Current strategy: multi-transfer recovery-hold experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `assign_associated_bookings` keeps the accepted v3
-recovery hold (`False`) except for one narrower case. It delegates (`None`) only
-when the v3 hold already qualifies, the matching disruption has one congested
-leg and one closed port, the safe shortest route has exactly three service-route
-changes, and the hold-versus-detour timing margin is strictly smaller than the
-first safe route's live full headway. Equality and every other case retain the
-v3 hold or delegate as v3 dictates.
+During an active disruption, `assign_associated_bookings` may return `False`
+for a newly generated shipment only when all of the following are derived from
+the live context: its normal shortest route is one disrupted direct service,
+the currently safe shortest route needs at least two changes between services
+(at least three service boardings), and the direct service is estimated to
+recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a
-full-precision comparison, and otherwise preserves the v3 decision. Missing or
-ambiguous data delegates without mutation. No performance result is claimed
-until the pre-registered full experiment finishes.
+full-precision comparison, and otherwise delegates. Missing or ambiguous data
+also delegates without mutation. No performance result is claimed until the
+pre-registered full experiment finishes.
 
 ## Submission boundary
 

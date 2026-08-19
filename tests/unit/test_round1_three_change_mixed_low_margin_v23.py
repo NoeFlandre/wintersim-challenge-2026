@@ -8,6 +8,7 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
+
 ANCHOR = dt.datetime.min
 
 
@@ -33,7 +34,9 @@ def _route(name: str, ports: list[Any], distance: float) -> SimpleNamespace:
         )
         for index in range(1, len(ports))
     ]
-    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))]
+    route.deployed_vessels = [
+        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))
+    ]
     return route
 
 
@@ -141,8 +144,7 @@ def test_mixed_three_change_low_margin_delegates_without_mutation() -> None:
 
 
 def test_mixed_three_change_exact_headway_keeps_v3_hold() -> None:
-    context, _, shipment = _fixture()
-    now = ANCHOR + dt.timedelta(days=14, hours=15, minutes=30)
+    context, now, shipment = _fixture(safe_distance=155.0 / 6.0)
 
     assert _decision(context, now, shipment) is False
 

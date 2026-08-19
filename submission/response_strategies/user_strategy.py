@@ -403,52 +403,6 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
-def _matching_constraints(edge: _Edge, state: _ActiveState) -> tuple[_Constraint, ...]:
-    leg_ids = {id(leg) for leg in edge.legs}
-    arrival_names = {_port_name(port) for port in (*edge.intermediate_ports, edge.arrival)}
-    return tuple(
-        constraint
-        for constraint in state.constraints
-        if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
-        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
-    )
-
-
-def _v23_should_delegate(
-    now: dt.datetime,
-    state: _ActiveState,
-    nominal_path: tuple[_Edge, ...],
-    safe_path: tuple[_Edge, ...],
-) -> bool:
-    if len(nominal_path) != 1 or len(safe_path) < 2:
-        return False
-    changes = sum(
-        left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
-    )
-    if changes != 3:
-        return False
-    matching = _matching_constraints(nominal_path[0], state)
-    if frozenset(item.kind for item in matching) != frozenset({"leg", "port"}):
-        return False
-    nominal_hours = _path_service_hours(nominal_path)
-    detour_hours = _path_service_hours(safe_path)
-    recovery = _edge_constraint_recovery(nominal_path[0], state)
-    first_profile = _route_profile(safe_path[0].route)
-    if nominal_hours is None or detour_hours is None or recovery is None or first_profile is None:
-        return False
-    wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
-    hold_hours = wait_hours + nominal_hours
-    margin = detour_hours - hold_hours
-    headway = first_profile.headway_hours
-    return (
-        all(
-            math.isfinite(value) and value > 0.0
-            for value in (hold_hours, detour_hours, margin, headway)
-        )
-        and margin < headway
-    )
-
-
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -517,25 +471,9 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct shipment except for the narrow v23 delegation guard."""
+        """Hold a direct-service shipment instead of a two-transfer detour."""
         try:
-            if not _should_hold(context, now, shipment):
-                return None
-            state = _active_state(context, now)
-            demand = getattr(shipment, "demand", None)
-            origin = getattr(demand, "origin_port", None)
-            destination = getattr(demand, "destination_port", None)
-            graphs = _graphs(context, state) if state is not None else None
-            if state is not None and graphs is not None:
-                nominal_path = _shortest_path(context, origin, destination, graphs[0])
-                safe_path = _shortest_path(context, origin, destination, graphs[1])
-                if (
-                    nominal_path is not None
-                    and safe_path is not None
-                    and _v23_should_delegate(now, state, nominal_path, safe_path)
-                ):
-                    return None
-            return False
+            return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:
             return None
 

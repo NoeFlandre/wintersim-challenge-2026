@@ -293,12 +293,8 @@ def _equal_service_time_fixture(
 
 
 def test_service_time_ties_follow_context_port_order() -> None:
-    first, now, shipment, items = _equal_service_time_fixture(
-        ["O", "X1", "X2", "Y1", "Y2", "D"]
-    )
-    second, _, _, second_items = _equal_service_time_fixture(
-        ["O", "Y1", "Y2", "X1", "X2", "D"]
-    )
+    first, now, shipment, items = _equal_service_time_fixture(["O", "X1", "X2", "Y1", "Y2", "D"])
+    second, _, _, second_items = _equal_service_time_fixture(["O", "Y1", "Y2", "X1", "X2", "D"])
 
     for context, origin, destination, expected in (
         (first, items["origin"], items["destination"], ["path-a1", "path-a2", "path-a3"]),
@@ -443,12 +439,12 @@ def _tie_fixture(port_order: list[str]) -> tuple[SimpleNamespace, dt.datetime, A
     return context, ANCHOR + dt.timedelta(days=14.5), _shipment(ports["O"], ports["D"])
 
 
-def test_equal_distance_ties_follow_context_port_order() -> None:
+def test_service_time_cost_overrides_distance_only_ties() -> None:
     fast_first = _tie_fixture(["O", "X1", "X2", "Y1", "Y2", "D"])
     slow_first = _tie_fixture(["O", "Y1", "Y2", "X1", "X2", "D"])
 
     assert _decision(*fast_first) is None
-    assert _decision(*slow_first) is False
+    assert _decision(*slow_first) is None
 
 
 @pytest.mark.parametrize(

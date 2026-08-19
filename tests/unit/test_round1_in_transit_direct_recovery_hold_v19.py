@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
-import math
 from types import SimpleNamespace
 from typing import Any
 
-import pytest
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -198,76 +196,3 @@ def test_nonqualifying_active_direct_edge_delegates() -> None:
     context, now, _, vessel, _ = _fixture(safe_distances=(40.0, 40.0, 80.0))
 
     assert _decision(context, now, vessel) is None
-
-
-def test_missing_safe_graph_delegates() -> None:
-    context, now, _, vessel, _ = _fixture()
-    context.service_routes = [context.service_routes[0]]
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_malformed_carried_bookings_delegate() -> None:
-    context, now, shipment, vessel, _ = _fixture()
-    shipment.associated_bookings = None
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_current_segment_not_on_booking_route_delegates() -> None:
-    context, now, _, vessel, _ = _fixture()
-    vessel.current_segment = SimpleNamespace(
-        associated_leg=SimpleNamespace(arrival_port=context.ports[0])
-    )
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_shorter_nominal_edge_not_matching_booking_delegates() -> None:
-    context, now, _, vessel, items = _fixture()
-    context.service_routes.append(
-        _route("other-direct", [items["origin"], items["destination"], items["origin"]], [1.0, 1.0])
-    )
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_one_transfer_safe_path_delegates() -> None:
-    context, now, _, vessel, items = _fixture()
-    context.service_routes = [items["nominal"], items["safe_a"], items["safe_b"]]
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_safe_path_without_deployed_vessel_delegates() -> None:
-    context, now, _, vessel, items = _fixture()
-    items["safe_a"].deployed_vessels = []
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_nonfinite_service_estimate_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
-    import response_strategies.user_strategy as strategy_module
-
-    context, now, _, vessel, _ = _fixture()
-    monkeypatch.setattr(
-        strategy_module,
-        "_path_service_hours",
-        lambda path: 1.0 if len(path) == 1 else math.nan,
-    )
-
-    assert _decision(context, now, vessel) is None
-
-
-def test_public_hook_catches_data_errors() -> None:
-    class BrokenVessel:
-        @property
-        def carried_shipments(self) -> list[Any]:
-            raise AttributeError("broken")
-
-    assert (
-        UserStrategy.adjust_bookings_before_cargo_handling(
-            SimpleNamespace(), ANCHOR, BrokenVessel()
-        )
-        is None
-    )

@@ -1,7 +1,11 @@
 # Round 1 in-transit direct recovery hold v19
 
-**Status: DESIGN FROZEN — implementation and activation audit pending; no
-full simulation has run for v19.**
+**Status: IMPLEMENTED — PRE-RUN REVIEW; no full simulation has run for v19.**
+
+Implementation is committed as `ce8929e` after the RED checkpoint
+`31e2a57`. The candidate changes only the participant strategy, its participant
+README, and the v19 unit/integration contracts. The working tree must be
+revalidated before any operational launch.
 
 ## Selection and hypothesis
 
@@ -101,6 +105,22 @@ and no Output write. Evidence is immutable and ignored at:
 
 `.challenge/round1/results/in_transit_direct_recovery_hold_v19_20260819/activation_audit.json`.
 
+### Audit result
+
+The frozen audit completed on 2026-08-19 with `PYTHONHASHSEED=0` and returned
+`go: true`. It examined 19,000 demand observations across 50 valid disruption
+timestamps. The v19 oracle produced 48 candidate-only direct-current
+activations, matching the 48 v3-shaped control exposures. Every observation
+was non-mutating; no model event advanced; the organizer ATT file stayed
+byte-identical (SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`) and no
+Output file was written. This is structural readiness evidence only; it does
+not predict the score.
+
+The immutable audit record also records its candidate-definition hash
+`dcc50bd00d75560e94d82fa5d59a2c435020e508b8a745602af9de65fd76960d`, control
+strategy hash, configuration, limitations, and the complete audit method.
+
 ## Fixed control and run contract
 
 - checkout: `/Users/noeflandre/wintersim-challenge-2026`;
@@ -109,7 +129,7 @@ and no Output write. Evidence is immutable and ignored at:
 - seed / `PYTHONHASHSEED`: `2026` / `0`;
 - warm-up / measured horizon / interval: `140` / `360` / `5` days;
 - required numbered ATT periods: `72`;
-- launch HEAD before implementation: `be39d9f6425ffd796089200458f01a6b78d2ebbf`;
+- design-base HEAD before implementation: `be39d9f6425ffd796089200458f01a6b78d2ebbf`;
 - accepted v3 strategy SHA-256:
   `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
 - accepted v3 ATT snapshot:
@@ -134,13 +154,13 @@ upload, submission, or history rewrite is part of v19.
 
 ## TDD and restoration procedure
 
-Write RED behavior tests before production code. Against untouched v3, RED
-must fail only for the direct-current all-qualifying case; the future-only,
-mixed, multi-booking, one-transfer, inactive, malformed, exact-boundary,
-state-identity, public-signature, forbidden-capability, and retained-v3 cases
-must remain green. GREEN is the smallest read-only predicate and should add no
-unrelated refactor. Run focused tests, Ruff, Ty, and mypy before committing
-implementation.
+RED was recorded in `31e2a57`: one qualifying direct-current case failed
+against untouched v3 while five delegation/safety cases passed. GREEN was
+recorded in `ce8929e`: the focused v19 contract, retained-v3 unit/contract
+tests, and the real-context integration contract passed. The implementation is
+the smallest read-only predicate for the approved hook; it adds no unrelated
+refactor. Ruff, Ty, mypy, and the full test suite passed before this pre-run
+review (`242 passed`).
 
 Before launch, require locked uv resolution/sync, Ruff format/lint, Ty, mypy,
 non-integration branch coverage at least 90.00%, serial integration tests,

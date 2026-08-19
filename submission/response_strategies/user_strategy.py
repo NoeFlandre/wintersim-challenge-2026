@@ -2,8 +2,9 @@
 
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+is estimated to recover sooner than the fastest safe detour requiring at least
+two changes between service routes. Safe-path speed includes sailing time and
+half a service-route headway at each route transition.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -11,6 +12,7 @@ read-only, deterministic, standard-library-only, and delegates on uncertainty.
 from __future__ import annotations
 
 import datetime as dt
+import heapq
 import math
 import numbers
 from typing import Any, NamedTuple
@@ -347,6 +349,112 @@ def _shortest_path(
     return tuple(path)
 
 
+def _fastest_path(
+    context: Any, origin: Any, destination: Any, edges: tuple[_Edge, ...]
+) -> tuple[_Edge, ...] | None:
+    """Find a safe path by sailing time plus deterministic service headways."""
+    raw_ports = getattr(context, "ports", None)
+    raw_routes = getattr(context, "service_routes", None)
+    if not isinstance(raw_ports, (list, tuple)) or not isinstance(raw_routes, (list, tuple)):
+        return None
+    ports = list(raw_ports)
+    port_order = {id(port): index for index, port in enumerate(ports)}
+    if len(port_order) != len(ports):
+        return None
+    origin_id = id(origin)
+    destination_id = id(destination)
+    if origin_id not in port_order or destination_id not in port_order:
+        return None
+    if origin_id == destination_id:
+        return ()
+
+    route_order = {id(route): index for index, route in enumerate(raw_routes)}
+    if len(route_order) != len(raw_routes):
+        return None
+    profiles: dict[int, _RouteProfile] = {}
+    outgoing: dict[int, list[tuple[int, _Edge, _RouteProfile]]] = {}
+    for edge_index, edge in enumerate(edges):
+        departure_id = id(edge.departure)
+        arrival_id = id(edge.arrival)
+        route_id = id(edge.route)
+        if (
+            departure_id not in port_order
+            or arrival_id not in port_order
+            or route_id not in route_order
+        ):
+            return None
+        profile = profiles.get(route_id)
+        if profile is None:
+            profile = _route_profile(edge.route)
+            if profile is None:
+                return None
+            profiles[route_id] = profile
+        outgoing.setdefault(departure_id, []).append((edge_index, edge, profile))
+
+    State = tuple[int, int | None]
+    start: State = (origin_id, None)
+    Score = tuple[float, tuple[int, ...], tuple[int, ...], tuple[int, ...]]
+    start_score: Score = (0.0, (port_order[origin_id],), (), ())
+    scores: dict[State, Score] = {start: start_score}
+    previous: dict[State, tuple[State, _Edge]] = {}
+    queue: list[tuple[float, tuple[int, ...], tuple[int, ...], tuple[int, ...], State]] = [
+        (0.0, (port_order[origin_id],), (), (), start)
+    ]
+    visited: set[State] = set()
+    destination_state: State | None = None
+
+    while queue:
+        distance, port_signature, route_signature, edge_signature, state = heapq.heappop(queue)
+        score = (distance, port_signature, route_signature, edge_signature)
+        if state in visited or score != scores.get(state):
+            continue
+        visited.add(state)
+        current_port_id, previous_route_id = state
+        if current_port_id == destination_id:
+            destination_state = state
+            break
+        for edge_index, edge, profile in outgoing.get(current_port_id, ()):
+            route_id = id(edge.route)
+            next_state = (id(edge.arrival), route_id)
+            transition_hours = 0.5 * profile.headway_hours if previous_route_id != route_id else 0.0
+            sailing_hours = edge.distance / profile.mean_speed
+            alternative = distance + transition_hours + sailing_hours
+            if not math.isfinite(alternative):
+                return None
+            next_score: Score = (
+                alternative,
+                (*port_signature, port_order[id(edge.arrival)]),
+                (*route_signature, route_order[route_id]),
+                (*edge_signature, edge_index),
+            )
+            if next_score < scores.get(next_state, (math.inf, (), (), ())):
+                scores[next_state] = next_score
+                previous[next_state] = (state, edge)
+                heapq.heappush(
+                    queue,
+                    (
+                        next_score[0],
+                        next_score[1],
+                        next_score[2],
+                        next_score[3],
+                        next_state,
+                    ),
+                )
+
+    if destination_state is None:
+        return None
+    path: list[_Edge] = []
+    cursor = destination_state
+    while cursor != start:
+        predecessor = previous.get(cursor)
+        if predecessor is None:
+            return None
+        cursor, edge = predecessor
+        path.append(edge)
+    path.reverse()
+    return tuple(path)
+
+
 def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime | None:
     leg_identities = tuple(id(leg) for leg in edge.legs)
     arrival_names = tuple(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
@@ -424,7 +532,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if graphs is None:
         return False
     nominal_path = _shortest_path(context, origin, destination, graphs[0])
-    safe_path = _shortest_path(context, origin, destination, graphs[1])
+    safe_path = _fastest_path(context, origin, destination, graphs[1])
     if nominal_path is None or safe_path is None:
         return False
     if len(nominal_path) != 1 or len(safe_path) < 2:

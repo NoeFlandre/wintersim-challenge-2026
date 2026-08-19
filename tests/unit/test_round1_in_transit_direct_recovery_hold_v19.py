@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import importlib
 import math
 from types import SimpleNamespace
 from typing import Any
@@ -247,9 +248,8 @@ def test_safe_path_without_deployed_vessel_delegates() -> None:
 
 
 def test_nonfinite_service_estimate_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
-    import response_strategies.user_strategy as strategy_module
-
     context, now, _, vessel, _ = _fixture()
+    strategy_module = importlib.import_module("response_strategies.user_strategy")
     monkeypatch.setattr(
         strategy_module,
         "_path_service_hours",

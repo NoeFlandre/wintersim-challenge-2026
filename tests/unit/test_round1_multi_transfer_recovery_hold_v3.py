@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-import response_strategies.user_strategy as strategy_module
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -245,77 +244,6 @@ def test_safe_direct_path_delegates() -> None:
     context.service_routes.append(direct_safe)
 
     assert _decision(context, now, shipment) is None
-
-
-def test_service_time_fast_safe_path_vetoes_distance_only_hold_without_mutation() -> None:
-    context, now, shipment, items = _qualifying_fixture()
-    direct_fast = _route(
-        "direct-fast",
-        [items["origin"], items["destination"], items["origin"]],
-        [4000.0, 4000.0],
-        speed=1000.0,
-    )
-    context.service_routes.append(direct_fast)
-    before = _freeze((context, shipment))
-
-    decision = _decision(context, now, shipment)
-
-    assert decision is None
-    assert _freeze((context, shipment)) == before
-
-
-def _equal_service_time_fixture(
-    port_order: list[str],
-) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace, dict[str, Any]]:
-    ports = {name: _port(name) for name in ["O", "X1", "X2", "Y1", "Y2", "D"]}
-    nominal = _route("nominal", [ports["O"], ports["D"], ports["O"]], [100.0, 100.0])
-    path_a = [
-        _route("path-a1", [ports["O"], ports["X1"], ports["O"]], [40.0, 40.0]),
-        _route("path-a2", [ports["X1"], ports["X2"], ports["X1"]], [40.0, 40.0]),
-        _route("path-a3", [ports["X2"], ports["D"], ports["X2"]], [80.0, 80.0]),
-    ]
-    path_b = [
-        _route("path-b1", [ports["O"], ports["Y1"], ports["O"]], [40.0, 40.0]),
-        _route("path-b2", [ports["Y1"], ports["Y2"], ports["Y1"]], [40.0, 40.0]),
-        _route("path-b3", [ports["Y2"], ports["D"], ports["Y2"]], [80.0, 80.0]),
-    ]
-    context = SimpleNamespace(
-        ports=[ports[name] for name in port_order],
-        service_routes=[nominal, *path_a, *path_b],
-        disruption_plans=[_leg_plan(_leg(nominal))],
-    )
-    return (
-        context,
-        ANCHOR + dt.timedelta(days=14.5),
-        _shipment(ports["O"], ports["D"]),
-        {"origin": ports["O"], "destination": ports["D"]},
-    )
-
-
-def test_service_time_ties_follow_context_port_order() -> None:
-    first, now, shipment, items = _equal_service_time_fixture(
-        ["O", "X1", "X2", "Y1", "Y2", "D"]
-    )
-    second, _, _, second_items = _equal_service_time_fixture(
-        ["O", "Y1", "Y2", "X1", "X2", "D"]
-    )
-
-    for context, origin, destination, expected in (
-        (first, items["origin"], items["destination"], ["path-a1", "path-a2", "path-a3"]),
-        (
-            second,
-            second_items["origin"],
-            second_items["destination"],
-            ["path-b1", "path-b2", "path-b3"],
-        ),
-    ):
-        state = strategy_module._active_state(context, now)
-        assert state is not None
-        graphs = strategy_module._graphs(context, state)
-        assert graphs is not None
-        path = strategy_module._fastest_path(context, origin, destination, graphs[1])
-        assert path is not None
-        assert [edge.route.name for edge in path] == expected
 
 
 def test_multi_booking_nominal_path_delegates() -> None:

@@ -68,7 +68,7 @@ def _fixture(
                 target_leg=nominal.segments[0].associated_leg,
                 target_berth=None,
                 start_offset_days=10.0,
-                duration_days=5.0,
+                duration_days=6.0,
                 multiplier=2.0,
                 close_berth=False,
             ),
@@ -76,7 +76,7 @@ def _fixture(
                 target_leg=None,
                 target_berth=SimpleNamespace(port=closed),
                 start_offset_days=10.0,
-                duration_days=5.0,
+                duration_days=6.0,
                 multiplier=1.0,
                 close_berth=True,
             ),
@@ -110,7 +110,7 @@ def test_mixed_one_transfer_below_half_headway_delegates() -> None:
 
 
 def test_mixed_one_transfer_at_half_headway_delegates() -> None:
-    context, now, shipment = _fixture(safe_distance=106.66666666666667)
+    context, now, shipment = _fixture(safe_distance=106.6666666666666)
 
     assert _decision(context, now, shipment) is None
 

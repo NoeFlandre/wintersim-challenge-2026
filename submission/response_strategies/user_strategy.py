@@ -449,43 +449,8 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     return hold_hours < detour_hours
 
 
-def _pending_route_starts_at_port(vessel: Any, port: Any, disruption_key: Any) -> bool:
-    carried_shipments = getattr(vessel, "carried_shipments", None)
-    if not isinstance(carried_shipments, (list, tuple)) or carried_shipments:
-        return False
-
-    route = getattr(vessel, "pending_assigned_service_route", None)
-    if route is None or getattr(route, "source_service_route", None) is None:
-        return False
-    if getattr(route, "disruption_key", None) != disruption_key:
-        return False
-
-    raw_segments = getattr(route, "segments", None)
-    if not isinstance(raw_segments, (list, tuple)) or not raw_segments:
-        return False
-    indexed_departures: list[tuple[int, Any]] = []
-    for segment in raw_segments:
-        sequence_index = getattr(segment, "sequence_index", None)
-        leg = getattr(segment, "associated_leg", None)
-        departure_port = getattr(leg, "departure_port", None)
-        if (
-            isinstance(sequence_index, bool)
-            or not isinstance(sequence_index, int)
-            or sequence_index < 0
-            or departure_port is None
-        ):
-            return False
-        indexed_departures.append((sequence_index, departure_port))
-
-    sequence_indexes = [index for index, _ in indexed_departures]
-    if len(set(sequence_indexes)) != len(sequence_indexes):
-        return False
-    first_departure = min(indexed_departures, key=lambda item: item[0])[1]
-    return first_departure is port
-
-
 class UserStrategy:
-    """Deterministic participant strategy with two narrow read-only policies."""
+    """Deterministic participant strategy with one read-only cargo policy."""
 
     @staticmethod
     def select_vessel_for_berth(
@@ -496,16 +461,7 @@ class UserStrategy:
         current_time: Any,
         waiting_since_by_vessel: Any = None,
     ) -> Any:
-        """Activate a matching pending alternative during active disruption."""
-        try:
-            state = _active_state(maritime_data_context, current_time)
-            if state is None:
-                return None
-            for vessel in waiting_vessels:
-                if _pending_route_starts_at_port(vessel, port, state.disruption_key):
-                    return vessel
-        except _DATA_ERRORS:
-            return None
+        """Delegate vessel selection to the organizer fallback."""
         return None
 
     @staticmethod

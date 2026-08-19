@@ -18,14 +18,7 @@ by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
 ## Current strategy: multi-transfer recovery-hold experiment
 
-Two hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `select_vessel_for_berth` may return the first
-waiting vessel that is empty and already reserved for a matching alternative
-route whose first segment departs from the requested berth port. It delegates
-when the disruption key, route, queue, or segment data is inactive or
-ambiguous. This only activates an existing reservation; it does not create or
-edit routes.
-
+Three hooks return `None` and delegate completely to the organizer fallback.
 During an active disruption, `assign_associated_bookings` may return `False`
 for a newly generated shipment only when all of the following are derived from
 the live context: its normal shortest route is one disrupted direct service,
@@ -33,7 +26,7 @@ the currently safe shortest route needs at least two changes between services
 (at least three service boardings), and the direct service is estimated to
 recover and deliver sooner than that detour.
 
-The strategy does not create or edit routes or bookings. It reads runtime topology,
+The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a
 full-precision comparison, and otherwise delegates. Missing or ambiguous data
 also delegates without mutation. No performance result is claimed until the

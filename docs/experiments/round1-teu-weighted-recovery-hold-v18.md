@@ -54,6 +54,13 @@ no model advancement. These are reachability and exposure facts only, not a
 score prediction. The immutable audit JSON belongs at
 `.challenge/round1/results/teu_weighted_recovery_hold_v18_20260819/activation_audit.json`.
 
+The audit passed before implementation with SHA-256
+`959bb26a4f929291344b49075dc4e200347a13165afe3bdafa62291a38582906`:
+`50` timestamps, `19,000` observations, `48` v3 holds, `0` one-TEU v18 holds,
+`48` two-TEU v18 holds, `48` control-only one-TEU activations, a repeated
+annual-TEU exposure proxy of `77,478`, `no_mutation: true`, unchanged Output,
+and `model_advanced: false`. This is structural reachability evidence only.
+
 ## Fixed control and acceptance
 
 - canonical checkout: `/Users/noeflandre/wintersim-challenge-2026`;

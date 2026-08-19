@@ -1,6 +1,6 @@
 # Round 1 in-transit direct recovery hold v19
 
-**Status: IMPLEMENTED — PRE-RUN REVIEW; no full simulation has run for v19.**
+**Status: REJECTED — full run complete; v3 restoration pending final gates.**
 
 Implementation is committed as `ce8929e` after the RED checkpoint
 `31e2a57`; fail-closed coverage and full-suite isolation follow in
@@ -140,6 +140,31 @@ has the expected ATT SHA. The active ignored Output ATT is byte-identical to
 that snapshot before the candidate run. A non-overwriting launch manifest is
 kept with the exact hashes, stale-Output metadata, package identity, command,
 acceptance threshold, and gate results.
+
+## Full-run result
+
+The literal command first exited `2` before simulation because the default uv
+cache was inaccessible; its log is preserved separately. The predeclared
+writable-cache command then ran exactly once and exited `0`. It reached Period
+72, Day 360, printed `Simulation completed`, and wrote a fresh ATT after a
+`00:24:04` simulation runtime. The fresh ATT and raw log were preserved before
+scoring.
+
+The candidate cumulative resilience loss is
+`19.084638612143134` over 72 periods, exactly equal to the pinned v3 control.
+The candidate ATT SHA is
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, byte
+identical to control. Delta is `0.0` and relative change is `0.0%`; the strict
+rule requires a value below `19.084638612143134 - 1e-9`, so the candidate is
+rejected. It did not beat the historical `18.276620672293834` either.
+
+Private evidence is retained under
+`.challenge/round1/results/in_transit_direct_recovery_hold_v19_20260819/`:
+the preserved candidate ATT, `full_run.log`, `full_run_preserved.log`, and
+`literal_launch.log`. The ignored aggregate is
+`experiments/results/round1_in_transit_direct_recovery_hold_v19_20260819.json`.
+The 48 structural candidate-only activations therefore produced no scored
+divergence in this pinned run; no causal gain is claimed.
 
 ## Fixed control and run contract
 

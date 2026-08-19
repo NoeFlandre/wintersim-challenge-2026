@@ -1,12 +1,36 @@
 # Round 1 service-time safe-path refinement v24
 
-**Status: DESIGN FROZEN — pre-code activation audit passed; no candidate
-implementation or full simulation has started.**
+**Status: PRE-RUN READY — implementation and all preflight gates passed; no
+full simulation has started.**
 
 This is one separately named experiment from the accepted Round 1 v3 control.
 It tests whether v3 sometimes holds cargo only because it measures the safe
 detour's *distance-shortest* path, even though another safe path would complete
 faster when sailing time and service-route headways are considered.
+
+## Implementation and pre-run verification
+
+- candidate implementation commit: `3fd9172`;
+- RED/integration correction commit: `88e2177`;
+- candidate participant strategy SHA-256:
+  `ae9eb72441237c64fcb1a2708d5d2b37be178fcee1fad47e2deb73ace30a6c12`;
+- candidate/runtime strategy and README copies are byte-identical after
+  Round 1 synchronization;
+- deterministic validation package SHA-256:
+  `42ae961f0c1a2c6a57c0c5555eb08ec1af2c409365924247e72beb645d403e0f`, with
+  only `README.md` and `user_strategy.py` members;
+- locked environment, Ruff, Ty, mypy, 229 non-integration tests at 90.52%
+  true branch coverage, and 8 integration tests all passed;
+- Round 1 smoke returned `SMOKE_OK`;
+- the v3 control re-scored to exactly `19.084638612143134` over 72 periods;
+- the non-overwriting launch manifest is
+  `.challenge/round1/results/service_time_safe_path_v24_20260819/pre_run_manifest.json`
+  (SHA-256 `21075f0caac95a324f1d6e62e9a487cea4c351c05b42ff6d290ec988fbf098ba`);
+- no matching simulator, probe, or organizer process was observed at the
+  launch boundary.
+
+These checks authorize preparation for exactly one candidate run under the
+fixed contract below; they are not performance evidence.
 
 ## Control and decision rule
 

@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-import response_strategies.user_strategy as strategy
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -207,39 +206,6 @@ def test_one_transfer_safe_path_delegates_without_mutation() -> None:
         disruption_plans=[_leg_plan(_leg(nominal))],
     )
     shipment = _shipment(origin, destination)
-    before = _freeze((context, shipment))
-
-    decision = _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment)
-
-    assert decision is None
-    assert _freeze((context, shipment)) == before
-
-
-def test_three_edge_terminal_return_safe_path_delegates_without_mutation() -> None:
-    origin = _port("Origin")
-    transfer_a = _port("Transfer A")
-    transfer_b = _port("Transfer B")
-    destination = _port("Destination")
-    nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
-    repeated = _route(
-        "repeated",
-        [origin, transfer_a, transfer_b, destination, origin],
-        [100.0, 100.0, 100.0, 100.0],
-    )
-    middle = _route("middle", [transfer_a, transfer_b, transfer_a], [10.0, 10.0])
-    context = SimpleNamespace(
-        ports=[origin, transfer_a, transfer_b, destination],
-        service_routes=[nominal, repeated, middle],
-        disruption_plans=[_leg_plan(_leg(nominal))],
-    )
-    shipment = _shipment(origin, destination)
-    state = strategy._active_state(context, ANCHOR + dt.timedelta(days=14.5))
-    assert state is not None
-    graphs = strategy._graphs(context, state)
-    assert graphs is not None
-    safe_path = strategy._shortest_path(context, origin, destination, graphs[1])
-    assert safe_path is not None
-    assert [edge.route for edge in safe_path] == [repeated, middle, repeated]
     before = _freeze((context, shipment))
 
     decision = _decision(context, ANCHOR + dt.timedelta(days=14.5), shipment)

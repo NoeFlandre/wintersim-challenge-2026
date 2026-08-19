@@ -1,6 +1,6 @@
 # Round 1 selective cyclic terminal-return hold v14
 
-**Status: PRE-RUN REVIEW — no full simulation authorized yet.**
+**Status: REJECTED — full run complete and v3 control restored.**
 
 V13 showed that suppressing every repeated-route safe path was too broad: it
 removed 42 of the 48 v3 holds and scored `23.329445446758054`. V14 tests only
@@ -79,3 +79,52 @@ control active on rejection.
 
 No push, merge, PR, upload, submission archive, history rewrite, or second
 candidate is part of v14.
+
+## Full-run outcome
+
+The pre-run manifest was reviewed at HEAD `a7c003ab8bd5db869fe37dd586187abad58a657a`.
+The literal launch again failed before simulator startup because the default uv
+cache was unreadable; that log is preserved. The one actual simulator run used
+the same fixed Round 1 command and configuration with the validated temporary
+`UV_CACHE_DIR=/tmp/wsc-uv-cache-v14`. No strategy, seed, horizon, scenario,
+threshold, or acceptance rule changed.
+
+The run exited `0` with Period 72, Day 360, `Simulation completed`, and a fresh
+CSV-write marker. Preserved evidence:
+
+- candidate ATT:
+  `.challenge/round1/results/selective_cyclic_terminal_return_v14_20260819/ATT_By_Statistics_Interval.csv`
+  (SHA-256 `7f54b398140f2550685894c4c12113e879f72f10a304188e2a269e1225b128a7`);
+- raw completed log:
+  `.challenge/round1/results/selective_cyclic_terminal_return_v14_20260819/full_run.log`
+  (SHA-256 `dc4e89858b02780847580496ce6b74364d4a9a50730f6386613ae2a6f47c1b5d`);
+- pre-simulator launch failure:
+  `.challenge/round1/results/selective_cyclic_terminal_return_v14_20260819/launch_failure_default_uv_cache.log`
+  (SHA-256 `428110c146046e897b3cda61be7243c9c56c1389651ce31de39877a203f84c2a`);
+- score aggregate:
+  `experiments/results/round1_selective_cyclic_terminal_return_v14_20260819.json`.
+
+The scorer reported cumulative resilience loss `22.564049197867078` over 72
+periods. Against the pinned v3 control `19.084638612143134`, the delta is
+`+3.4794105857239437` (`+18.231472214045862%`). The candidate ATT was better in
+13 periods, equal in 26, and worse in 33. The strict acceptance rule rejects
+the candidate.
+
+**Decision: REJECTED.** Even the narrow four-activation A → B → A suppression
+was harmful in aggregate. It must not be tuned or rerun as v14.
+
+## Restoration checkpoint
+
+The rejected implementation was reverted from commit `a7c003a`. The
+candidate-only RED test was removed while this report and private evidence were
+retained. Round 1 synchronization restored the accepted v3 participant and
+runtime strategy files byte-identically (SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`), and the
+README copies are byte-identical. The active ATT was restored from the v3
+snapshot with SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+
+No second candidate, tuning, rerun, submission, push, merge, or history rewrite
+was performed. Final static, unit, integration, smoke, packaging,
+restricted-material, clean-state, and restored-control-score gates must be
+rerun after restoration before pausing v14.

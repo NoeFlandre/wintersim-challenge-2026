@@ -23,10 +23,8 @@ During an active disruption, `assign_associated_bookings` may return `False`
 for a newly generated shipment only when all of the following are derived from
 the live context: its normal shortest route is one disrupted direct service,
 the currently safe shortest route needs at least two changes between services
-(at least three service boardings), except for a three-edge path that returns
-to its first service route, and the direct service is estimated to recover and
-deliver sooner than that detour. That narrow A → B → A case delegates because
-it is a cyclic terminal return; all other qualifying paths retain the v3 hold.
+(at least three service boardings), and the direct service is estimated to
+recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a

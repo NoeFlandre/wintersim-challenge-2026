@@ -16,7 +16,7 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: v21 multi-TEU mixed recovery hold
+## Current strategy: multi-transfer recovery-hold experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
 During an active disruption, `assign_associated_bookings` may return `False`
@@ -24,12 +24,7 @@ for a newly generated shipment only when all of the following are derived from
 the live context: its normal shortest route is one disrupted direct service,
 the currently safe shortest route needs at least two changes between services
 (at least three service boardings), and the direct service is estimated to
-recover and deliver sooner than that detour. The v21 extension preserves those
-holds and adds exactly one narrower case: a finite, non-boolean `teu_size`
-strictly greater than one, a one-change safe route, and both a matching
-congested leg and closed arrival port on the nominal edge. Exact one-TEU,
-missing, malformed, non-finite, and non-positive cargo sizes delegate the
-one-change case.
+recover and deliver sooner than that detour.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a

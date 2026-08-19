@@ -3,8 +3,7 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes. The v21 extension additionally handles only
-multi-TEU cargo in a mixed leg-and-port one-change case.
+changes between service routes.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -50,14 +49,6 @@ class _RouteData(NamedTuple):
 class _RouteProfile(NamedTuple):
     mean_speed: float
     headway_hours: float
-
-
-class _RecoveryCandidate(NamedTuple):
-    state: _ActiveState
-    nominal_path: tuple[_Edge, ...]
-    safe_path: tuple[_Edge, ...]
-    hold_hours: float
-    detour_hours: float
 
 
 _DATA_ERRORS = (
@@ -357,22 +348,16 @@ def _shortest_path(
 
 
 def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime | None:
-    recoveries = tuple(
-        constraint.recovery for constraint in _matching_edge_constraints(edge, state)
-    )
+    leg_identities = tuple(id(leg) for leg in edge.legs)
+    arrival_names = tuple(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
+    recoveries: list[dt.datetime] = []
+    for constraint in state.constraints:
+        if constraint.kind == "leg":
+            if constraint.target_identity in leg_identities:
+                recoveries.append(constraint.recovery)
+        elif constraint.arrival_name in arrival_names:
+            recoveries.append(constraint.recovery)
     return max(recoveries) if recoveries else None
-
-
-def _matching_edge_constraints(edge: _Edge, state: _ActiveState) -> tuple[_Constraint, ...]:
-    """Return active constraints matching an edge under the v3 semantics."""
-    leg_identities = frozenset(id(leg) for leg in edge.legs)
-    arrival_names = frozenset(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
-    return tuple(
-        constraint
-        for constraint in state.constraints
-        if (constraint.kind == "leg" and constraint.target_identity in leg_identities)
-        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
-    )
 
 
 def _route_profile(route: Any) -> _RouteProfile | None:
@@ -418,76 +403,50 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
-def _recovery_candidate(context: Any, now: Any, shipment: Any) -> _RecoveryCandidate | None:
+def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
-        return None
+        return False
     bookings = getattr(shipment, "associated_bookings", None)
     if not isinstance(bookings, list) or bookings:
-        return None
+        return False
     if getattr(shipment, "current_booking_index", None) is not None:
-        return None
+        return False
     demand = getattr(shipment, "demand", None)
     origin = getattr(demand, "origin_port", None)
     destination = getattr(demand, "destination_port", None)
     if origin is None or destination is None or origin is destination:
-        return None
+        return False
 
     state = _active_state(context, now)
     if state is None:
-        return None
+        return False
     graphs = _graphs(context, state)
     if graphs is None:
-        return None
+        return False
     nominal_path = _shortest_path(context, origin, destination, graphs[0])
     safe_path = _shortest_path(context, origin, destination, graphs[1])
     if nominal_path is None or safe_path is None:
-        return None
+        return False
     if len(nominal_path) != 1 or len(safe_path) < 2:
-        return None
+        return False
+    route_change_count = sum(
+        left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
+    )
+    if route_change_count < 2:
+        return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)
     if recovery is None:
-        return None
+        return False
     nominal_hours = _path_service_hours(nominal_path)
     detour_hours = _path_service_hours(safe_path)
     if nominal_hours is None or detour_hours is None:
-        return None
+        return False
     wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
-        return None
-    return _RecoveryCandidate(state, nominal_path, safe_path, hold_hours, detour_hours)
-
-
-def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
-    candidate = _recovery_candidate(context, now, shipment)
-    if candidate is None:
         return False
-    route_change_count = sum(
-        left.route is not right.route
-        for left, right in zip(candidate.safe_path, candidate.safe_path[1:], strict=False)
-    )
-    return route_change_count >= 2 and candidate.hold_hours < candidate.detour_hours
-
-
-def _should_hold_multi_teu_mixed_one_transfer(context: Any, now: Any, shipment: Any) -> bool:
-    teu_size = _finite_real(getattr(shipment, "teu_size", None))
-    if teu_size is None or teu_size <= 1.0:
-        return False
-    candidate = _recovery_candidate(context, now, shipment)
-    if candidate is None:
-        return False
-    route_change_count = sum(
-        left.route is not right.route
-        for left, right in zip(candidate.safe_path, candidate.safe_path[1:], strict=False)
-    )
-    if route_change_count != 1:
-        return False
-    matching_kinds = {
-        constraint.kind
-        for constraint in _matching_edge_constraints(candidate.nominal_path[0], candidate.state)
-    }
-    return matching_kinds == {"leg", "port"} and candidate.hold_hours < candidate.detour_hours
+    return hold_hours < detour_hours
 
 
 class UserStrategy:
@@ -512,14 +471,9 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold selected direct-service cargo instead of a safe detour."""
+        """Hold a direct-service shipment instead of a two-transfer detour."""
         try:
-            return (
-                False
-                if _should_hold(context, now, shipment)
-                or _should_hold_multi_teu_mixed_one_transfer(context, now, shipment)
-                else None
-            )
+            return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:
             return None
 

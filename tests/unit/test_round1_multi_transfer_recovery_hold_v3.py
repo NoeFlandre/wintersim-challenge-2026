@@ -92,9 +92,10 @@ def _berth_plan(
     )
 
 
-def _shipment(origin: Any, destination: Any) -> SimpleNamespace:
+def _shipment(origin: Any, destination: Any, *, teu_size: Any = 1) -> SimpleNamespace:
     return SimpleNamespace(
         demand=SimpleNamespace(origin_port=origin, destination_port=destination),
+        teu_size=teu_size,
         associated_bookings=[],
         current_booking_index=None,
     )
@@ -232,6 +233,62 @@ def test_exact_hold_detour_equality_delegates() -> None:
     context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
 
     assert _decision(context, now, shipment) is None
+
+
+def test_multi_teu_uses_one_safe_headway_buffer_without_mutation() -> None:
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(40.0, 40.0, 80.0)
+    )
+    shipment.teu_size = 2
+    before = _freeze((context, shipment))
+
+    assert _decision(context, now, shipment) is False
+    assert _freeze((context, shipment)) == before
+
+
+def test_one_teu_does_not_use_missed_connection_buffer() -> None:
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(40.0, 40.0, 80.0)
+    )
+
+    assert shipment.teu_size == 1
+    assert _decision(context, now, shipment) is None
+
+
+def test_exact_buffered_equality_delegates() -> None:
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(32.0, 32.0, 64.0)
+    )
+    shipment.teu_size = 2
+
+    assert _decision(context, now, shipment) is None
+
+
+@pytest.mark.parametrize("teu_size", [True, 2.0, 0, -1, None, math.nan])
+def test_invalid_multi_teu_size_does_not_use_buffer(teu_size: Any) -> None:
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(40.0, 40.0, 80.0)
+    )
+    shipment.teu_size = teu_size
+
+    assert _decision(context, now, shipment) is None
+
+
+def test_missing_teu_size_does_not_use_buffer() -> None:
+    context, now, shipment, _ = _qualifying_fixture(
+        safe_distances=(40.0, 40.0, 80.0)
+    )
+    del shipment.teu_size
+
+    assert _decision(context, now, shipment) is None
+
+
+@pytest.mark.parametrize("teu_size", [1, 2, True, None])
+def test_existing_v3_strict_hold_is_preserved_for_every_size(teu_size: Any) -> None:
+    context, now, shipment, _ = _qualifying_fixture()
+    shipment.teu_size = teu_size
+
+    assert _decision(context, now, shipment) is False
 
 
 def test_safe_direct_path_delegates() -> None:

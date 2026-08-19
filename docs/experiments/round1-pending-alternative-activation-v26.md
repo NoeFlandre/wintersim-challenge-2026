@@ -2,8 +2,11 @@
 
 ## Status
 
-`PRE-RUN REVIEW` — participant implementation and the one-run decision are not
-yet complete. No full simulation has been launched for v26.
+`REJECTED — EQUALITY; V3 RESTORATION IN PROGRESS`.
+
+The one authorized full simulation completed and its evidence was preserved.
+The candidate was not retained because the official score tied the accepted v3
+control exactly.
 
 The frozen implementation is committed on `main` as `0ca40d9`
 (`feat: activate pending alternative vessels at berth`), with the test-module
@@ -65,6 +68,31 @@ deterministic validation packages contain only the two participant files and
 both have SHA-256
 `439938a567579d0b2be02b92e6288b479054e606708a1700d506d6085540b9b4`.
 
+## Full-run result
+
+The frozen command ran exactly once with exit code `0`. The raw log contains
+Period 72 (Days 356–360), Output Simulation Day 360, `Simulation completed.`,
+and `CSV output written`. The simulator runtime was `00:56:38`.
+
+- candidate cumulative resilience loss: `19.084638612143134`;
+- pinned v3 control loss: `19.084638612143134`;
+- delta: `0.0` (`0.0%`);
+- candidate ATT: 72 numbered periods, mean `20.3675` days;
+- candidate ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- pinned v3 ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- periods better/equal/worse than v3: `0 / 72 / 0`;
+- raw log SHA-256:
+  `ec64dfcef160c781418f34298167b74404fd485f56f9e4b1d1c047de33e0bf33`.
+
+The strict expression `candidate_loss < 19.084638612143134 - 1e-9` is false,
+so the decision is **REJECTED — EQUALITY**. The audit proved the hook is
+structurally live, but this run produced no measurable trajectory difference.
+The raw ATT, log, scorer JSON, comparison JSON, aggregate, launch manifest,
+and activation audit remain in the ignored evidence directory; they are not
+submission or public artifacts.
+
 ## Invariants and run rules
 
 The participant must be standard-library-only, deterministic, read-only, and
@@ -80,3 +108,11 @@ committed, v26 implementation/tests are reverted, the pinned v3 adapter and
 ATT are restored by provenance-preserving commands, and final gates are rerun.
 No tuning, second candidate, push, merge, PR, upload, submission, or history
 rewrite is part of this experiment.
+
+## Restoration record
+
+The rejection report is committed before restoration. The next steps are to
+revert the v26 implementation and candidate-only tests in reverse order,
+synchronize the restored participant adapter, restore the pinned v3 ATT
+snapshot, re-score it exactly, and rerun all final gates. The v26 design,
+activation audit, aggregate, and this result record remain as the audit trail.

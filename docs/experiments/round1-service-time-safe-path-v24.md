@@ -23,9 +23,12 @@ faster when sailing time and service-route headways are considered.
   true branch coverage, and 8 integration tests all passed;
 - Round 1 smoke returned `SMOKE_OK`;
 - the v3 control re-scored to exactly `19.084638612143134` over 72 periods;
-- the non-overwriting launch manifest is
-  `.challenge/round1/results/service_time_safe_path_v24_20260819/pre_run_manifest.json`
-  (SHA-256 `21075f0caac95a324f1d6e62e9a487cea4c351c05b42ff6d290ec988fbf098ba`);
+- the canonical non-overwriting launch manifest is generated after this
+  documentation commit at
+  `.challenge/round1/results/service_time_safe_path_v24_20260819/pre_run_manifest.json`;
+  an earlier manifest made before this final documentation commit is preserved
+  as the ignored `pre_run_manifest_superseded_88e2177.json` and is not a launch
+  authorization;
 - no matching simulator, probe, or organizer process was observed at the
   launch boundary.
 

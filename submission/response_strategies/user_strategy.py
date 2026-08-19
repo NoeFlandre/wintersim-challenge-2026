@@ -3,7 +3,8 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+changes between service routes. Multi-TEU cargo receives one additional,
+live-route-headway allowance for a possible capacity-driven missed connection.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -403,6 +404,24 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
+def _minimum_path_headway_hours(path: tuple[_Edge, ...]) -> float | None:
+    seen_route_ids: set[int] = set()
+    headways: list[float] = []
+    for edge in path:
+        route_id = id(edge.route)
+        if route_id in seen_route_ids:
+            continue
+        seen_route_ids.add(route_id)
+        profile = _route_profile(edge.route)
+        if profile is None:
+            return None
+        headways.append(profile.headway_hours)
+    if not headways:
+        return None
+    result = min(headways)
+    return result if math.isfinite(result) and result > 0.0 else None
+
+
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -446,7 +465,21 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
         return False
-    return hold_hours < detour_hours
+    if hold_hours < detour_hours:
+        return True
+
+    teu_size = getattr(shipment, "teu_size", None)
+    if isinstance(teu_size, bool) or not isinstance(teu_size, numbers.Integral):
+        return False
+    if int(teu_size) <= 1:
+        return False
+    buffer_hours = _minimum_path_headway_hours(safe_path)
+    if buffer_hours is None:
+        return False
+    buffered_detour_hours = detour_hours + buffer_hours
+    if not math.isfinite(buffered_detour_hours):
+        return False
+    return hold_hours < buffered_detour_hours
 
 
 class UserStrategy:
@@ -471,7 +504,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Hold selected direct-service cargo instead of a multi-transfer detour."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

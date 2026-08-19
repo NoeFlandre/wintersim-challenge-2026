@@ -300,9 +300,7 @@ def test_real_round1_context_contains_multi_teu_buffer_activation() -> None:
                 )
                 before = _snapshot(context, shipment)
                 decisions.append(
-                    participant.UserStrategy.assign_associated_bookings(
-                        context, now, shipment
-                    )
+                    participant.UserStrategy.assign_associated_bookings(context, now, shipment)
                 )
                 assert _snapshot(context, shipment) == before
             if decisions == [None, False]:

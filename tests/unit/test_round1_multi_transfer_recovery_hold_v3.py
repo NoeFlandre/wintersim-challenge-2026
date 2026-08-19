@@ -236,9 +236,7 @@ def test_exact_hold_detour_equality_delegates() -> None:
 
 
 def test_multi_teu_uses_one_safe_headway_buffer_without_mutation() -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(40.0, 40.0, 80.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
     shipment.teu_size = 2
     before = _freeze((context, shipment))
 
@@ -247,18 +245,14 @@ def test_multi_teu_uses_one_safe_headway_buffer_without_mutation() -> None:
 
 
 def test_one_teu_does_not_use_missed_connection_buffer() -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(40.0, 40.0, 80.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
 
     assert shipment.teu_size == 1
     assert _decision(context, now, shipment) is None
 
 
 def test_exact_buffered_equality_delegates() -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(32.0, 32.0, 64.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(32.0, 32.0, 64.0))
     shipment.teu_size = 2
 
     assert _decision(context, now, shipment) is None
@@ -266,18 +260,14 @@ def test_exact_buffered_equality_delegates() -> None:
 
 @pytest.mark.parametrize("teu_size", [True, 2.0, 0, -1, None, math.nan])
 def test_invalid_multi_teu_size_does_not_use_buffer(teu_size: Any) -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(40.0, 40.0, 80.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
     shipment.teu_size = teu_size
 
     assert _decision(context, now, shipment) is None
 
 
 def test_missing_teu_size_does_not_use_buffer() -> None:
-    context, now, shipment, _ = _qualifying_fixture(
-        safe_distances=(40.0, 40.0, 80.0)
-    )
+    context, now, shipment, _ = _qualifying_fixture(safe_distances=(40.0, 40.0, 80.0))
     del shipment.teu_size
 
     assert _decision(context, now, shipment) is None

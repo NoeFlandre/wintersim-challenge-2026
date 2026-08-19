@@ -7,6 +7,7 @@ import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
+import response_strategies.user_strategy as strategy
 from response_strategies.user_strategy import UserStrategy
 
 ANCHOR = dt.datetime.min
@@ -61,9 +62,7 @@ def _route(
         )
         for index, distance in enumerate(distances, start=1)
     ]
-    route.deployed_vessels = [
-        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))
-    ]
+    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))]
     return route
 
 
@@ -207,3 +206,152 @@ def test_installation_append_failure_rolls_back(monkeypatch: Any) -> None:
 
 def test_malformed_context_delegates() -> None:
     assert UserStrategy.assign_associated_bookings({}, ANCHOR, object()) is None
+
+
+def test_tie_solver_fail_closed_guards() -> None:
+    context, now, shipment, items = _two_to_one_fixture()
+    state = strategy._active_state(context, now)
+    assert state is not None
+    graphs = strategy._graphs(context, state)
+    assert graphs is not None
+    fallback = strategy._shortest_path(
+        context,
+        shipment.demand.origin_port,
+        shipment.demand.destination_port,
+        graphs[1],
+    )
+    assert fallback is not None
+    assert strategy._path_distance(()) is None
+    assert (
+        strategy._fewer_transfer_equal_path(
+            context,
+            shipment.demand.origin_port,
+            shipment.demand.destination_port,
+            graphs[1],
+            (),
+        )
+        is None
+    )
+    assert (
+        strategy._fewer_transfer_equal_path(
+            context,
+            shipment.demand.origin_port,
+            shipment.demand.destination_port,
+            graphs[1],
+            fallback[:1],
+        )
+        is None
+    )
+    assert (
+        strategy._fewer_transfer_equal_path(
+            SimpleNamespace(ports=None),
+            shipment.demand.origin_port,
+            shipment.demand.destination_port,
+            graphs[1],
+            fallback,
+        )
+        is None
+    )
+    duplicate_context = SimpleNamespace(ports=[context.ports[0], context.ports[0]])
+    assert (
+        strategy._fewer_transfer_equal_path(
+            duplicate_context,
+            shipment.demand.origin_port,
+            shipment.demand.destination_port,
+            graphs[1],
+            fallback,
+        )
+        is None
+    )
+    outside = _port("Outside")
+    assert (
+        strategy._fewer_transfer_equal_path(
+            context,
+            outside,
+            shipment.demand.destination_port,
+            graphs[1],
+            fallback,
+        )
+        is None
+    )
+    foreign_edge = strategy._Edge(outside, context.ports[-1], (), items["fewer"][0], 1.0, ())
+    assert (
+        strategy._fewer_transfer_equal_path(
+            context,
+            shipment.demand.origin_port,
+            shipment.demand.destination_port,
+            (foreign_edge,),
+            fallback,
+        )
+        is None
+    )
+
+
+def test_installation_guards_and_booking_failures(monkeypatch: Any) -> None:
+    _install_booking_module(monkeypatch)
+    context, now, shipment, items = _two_to_one_fixture()
+    state = strategy._active_state(context, now)
+    assert state is not None
+    graphs = strategy._graphs(context, state)
+    assert graphs is not None
+    fallback = strategy._shortest_path(
+        context,
+        shipment.demand.origin_port,
+        shipment.demand.destination_port,
+        graphs[1],
+    )
+    assert fallback is not None
+    path = strategy._fewer_transfer_equal_path(
+        context,
+        shipment.demand.origin_port,
+        shipment.demand.destination_port,
+        graphs[1],
+        fallback,
+    )
+    assert path is not None
+    assert strategy._booking_path_is_contiguous(shipment, ()) is False
+    wrong_origin = _shipment(_port("Wrong"), shipment.demand.destination_port)
+    assert strategy._booking_path_is_contiguous(wrong_origin, path) is False
+    disconnected = path[:1] + (
+        strategy._Edge(
+            _port("Elsewhere"), shipment.demand.destination_port, (), path[-1].route, 1.0, ()
+        ),
+    )
+    assert strategy._booking_path_is_contiguous(shipment, disconnected) is False
+
+    invalid_segment = SimpleNamespace(sequence_index=True, associated_leg=path[0].legs[0])
+    path[0].route.segments = [invalid_segment]
+    assert strategy._segment_bounds(path[0]) is None
+
+    context, now, shipment, items = _two_to_one_fixture()
+    state = strategy._active_state(context, now)
+    assert state is not None
+    graphs = strategy._graphs(context, state)
+    assert graphs is not None
+    fallback = strategy._shortest_path(
+        context,
+        shipment.demand.origin_port,
+        shipment.demand.destination_port,
+        graphs[1],
+    )
+    assert fallback is not None
+    path = strategy._fewer_transfer_equal_path(
+        context,
+        shipment.demand.origin_port,
+        shipment.demand.destination_port,
+        graphs[1],
+        fallback,
+    )
+    assert path is not None
+    module = sys.modules["maritime_data_context"]
+    module.Booking = object()
+    assert strategy._install_equal_tie_path(shipment, path) is None
+
+    class _BrokenBooking:
+        def __init__(self, **_: Any) -> None:
+            raise TypeError("injected constructor failure")
+
+    module.Booking = _BrokenBooking
+    assert strategy._install_equal_tie_path(shipment, path) is None
+    path[0].route.associated_bookings = None
+    assert strategy._install_equal_tie_path(shipment, path) is None

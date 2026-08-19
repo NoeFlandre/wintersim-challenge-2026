@@ -1,11 +1,11 @@
 """Participant-owned response strategy for the WSC 2026 challenge.
 
-The active experiment is deliberately narrow: while a disruption is active,
-new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
-Every decision is derived from the supplied runtime objects. The strategy is
-read-only, deterministic, standard-library-only, and delegates on uncertainty.
+The active experiment preserves the v3 recovery hold and adds one narrow
+tie-break: when the fallback's disruption-safe shortest path has an exactly
+equal-distance alternative with fewer service-route changes, the alternative
+is installed only for a two-to-one transfer reduction. Every decision is
+derived from the supplied runtime objects, is deterministic, standard-
+library-only, and delegates on uncertainty.
 """
 
 from __future__ import annotations
@@ -55,11 +55,13 @@ _DATA_ERRORS = (
     AttributeError,
     IndexError,
     KeyError,
+    ImportError,
     TypeError,
     ValueError,
     ZeroDivisionError,
     FloatingPointError,
     OverflowError,
+    RuntimeError,
 )
 
 
@@ -403,6 +405,224 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
+def _path_distance(path: tuple[_Edge, ...]) -> float | None:
+    if not path:
+        return None
+    distance = math.fsum(edge.distance for edge in path)
+    return distance if math.isfinite(distance) and distance > 0.0 else None
+
+
+def _route_change_count(path: tuple[_Edge, ...]) -> int:
+    return sum(left.route is not right.route for left, right in zip(path, path[1:], strict=False))
+
+
+def _fewer_transfer_equal_path(
+    context: Any,
+    origin: Any,
+    destination: Any,
+    edges: tuple[_Edge, ...],
+    fallback_path: tuple[_Edge, ...],
+) -> tuple[_Edge, ...] | None:
+    """Find an exact-distance path with fewer route changes."""
+    if len(fallback_path) < 2:
+        return None
+    fallback_distance = _path_distance(fallback_path)
+    fallback_changes = _route_change_count(fallback_path)
+    if fallback_distance is None or fallback_changes <= 0:
+        return None
+
+    raw_ports = getattr(context, "ports", None)
+    if not isinstance(raw_ports, (list, tuple)):
+        return None
+    ports = list(raw_ports)
+    port_ids = [id(port) for port in ports]
+    if len(set(port_ids)) != len(port_ids):
+        return None
+    origin_id = id(origin)
+    destination_id = id(destination)
+    if origin_id not in port_ids or destination_id not in port_ids:
+        return None
+
+    outgoing: dict[int, list[_Edge]] = {}
+    incoming: dict[int, list[_Edge]] = {}
+    for edge in edges:
+        departure_id = id(edge.departure)
+        arrival_id = id(edge.arrival)
+        if departure_id not in port_ids or arrival_id not in port_ids:
+            return None
+        outgoing.setdefault(departure_id, []).append(edge)
+        incoming.setdefault(arrival_id, []).append(edge)
+
+    reverse_distances: dict[int, float] = dict.fromkeys(port_ids, math.inf)
+    reverse_distances[destination_id] = 0.0
+    unvisited = list(port_ids)
+    unvisited_members = set(unvisited)
+    while unvisited:
+        current_index = min(
+            range(len(unvisited)),
+            key=lambda index: reverse_distances[unvisited[index]],
+        )
+        current_id = unvisited.pop(current_index)
+        unvisited_members.remove(current_id)
+        current_distance = reverse_distances[current_id]
+        if not math.isfinite(current_distance):
+            break
+        for edge in incoming.get(current_id, ()):
+            predecessor_id = id(edge.departure)
+            if predecessor_id not in unvisited_members:
+                continue
+            alternative = math.fsum((edge.distance, current_distance))
+            if not math.isfinite(alternative):
+                return None
+            if alternative < reverse_distances[predecessor_id]:
+                reverse_distances[predecessor_id] = alternative
+
+    shortest_distance = reverse_distances.get(origin_id, math.inf)
+    if not math.isfinite(shortest_distance) or shortest_distance != fallback_distance:
+        return None
+
+    memo: dict[tuple[int, int | None], tuple[int, tuple[_Edge, ...]] | None] = {}
+    active: set[tuple[int, int | None]] = set()
+
+    def solve(
+        current_id: int,
+        previous_route_id: int | None,
+    ) -> tuple[int, tuple[_Edge, ...]] | None:
+        if current_id == destination_id:
+            return 0, ()
+        key = (current_id, previous_route_id)
+        if key in memo:
+            return memo[key]
+        if key in active:
+            return None
+        active.add(key)
+        best: tuple[int, tuple[_Edge, ...]] | None = None
+        current_distance = reverse_distances[current_id]
+        for edge in outgoing.get(current_id, ()):
+            next_id = id(edge.arrival)
+            tail_distance = reverse_distances.get(next_id, math.inf)
+            if not math.isfinite(tail_distance):
+                continue
+            if math.fsum((edge.distance, tail_distance)) != current_distance:
+                continue
+            child = solve(next_id, id(edge.route))
+            if child is None:
+                continue
+            changes = child[0] + (
+                0 if previous_route_id is None or previous_route_id == id(edge.route) else 1
+            )
+            candidate = (changes, (edge, *child[1]))
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+        active.remove(key)
+        memo[key] = best
+        return best
+
+    result = solve(origin_id, None)
+    if result is None or result[0] >= fallback_changes:
+        return None
+    candidate_path = result[1]
+    candidate_distance = _path_distance(candidate_path)
+    if candidate_distance != fallback_distance:
+        return None
+    return candidate_path
+
+
+def _segment_bounds(edge: _Edge) -> tuple[int, int] | None:
+    segments = getattr(edge.route, "segments", None)
+    if not isinstance(segments, (list, tuple)) or not edge.legs:
+        return None
+    first_index: int | None = None
+    last_index: int | None = None
+    for segment in segments:
+        leg = getattr(segment, "associated_leg", None)
+        sequence_index = getattr(segment, "sequence_index", None)
+        if isinstance(sequence_index, bool) or not isinstance(sequence_index, int):
+            return None
+        if leg is edge.legs[0]:
+            first_index = sequence_index
+        if leg is edge.legs[-1]:
+            last_index = sequence_index
+    if first_index is None or last_index is None or first_index <= 0 or last_index <= 0:
+        return None
+    return first_index, last_index
+
+
+def _booking_path_is_contiguous(shipment: Any, path: tuple[_Edge, ...]) -> bool:
+    demand = getattr(shipment, "demand", None)
+    origin = getattr(demand, "origin_port", None)
+    destination = getattr(demand, "destination_port", None)
+    if origin is None or destination is None or not path:
+        return False
+    if path[0].departure is not origin:
+        return False
+    for previous, current in zip(path, path[1:], strict=False):
+        if previous.arrival is not current.departure:
+            return False
+    return path[-1].arrival is destination
+
+
+def _install_equal_tie_path(shipment: Any, path: tuple[_Edge, ...]) -> bool | None:
+    """Create the candidate booking chain and roll back on append failure."""
+    old_bookings = getattr(shipment, "associated_bookings", None)
+    if not isinstance(old_bookings, list) or old_bookings:
+        return None
+    if getattr(shipment, "current_booking_index", None) is not None:
+        return None
+    if not _booking_path_is_contiguous(shipment, path):
+        return None
+
+    specs: list[tuple[Any, int, int]] = []
+    touched_routes: list[tuple[Any, list[Any]]] = []
+    for edge in path:
+        bounds = _segment_bounds(edge)
+        route_bookings = getattr(edge.route, "associated_bookings", None)
+        if bounds is None or not isinstance(route_bookings, list):
+            return None
+        specs.append((edge.route, bounds[0], bounds[1]))
+        if not any(route is edge.route for route, _ in touched_routes):
+            touched_routes.append((edge.route, list(route_bookings)))
+
+    try:
+        module = __import__("maritime_data_context", fromlist=["Booking"])
+        booking_type = vars(module).get("Booking")
+    except _DATA_ERRORS:
+        return None
+    if not callable(booking_type):
+        return None
+
+    new_bookings: list[Any] = []
+    try:
+        for sequence_index, (route, departure_index, arrival_index) in enumerate(
+            specs,
+            start=1,
+        ):
+            new_bookings.append(
+                booking_type(
+                    sequence_index=sequence_index,
+                    shipment=shipment,
+                    service_route=route,
+                    departure_segment_index=departure_index,
+                    arrival_segment_index=arrival_index,
+                )
+            )
+    except _DATA_ERRORS:
+        return None
+
+    try:
+        shipment.associated_bookings = new_bookings
+        shipment.current_booking_index = 1
+        for booking in new_bookings:
+            booking.service_route.associated_bookings.append(booking)
+    except _DATA_ERRORS:
+        shipment.associated_bookings = old_bookings
+        shipment.current_booking_index = None
+        for route, snapshot in touched_routes:
+            route.associated_bookings[:] = snapshot
+        return None
+    return True
+
+
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -450,7 +670,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
 
 
 class UserStrategy:
-    """Deterministic participant strategy with one read-only cargo policy."""
+    """Deterministic participant strategy with one narrow cargo policy."""
 
     @staticmethod
     def select_vessel_for_berth(
@@ -471,9 +691,41 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Preserve v3 holds and install only a bounded two-to-one tie path."""
         try:
-            return False if _should_hold(context, now, shipment) else None
+            if _should_hold(context, now, shipment):
+                return False
+            if not isinstance(now, dt.datetime):
+                return None
+            bookings = getattr(shipment, "associated_bookings", None)
+            if not isinstance(bookings, list) or bookings:
+                return None
+            if getattr(shipment, "current_booking_index", None) is not None:
+                return None
+            demand = getattr(shipment, "demand", None)
+            origin = getattr(demand, "origin_port", None)
+            destination = getattr(demand, "destination_port", None)
+            if origin is None or destination is None or origin is destination:
+                return None
+            state = _active_state(context, now)
+            if state is None:
+                return None
+            graphs = _graphs(context, state)
+            if graphs is None:
+                return None
+            fallback_path = _shortest_path(context, origin, destination, graphs[1])
+            if fallback_path is None or _route_change_count(fallback_path) != 2:
+                return None
+            candidate_path = _fewer_transfer_equal_path(
+                context,
+                origin,
+                destination,
+                graphs[1],
+                fallback_path,
+            )
+            if candidate_path is None or _route_change_count(candidate_path) != 1:
+                return None
+            return _install_equal_tie_path(shipment, candidate_path)
         except _DATA_ERRORS:
             return None
 

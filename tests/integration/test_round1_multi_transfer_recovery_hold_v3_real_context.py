@@ -224,6 +224,10 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
             before = _snapshot(context, shipment)
             decision = participant.UserStrategy.assign_associated_bookings(context, now, shipment)
             after = _snapshot(context, shipment)
+            if decision is True:
+                assert shipment.current_booking_index == 1
+                assert shipment.associated_bookings
+                continue
             assert after == before, "participant decision mutated real Round 1 state"
             if decision is False:
                 state = participant._active_state(context, now)

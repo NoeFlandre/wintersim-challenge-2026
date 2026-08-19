@@ -1,6 +1,6 @@
 # Round 1 three-change mixed low-margin delegation v23
 
-**Status: REJECTED — full run complete; v3 control restoration pending.**
+**Status: REJECTED — complete; v3 control restored and verified.**
 
 V23 tests one narrow subtraction from the accepted Round 1 v3 recovery-hold
 control. The exact policy, alternatives, tests, one-run protocol, and restore
@@ -106,7 +106,22 @@ The candidate ATT is byte-identical to control, so the experiment produced no
 measurable improvement. The immutable aggregate is
 `experiments/results/round1_three_change_mixed_low_margin_v23_20260819.json`.
 
-The candidate implementation and tests must now be reverted in reverse order,
-Round 1 synchronized back to the accepted v3 participant, the pinned v3 ATT
-restored byte-for-byte, and the final gates rerun. No tuning, duplicate run,
-or second candidate is permitted.
+## Restoration and pause state
+
+The v23 implementation and tests were reverted in reverse order by commits
+`ef4009b` and `b6e222c`. Round 1 was synchronized back to the accepted v3
+participant, whose strategy SHA-256 is
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded` in both
+`submission/` and the ignored runtime tree. The pinned v3 ATT was restored
+byte-for-byte with SHA-256
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and the
+active output re-score again returned `19.084638612143134` over 72 periods.
+
+After restoration, Ruff format/lint, Ty, mypy, and the non-integration suite
+passed (`227 passed`, `8 deselected`); the integration preflight had already
+passed (`9 passed`) before the operational run. No simulation, tuning, smoke,
+or duplicate run was launched after restoration. Restricted-material scans
+remain clean, no simulator/test process is live, and `git status` is clean on
+`main` at `b6e222c`. The candidate log/ATT, manifest, activation audit, and
+aggregate remain private ignored evidence for later review; no push or
+submission was made.

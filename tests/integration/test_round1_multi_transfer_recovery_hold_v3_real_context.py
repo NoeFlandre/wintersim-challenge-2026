@@ -216,7 +216,7 @@ def test_real_round1_context_contains_qualifying_and_delegated_calls() -> None:
         for index, demand in enumerate(context.demands):
             shipment = Shipment(
                 index=index,
-                teu_size=1,
+                teu_size=2,
                 demand=demand,
                 current_storage_port=demand.origin_port,
                 generated_time=now,

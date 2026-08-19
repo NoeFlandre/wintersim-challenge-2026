@@ -95,6 +95,7 @@ def _berth_plan(
 def _shipment(origin: Any, destination: Any) -> SimpleNamespace:
     return SimpleNamespace(
         demand=SimpleNamespace(origin_port=origin, destination_port=destination),
+        teu_size=2,
         associated_bookings=[],
         current_booking_index=None,
     )

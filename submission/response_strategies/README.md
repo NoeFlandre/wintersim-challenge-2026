@@ -16,26 +16,21 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: v3 recovery hold plus v27 tie experiment
+## Current strategy: multi-transfer recovery-hold experiment
 
 Three hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `assign_associated_bookings` preserves the v3
-hold: it may return `False` for a newly generated shipment only when all of
-the following are derived from the live context: its normal shortest route is
-one disrupted direct service, the currently safe shortest route needs at least
-two changes between services (at least three service boardings), and the
-direct service is estimated to recover and deliver sooner than that detour.
-Outside that hold, the current v27 experiment may return `True` only for a
-new shipment whose fallback safe shortest path has exactly two service-route
-changes and an exactly equal-distance safe path has exactly one. That booking
-chain is installed transactionally; `1->0` changes, non-ties, all other shapes,
-and uncertain data delegate `None`.
+During an active disruption, `assign_associated_bookings` may return `False`
+for a newly generated shipment only when all of the following are derived from
+the live context: its normal shortest route is one disrupted direct service,
+the currently safe shortest route needs at least two changes between services
+(at least three service boardings), and the direct service is estimated to
+recover and deliver sooner than that detour.
 
-The strategy reads runtime topology, disruption windows, vessel speeds, and
-service-route headways, makes full-precision comparisons, and otherwise
-delegates. Missing or ambiguous data also delegates without mutation. No
-performance result is claimed until the pre-registered full experiment
-finishes.
+The strategy does not create or edit bookings. It reads runtime topology,
+disruption windows, vessel speeds, and service-route headways, makes a
+full-precision comparison, and otherwise delegates. Missing or ambiguous data
+also delegates without mutation. No performance result is claimed until the
+pre-registered full experiment finishes.
 
 ## Submission boundary
 

@@ -1,6 +1,6 @@
 # Round 1 multi-TEU v3 hold suppression v22
 
-**Status: DESIGN FROZEN — no candidate code or full simulation has started.**
+**Status: REJECTED — candidate run complete; v3 control restored.**
 
 V22 is a separately named experiment from the accepted v3 control. It tests
 whether existing v3 holds for multi-TEU cargo create more queue/capacity cost
@@ -64,3 +64,25 @@ Decision: **REJECTED**. The candidate was materially worse than the frozen
 v3 control and did not satisfy the strict acceptance rule. Complete machine-
 readable evidence is in
 `experiments/results/round1_multi_teu_v3_hold_suppression_v22_20260819.json`.
+
+## Restoration and final state
+
+The candidate implementation and RED tests were reverted in this order:
+
+- `a1193e0` reverts the v22 implementation;
+- `bfb4d60` reverts the v22 RED tests.
+
+The participant runtime was synchronized to the accepted v3 control. The
+restored strategy SHA-256 is
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`; the
+active control ATT SHA-256 is
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`, and a
+fresh score re-check is `19.084638612143134` over 72 periods.
+
+Final gates passed after restoration: `uv lock --check`, locked `uv sync`,
+Ruff format and lint, Ty on tracked source, mypy, 227 non-integration tests
+with 90.84% coverage, 8 integration tests, Round 1 smoke, and two identical
+deterministic packages (SHA-256 `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`).
+Restricted-material scans passed, no simulation process remains, and the
+working tree is clean. The branch is `main`, ahead of `origin/main` by the
+local experiment commits and not yet pushed.

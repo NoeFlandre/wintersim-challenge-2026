@@ -121,5 +121,27 @@ were harmful; it only rejects this frozen route-change subset.
 
 The machine-readable result is retained in the ignored aggregate
 `experiments/results/round1_two_route_change_only_v17_20260819.json`. The
-candidate code and RED test must now be reverted and the pinned v3 participant,
-runtime, and ATT restored before final verification.
+candidate code and RED test were reverted in reverse order with Git: the
+implementation revert is `cba1083` and the RED-test revert is `1175ff2`. The
+Round 1 participant files were synchronized back to v3 and the active ATT was
+restored from the pinned v3 snapshot. Final active hashes are the v3 strategy
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`, v3 README
+`0590ba5bb34ffc9bf0e7f368b552f8f26c71eb7314a00fa221e0c5e8f4225595`, and ATT
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`. The
+restored ATT re-scored to exactly `19.084638612143134` over `72` periods.
+
+## Final verification after restoration
+
+After restoration, locked `uv` resolution/sync, Ruff format/lint, Ty, mypy,
+non-integration tests (`227` passed, `8` deselected, branch coverage
+`90.84%`), and serial integration tests (`8` passed) all passed. Round 1 smoke
+returned `SMOKE_OK`. Two participant-only package runs were byte-identical at
+SHA-256 `35acfa777ebc11f1e683674fbe20b6bc85184c5a51393f4ff0e47fb54d7d9001`
+and contained only the README and `user_strategy.py`. Participant/runtime
+files remained byte-identical after smoke and packaging. Restricted-history
+and tracked-path scans were clean, no simulator process remained, and the
+tracked working tree was clean before this documentation update. The ignored
+candidate ATT, raw log, literal-launch failure log, audit, manifest, and
+aggregate remain available under their predeclared evidence paths. No tuning,
+second candidate, push, merge, PR, upload, submission, or history rewrite was
+performed.

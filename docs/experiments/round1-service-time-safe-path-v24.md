@@ -1,7 +1,6 @@
 # Round 1 service-time safe-path refinement v24
 
-**Status: PRE-RUN READY — implementation and all preflight gates passed; no
-full simulation has started.**
+**Status: RUN COMPLETE — candidate rejected; v3 restoration is in progress.**
 
 This is one separately named experiment from the accepted Round 1 v3 control.
 It tests whether v3 sometimes holds cargo only because it measures the safe
@@ -34,6 +33,36 @@ faster when sailing time and service-route headways are considered.
 
 These checks authorize preparation for exactly one candidate run under the
 fixed contract below; they are not performance evidence.
+
+## Full-run outcome
+
+The single authorized run completed successfully with exit code `0` and all
+required markers: Period 72, Day 360, `Simulation completed.`, and a fresh
+ATT write. The raw evidence was preserved before any restoration or later
+runtime command:
+
+- simulation runtime: `00:21:16`;
+- candidate ATT:
+  `.challenge/round1/results/service_time_safe_path_v24_20260819/ATT_By_Statistics_Interval.csv`;
+- candidate ATT SHA-256:
+  `12bddba4a610ea0493ee5435edd78db419bfa31dc61d8a4cead8b4526472814c`;
+- raw log SHA-256:
+  `6dc3c6ff48173b4274695657b5009fe761a69a3c969efd11b546274d34775afd`;
+- candidate cumulative resilience loss:
+  `21.649049413906223` over exactly 72 periods;
+- candidate mean ATT: `20.527916666666666` days;
+- compared with v3 `19.084638612143134`, delta
+  `+2.5644108017630884` (`+13.437041454541404%`);
+- period comparison against v3: `16` better, `23` equal, `33` worse;
+- ignored aggregate:
+  `experiments/results/round1_service_time_safe_path_v24_20260819.json`
+  (SHA-256 `2d166d90f5fc87ed376a11824f2c41ab9a17dad68748021093bc8ffecf5f0a87`).
+
+The fixed rule is `candidate_loss < 19.084638612143134 - 1e-9`; therefore
+v24 is **REJECTED**. The candidate changed the measured trajectory, so this
+is evidence that the exact service-time path policy degraded this scenario;
+it does not establish a causal explanation for every changed period or for
+other scenarios.
 
 ## Control and decision rule
 

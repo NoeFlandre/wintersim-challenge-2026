@@ -142,3 +142,27 @@ The candidate is therefore **INVALID/REJECTED** under the immutable protocol.
 The v27 implementation and RED tests must be reverted, Round 1 synchronized to
 the accepted v3 participant, and the pinned v3 ATT restored and rescored before
 the final gates. No tuning, duplicate run, or second candidate is part of v27.
+
+## Final restoration record
+
+Restoration completed with report-first reverse-order reverts:
+
+- `c9d37de` reverted the v27 GREEN implementation;
+- `c13d122` reverted the v27 RED tests;
+- Round 1 was synchronized from the accepted participant source;
+- submission and organizer-runtime `user_strategy.py` are byte-identical at
+  SHA-256
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- the pinned v3 ATT was restored byte-for-byte at SHA-256
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- the restored control re-scored to `19.084638612143134` over 72 periods;
+- final checks passed: lock/sync, Ruff, Ty, mypy, 227 non-integration tests with
+  90.84% branch coverage, 8 integration tests, `SMOKE_OK`, restricted scans,
+  and deterministic packages twice at SHA-256
+  `a88fa1f534049cec96ffdf7d0204b2dc1fa3d685ceb438d9cecf45b4fcc5eef3`, with
+  only the two allowed participant files;
+- the tracked worktree is clean on the sole local `main` branch, with no live
+  simulator, smoke, or audit process.
+
+V27 is closed as an invalid environment-failure experiment. The clean v3
+control is ready for the next separately named experiment.

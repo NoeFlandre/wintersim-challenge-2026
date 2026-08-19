@@ -138,6 +138,17 @@ snapshot with SHA-256
 `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
 
 No second candidate, tuning, rerun, submission, push, merge, or history rewrite
-was performed. Final static, unit, integration, smoke, packaging, restricted-
-material, and clean-state gates must be rerun after this restoration before
-pausing the experiment.
+was performed. Final restoration verification passed:
+
+- locked `uv` check/sync, Ruff format/lint, Ty, and mypy;
+- non-integration tests: `227 passed, 8 deselected`, coverage `90.84%`;
+- integration tests: `8 passed`;
+- full smoke: `SMOKE_OK`;
+- two deterministic packages, each containing only
+  `response_strategies/README.md` and `response_strategies/user_strategy.py`,
+  SHA-256 `3d2bf1aa4c829ae947df89807944359799c258931734365f6e7981cfb32f9aa5`;
+- restored active ATT re-score: 72 periods,
+  `19.084638612143134`, byte-identical to the pinned v3 control;
+- restricted-material scans, `git diff --check`, participant/runtime hashes,
+  and no-live-process check all passed;
+- final Git working tree is clean on `main`.

@@ -5,6 +5,14 @@
 `PRE-RUN REVIEW` — participant implementation and the one-run decision are not
 yet complete. No full simulation has been launched for v26.
 
+The frozen implementation is committed on `main` as `0ca40d9`
+(`feat: activate pending alternative vessels at berth`), with the test-module
+correction in `1c81e96` (`test: avoid duplicate v26 test module names`). The
+candidate participant SHA-256 is
+`b04640e6ff3b42af0a7ed2e61b88042b7650cb5b20d9386d9f3c5c3aa21b5bb9`; the
+synchronized Round 1 runtime is byte-identical. The design/RED contract is
+committed as `f747dde`.
+
 ## Hypothesis
 
 The organizer fallback can reserve an empty vessel for a disruption-avoiding
@@ -49,6 +57,13 @@ differences, with no context or Output mutation. The queue and waiting ages
 were an explicit deterministic structural setup rather than event-history
 replay; activation is not causal score evidence. The audit JSON and script are
 ignored private evidence and will not enter the package or Git history.
+
+The actual candidate hook was rerun through the same audit after implementation
+and reproduced those 28 activations and 28 fallback-selection differences. The
+audit recorded the same pinned control ATT hash and no Output write. The two
+deterministic validation packages contain only the two participant files and
+both have SHA-256
+`439938a567579d0b2be02b92e6288b479054e606708a1700d506d6085540b9b4`.
 
 ## Invariants and run rules
 

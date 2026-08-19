@@ -1,0 +1,85 @@
+# Round 1 weekly-phase recovery hold v28
+
+**Status: DESIGN FROZEN — implementation and full run not yet started.**
+
+## Purpose
+
+This is one separately named experiment from the accepted Round 1 v3 control.
+It tests a single additive refinement to the v3 initial-booking hold. The
+experiment must remain one candidate and one full run; no tuning or duplicate
+run is allowed.
+
+## Frozen control
+
+- canonical checkout: `/Users/noeflandre/wintersim-challenge-2026`;
+- one worktree and one branch: `main`;
+- current control: accepted multi-transfer recovery hold v3;
+- control strategy SHA-256:
+  `f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`;
+- control ATT snapshot:
+  `.challenge/round1/results/multi_transfer_recovery_hold_v3_20260810/ATT_By_Statistics_Interval.csv`;
+- control ATT SHA-256:
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
+- control loss: `19.084638612143134` over 72 periods;
+- baseline ATT SHA-256:
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`.
+
+## Hypothesis and exact delta
+
+The v3 estimate uses half a derived headway and can delegate even when the
+organizer's declared weekly release phase makes the direct recovery hold faster
+than the multi-transfer safe detour. The candidate keeps every existing v3
+hold and adds `False` only when all v3 topology/recovery prerequisites hold,
+v3 itself would delegate, and a read-only phase walk using each route's
+`start_day_of_week` yields:
+
+```text
+recovery_wait + phase_nominal_service_time < phase_safe_service_time
+```
+
+Phase timing adds sailing time from deployed-vessel mean speed and the next
+weekly release wait at each route transition. Invalid or uncertain data
+delegates. No booking is installed by the participant and the other three
+hooks remain `None` delegates.
+
+## Structural exploration
+
+A read-only exploratory audit over the existing helper-derived 50 valid
+midpoints and 19,000 demand observations found nine phase-positive cases where
+v3 delegates, and one v3 hold that a phase replacement would suppress. The
+selected additive policy preserves all 48 v3 holds and therefore does not use
+the replacement's suppression. The exploratory result is reachability evidence
+only; it does not predict the official score. A post-GREEN audit must repeat the
+same sample with the actual candidate hook, prove no mutation/Output write, and
+record immutable evidence before any run.
+
+## Run contract
+
+- round/scenario: `round1` / `create_with_disruption`;
+- seed / `PYTHONHASHSEED`: `2026` / `0`;
+- warm-up / measured horizon / interval: `140` / `360` / `5` days;
+- required numbered periods: `72`;
+- acceptance: `candidate_loss < 19.084638612143134 - 1e-9`;
+- candidate evidence directory:
+  `.challenge/round1/results/weekly_phase_recovery_hold_v28_20260820/`;
+- ignored aggregate:
+  `experiments/results/round1_weekly_phase_recovery_hold_v28_20260820.json`.
+
+The fresh ATT and raw log must be preserved before scoring, synchronization,
+smoke, packaging, or restoration. Equality, worsening, invalid/incomplete
+output, a crash, or any failed gate is rejection. Rejection requires a result
+commit, reverse-order Git reverts of only v28 code/tests, v3 synchronization,
+byte-identical pinned ATT restoration, exact control re-score, and all final
+gates. No push, merge, PR, upload, submission, history rewrite, tuning, or
+second candidate is authorized.
+
+## TDD and implementation boundary
+
+RED tests must fail only because the untouched v3 implementation does not add
+the phase-positive decision. GREEN must add the smallest standard-library-only
+helpers and preserve v3 behavior and fail-closed validation. Tests must cover
+phase boundaries, invalid values, route transitions, mutation-free delegation,
+existing v3 holds, exact signatures, and package restrictions. The full run is
+not authorized until the actual-hook audit, all quality gates, deterministic
+participant-only packaging, fresh v3 control score, and immutable launch
+manifest are green.

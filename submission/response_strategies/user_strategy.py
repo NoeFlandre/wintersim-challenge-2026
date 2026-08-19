@@ -434,6 +434,9 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     )
     if route_change_count < 2:
         return False
+    safe_route_ids = tuple(id(edge.route) for edge in safe_path)
+    if len(set(safe_route_ids)) != len(safe_route_ids):
+        return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)
     if recovery is None:

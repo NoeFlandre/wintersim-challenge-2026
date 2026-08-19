@@ -1,6 +1,6 @@
 # Round 1 weekly-phase recovery hold v28
 
-**Status: DESIGN FROZEN — implementation and full run not yet started.**
+**Status: PRE-RUN REVIEW — implementation and structural audit passed; full run not yet started.**
 
 ## Purpose
 
@@ -52,6 +52,40 @@ the replacement's suppression. The exploratory result is reachability evidence
 only; it does not predict the official score. A post-GREEN audit must repeat the
 same sample with the actual candidate hook, prove no mutation/Output write, and
 record immutable evidence before any run.
+
+The actual candidate-hook audit completed before preflight using the same fresh
+contexts, all demands in context order, and a Git-loaded v3 control:
+
+- candidate strategy SHA-256: `dfe4613546480aee8015d172e91e27e1e9303872395006f6c321c6c80822f299`;
+- 19,000 observations over 50 timestamps;
+- candidate activations: `57`;
+- preserved v3/control activations: `48`;
+- candidate-only activations: `9`;
+- control-only activations: `0`;
+- candidate-only annual-TEU exposure proxy: `6,852`;
+- shape counts: safe edges/route changes `3/2` (`2`), `4/2` (`3`),
+  `5/3` (`4`);
+- `no_mutation: true`, `model_advanced: false`, `output_written: false`;
+- active Output remained byte-identical to the pinned v3 ATT
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+
+Private machine-readable evidence is
+`.challenge/round1/results/weekly_phase_recovery_hold_v28_20260820/activation_audit.json`.
+Activation is structural evidence only and is not a score prediction.
+
+## TDD and implementation record
+
+- RED contract commit: `0331398`;
+- formatting-only test correction: `bdbba87`;
+- GREEN implementation commit: `a077ee9`;
+- candidate strategy SHA-256:
+  `dfe4613546480aee8015d172e91e27e1e9303872395006f6c321c6c80822f299`;
+- focused v28 plus v3 contract tests: `42 passed`;
+- focused Ruff format/lint, Ty, and mypy: passed.
+
+The candidate changes only participant code, participant README, and the
+candidate tests. It adds no organizer import, external capability, mutable
+state, booking mutation, or other hook behavior.
 
 ## Run contract
 

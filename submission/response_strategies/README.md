@@ -16,15 +16,18 @@ the package `__init__.py` are **not** included here. They live only inside the
 local, ignored organizer tree under `.challenge/` and are overlaid at runtime
 by the `wsc2026 sync` command. Never copy organizer source into this directory.
 
-## Current strategy: multi-transfer recovery-hold experiment
+## Current strategy: multi-transfer and in-transit recovery holds
 
-Three hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `assign_associated_bookings` may return `False`
-for a newly generated shipment only when all of the following are derived from
-the live context: its normal shortest route is one disrupted direct service,
-the currently safe shortest route needs at least two changes between services
-(at least three service boardings), and the direct service is estimated to
-recover and deliver sooner than that detour.
+Two hooks may return `False`; the other two return `None` and delegate
+completely to the organizer fallback. For new cargo, `assign_associated_bookings`
+uses the multi-transfer recovery hold described above. For cargo already carried
+by a vessel, `adjust_bookings_before_cargo_handling` may return `False` only when
+every affected carried shipment has one original booking whose unfinished current
+edge is a disrupted direct service, the safe shortest route needs at least two
+changes between services, and waiting for recovery plus nominal service is
+strictly shorter than that detour. Unaffected carried shipments do not trigger a
+hold by themselves; a malformed, future-only, multi-booking, or alternative-route
+affected shipment delegates instead.
 
 The strategy does not create or edit bookings. It reads runtime topology,
 disruption windows, vessel speeds, and service-route headways, makes a

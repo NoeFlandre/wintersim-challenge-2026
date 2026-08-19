@@ -1,7 +1,7 @@
 # Round 1 multi-TEU missed-connection buffer v20
 
-**Status: REJECTED — one full run completed; result preserved; v3 restoration
-is pending.**
+**Status: REJECTED — complete; one full run completed, evidence preserved, and
+accepted v3 restored and verified.**
 
 The accepted v3 policy remains the control at cumulative resilience loss
 `19.084638612143134` over 72 periods and ATT SHA-256
@@ -50,8 +50,8 @@ These counts prove reachability only; the complete 72-period score decides.
 
 ## Pre-run verification
 
-No full candidate simulation has started. Fresh gates passed from the committed
-candidate:
+At this pre-run checkpoint, no full candidate simulation had started. Fresh
+gates passed from the committed candidate:
 
 - `uv lock --check` and locked all-group sync: passed (29 packages resolved);
 - Ruff format and lint: passed (21 files);
@@ -76,10 +76,9 @@ candidate:
 - diff/restricted-material checks, one-worktree/one-branch layout, clean tracked
   state, and no-live-simulator check: passed.
 
-The next step is to commit this pre-run record, write a non-overwriting ignored
-manifest pinned to that final documentation HEAD, revalidate every pinned
-identity, and run only the frozen command once. No tuning or second candidate
-is authorized.
+The pre-run record was then committed, a non-overwriting ignored manifest was
+pinned to that documentation HEAD, every identity was revalidated, and only
+the frozen command was run once.
 
 ## Full-run result
 
@@ -115,7 +114,44 @@ to the exact frozen policy and fixed scenario/seed; the activation audit alone
 did not predict it.
 
 No tuning, duplicate run, second candidate, score threshold change, push,
-submission, or history rewrite occurred. The next required step is the frozen
-rejection restoration: commit this result, revert candidate implementation and
-tests in reverse order, restore/sync v3 and its pinned ATT, re-score exactly,
-then rerun every final gate without another simulation.
+submission, or history rewrite occurred.
+
+## Rejection restoration and final verification
+
+The result was committed as `7825d3c`. The candidate was then removed using
+the frozen reverse-order Git procedure:
+
+- `f7d1bd7` reverted the v20 implementation commit `2534b7f`;
+- `977129f` reverted the v20 RED-contract commit `e79479a`.
+
+The retained design, plan, audit, and result documentation do not affect the
+participant package. Round 1 was synchronized only after those reverts. The
+participant and organizer-runtime files are byte-identical, with restored v3
+strategy SHA-256
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`
+and README SHA-256
+`0590ba5bb34ffc9bf0e7f368b552f8f26c71eb7314a00fa221e0c5e8f4225595`.
+
+The active Output ATT was restored from the pinned accepted v3 snapshot, not
+from a new simulation. Its SHA-256 is
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`
+and a fresh score is exactly `19.084638612143134` over 72 periods. The
+authoritative baseline SHA-256 remains
+`2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`.
+
+Final restored-state gates all passed:
+
+- locked `uv` environment, Ruff format/lint, `ty`, and mypy;
+- 227 non-integration tests with `90.84%` branch coverage, 8 integration
+  tests, and 235 tests in the complete suite;
+- one-day smoke (`SMOKE_OK`) without changing the restored ATT;
+- two byte-identical participant-only packages, SHA-256
+  `3d2bf1aa4c829ae947df89807944359799c258931734365f6e7981cfb32f9aa5`,
+  containing only `README.md` and `user_strategy.py`;
+- clean diff and working tree, one `main` branch and one worktree, clean
+  restricted-material scans, preserved ignored evidence hashes, and no live
+  Round 1 simulation or audit process.
+
+V20 is therefore closed as a rejected experiment. The accepted v3 strategy is
+again the only active participant policy. No additional simulation was used
+for restoration.

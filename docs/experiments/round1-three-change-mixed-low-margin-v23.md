@@ -1,6 +1,6 @@
 # Round 1 three-change mixed low-margin delegation v23
 
-**Status: DESIGN FROZEN — no candidate implementation or full run yet.**
+**Status: IMPLEMENTED — PRE-RUN REVIEW; no full run yet.**
 
 V23 tests one narrow subtraction from the accepted Round 1 v3 recovery-hold
 control. The exact policy, alternatives, tests, one-run protocol, and restore
@@ -60,3 +60,30 @@ with SHA-256
 
 The audit is a GO for RED→GREEN implementation and preflight. No full run is
 authorized until those gates and a fresh control identity check pass.
+
+## RED→GREEN implementation review
+
+The implementation remains limited to the participant-owned
+`assign_associated_bookings` hook. It first evaluates the unchanged v3 hold
+predicate; only after v3 qualifies does it derive matching constraint kinds,
+safe-path route-change count, and the live first-safe-route headway. It returns
+`None` only for the strict mixed leg-plus-port / exactly-three-change /
+margin-below-headway case, and returns the original v3 `False` for every
+retained hold. All other hooks remain unconditional `None` delegates. The
+code is read-only, deterministic, standard-library-only, fail-closed, and has
+no mutable module state or organizer imports.
+
+- RED contract: commit `1dcd9fb`; the new low-margin case failed against the
+  untouched v3 control while the retained and malformed cases passed;
+- GREEN implementation and participant documentation: commit `67c4eda`;
+- focused unit/v3 contract: `45 passed`;
+- real ignored-context integration sweep: `1 passed` over the derived
+  Round 1 midpoint/demand observations, with mutation snapshots unchanged;
+- participant strategy SHA-256 after implementation:
+  `bdead22d1ff31fbb11b1dabc6a49d93508370710a434c752074ceb65d01a809c`;
+- participant README SHA-256:
+  `901b43183886b41681758d38065b496f7ef082af17c58ab2be27baa3f799080f`.
+
+No operational simulation has run. The next gate is the complete locked
+preflight and a non-overwriting manifest check immediately before one
+authorized full run.

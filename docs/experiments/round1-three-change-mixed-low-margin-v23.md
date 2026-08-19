@@ -38,3 +38,25 @@ must reproduce 48 v3 holds and record every control-only v23 delegation,
 including full-precision timing margin and first-route headway. A no-op or
 malformed-only candidate is a no-go and consumes no full run.
 
+## Fresh audit result
+
+The identity-free audit completed before any candidate code was changed. It
+used 50 valid disruption midpoints and all 19,000 demand observations, with a
+fresh disposable context per timestamp and no model advancement or Output
+write. It reproduced 48 v3 holds and found four v23 control-only delegations;
+the v23 predicate retains 44 holds. Every suppressed observation is the same
+structural shape (mixed leg+port, three safe route changes, four nominal
+physical legs, annual demand proxy 39), with timing margins of
+`2.726818181818146`, `26.726818181818146`, `50.726818181818146`, and
+`74.72681818181815` hours against a first safe-route headway of
+`75.175` hours. The control-only annual-TEU exposure proxy is `156`.
+
+This is reachability evidence, not a score prediction. The audit observed
+`no_mutation: true`, `model_advanced: false`, `output_written: false`, and
+unchanged control ATT metadata. Its private JSON is
+`.challenge/round1/results/three_change_mixed_low_margin_v23_20260819/activation_audit.json`
+with SHA-256
+`6f72ed9e2d8d13349419d52aff2a9483f5be6f94f01c951a6b3015842d779a07`.
+
+The audit is a GO for RED→GREEN implementation and preflight. No full run is
+authorized until those gates and a fresh control identity check pass.

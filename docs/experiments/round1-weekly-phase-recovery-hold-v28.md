@@ -1,6 +1,6 @@
 # Round 1 weekly-phase recovery hold v28
 
-**Status: PRE-RUN REVIEW — implementation and structural audit passed; full run not yet started.**
+**Status: REJECTED — complete; v3 control restored.**
 
 ## Purpose
 
@@ -121,6 +121,38 @@ After synchronization, the complete preflight passed before any full run:
 The non-overwriting launch manifest is created only after this documentation
 commit and pins the final launch HEAD, hashes, package, control, stale Output,
 audit, run command, evidence paths, and threshold. A mismatch cancels launch.
+
+## Full-run result
+
+The one authorized full run completed successfully with the manifest-pinned
+command. The raw log and fresh ATT were preserved before scoring:
+
+- completion evidence: `Period 72 (Days 356-360)`, `Output Simulation Day:
+  360`, `Simulation completed`, and `CSV output written`;
+- raw log SHA-256: `93cc11b5aeea4228f546250a276e62d427ef62aa83e861b47df9f67bdc8e4e91`;
+- candidate ATT SHA-256:
+  `024256fcdb232d29953f21173cd57e463e6b1db39f8a34eff9e6baca6e23d9e5`;
+- candidate score: `22.0908979886841` over exactly 72 periods;
+- control score: `19.084638612143134`;
+- delta: `+3.0062593765409673` (`+15.752246807692503%`, worse);
+- ATT mean: candidate `20.550972222222224` days versus control `20.3675`;
+- periods versus control: `21` better, `17` equal, `34` worse;
+- acceptance rule: `22.0908979886841 < 19.084638612143134 - 1e-9` is false.
+
+The candidate is therefore **rejected**. Its private evidence remains under
+`.challenge/round1/results/weekly_phase_recovery_hold_v28_20260820/` and is
+not part of the submission package.
+
+## Restoration after rejection
+
+The v28 implementation, formatting-only test correction, and RED tests were
+reverted in reverse order after the result was recorded. The active
+participant/runtime strategy was synchronized back to the accepted v3 control,
+and the active Output ATT was restored byte-for-byte to the pinned v3 snapshot
+(`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`). The
+restored control was re-scored at `19.084638612143134` over 72 periods. Final
+quality, integration, smoke, packaging, restricted-material, and clean-state
+gates must be rerun after the restoration commits.
 
 ## Run contract
 

@@ -118,6 +118,26 @@ deterministic compliant packages, restricted-material scans, clean Git state,
 and no live simulator. Freeze all hashes and the exact command in an ignored,
 non-overwriting manifest.
 
+## Implementation and candidate audit
+
+The RED contract was committed as `f751c5e`. Against the unchanged v3
+implementation it produced exactly one expected failure: the pure-leg,
+below-headway fixture still returned v3's `False` instead of the required
+delegating `None`; the equality and mixed-constraint safeguards passed.
+
+The minimum GREEN implementation and participant README were committed as
+`cdd2fb1`. The focused v3 plus v29 tests pass (`42 passed`), and Ruff passes
+on the participant and focused test files. The candidate participant hash is
+`0f8ae2d2ab1c479dd07e372589257c4cf6d805fb9565a5d3e72b3c067cbac0a3`.
+
+After synchronization, a separate real-context audit exercised the actual
+public hook at all 50 valid timestamps and all 19,000 demands. It found 48
+control v3 holds, 39 candidate holds, and 9 control-only delegations. It
+reported no mutation, no model advance, no output write, and the unchanged
+control ATT hash. This is a readiness gate, not a performance result; the
+full simulation remains unauthorized until the complete preflight manifest is
+frozen.
+
 ## One-run procedure
 
 Exactly one full candidate run is authorized after the preflight manifest is
@@ -134,4 +154,3 @@ accepted v3 participant and pinned ATT, rescore the control exactly, rerun all
 final gates, and leave the repository clean. Do not tune, rerun, build a
 second candidate, submit, upload, push, merge, or rewrite history as part of
 this experiment.
-

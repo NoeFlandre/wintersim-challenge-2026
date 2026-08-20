@@ -87,6 +87,41 @@ The candidate changes only participant code, participant README, and the
 candidate tests. It adds no organizer import, external capability, mutable
 state, booking mutation, or other hook behavior.
 
+## Pre-run gate record
+
+After synchronization, the complete preflight passed before any full run:
+
+- participant/runtime strategy SHA-256: `dfe4613546480aee8015d172e91e27e1e9303872395006f6c321c6c80822f299`;
+- participant/runtime README SHA-256:
+  `ce2cbc5f3b9b667015d5acd98d5df41486d556c61f091e188a11a990c6408421`;
+- `uv lock --check`: passed (29 packages);
+- `uv sync --locked --all-groups`: passed (29 resolved, 25 checked);
+- Ruff format/check: passed;
+- Ty: passed;
+- mypy: passed (8 source files);
+- non-integration tests/branch coverage: `230 passed, 8 deselected`,
+  `90.41%` true branch coverage;
+- integration tests: `8 passed, 230 deselected`;
+- Round 1 sync and byte comparison: passed;
+- Round 1 smoke: `SMOKE_OK`;
+- deterministic participant-only package twice: SHA-256
+  `86ea4f2783918dfa49fa354107dbc988a8bf547541f443d745318ffdeb0ae694`,
+  6,380 bytes, members only
+  `Round1_V28Validation/response_strategies/README.md` and
+  `Round1_V28Validation/response_strategies/user_strategy.py`;
+- active Output after smoke remained the pinned control ATT SHA
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`,
+  1,262 bytes;
+- authoritative baseline ATT SHA:
+  `2b26eab78b184a19e30447bbee6b4982f08e2b6323966b1f58ea5bcbc328873d`;
+- fresh control re-score: `19.084638612143134`, exactly 72 periods;
+- `git diff --check`, clean Git state, one worktree/branch, restricted scans,
+  and no-live-simulator checks: passed.
+
+The non-overwriting launch manifest is created only after this documentation
+commit and pins the final launch HEAD, hashes, package, control, stale Output,
+audit, run command, evidence paths, and threshold. A mismatch cancels launch.
+
 ## Run contract
 
 - round/scenario: `round1` / `create_with_disruption`;

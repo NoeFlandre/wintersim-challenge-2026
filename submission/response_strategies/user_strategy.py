@@ -403,50 +403,6 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
-def _weekly_release_wait_hours(moment: Any, route: Any) -> float | None:
-    if not isinstance(moment, dt.datetime):
-        return None
-    start_day = _finite_real(getattr(route, "start_day_of_week", None))
-    if start_day is None or not 0.0 <= start_day < 7.0:
-        return None
-    seconds = (
-        moment.hour * 3600 + moment.minute * 60 + moment.second + moment.microsecond / 1_000_000.0
-    )
-    current_day = moment.weekday() + seconds / 86_400.0
-    wait_days = start_day - current_day
-    if wait_days < 0.0:
-        wait_days += 7.0
-    wait_hours = wait_days * 24.0
-    return wait_hours if math.isfinite(wait_hours) and wait_hours >= 0.0 else None
-
-
-def _phase_service_hours(path: tuple[_Edge, ...], now: Any) -> float | None:
-    if not isinstance(now, dt.datetime):
-        return None
-    total = 0.0
-    previous_route: Any = None
-    try:
-        for edge in path:
-            profile = _route_profile(edge.route)
-            if profile is None:
-                return None
-            if previous_route is not edge.route:
-                wait_hours = _weekly_release_wait_hours(now + dt.timedelta(hours=total), edge.route)
-                if wait_hours is None:
-                    return None
-                total += wait_hours
-            sailing_hours = edge.distance / profile.mean_speed
-            if not math.isfinite(sailing_hours) or sailing_hours <= 0.0:
-                return None
-            total += sailing_hours
-            if not math.isfinite(total):
-                return None
-            previous_route = edge.route
-    except (OverflowError, TypeError, ValueError):
-        return None
-    return total if total > 0.0 else None
-
-
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -490,17 +446,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
         return False
-    if hold_hours < detour_hours:
-        return True
-
-    phase_nominal_hours = _phase_service_hours(nominal_path, now)
-    phase_detour_hours = _phase_service_hours(safe_path, now)
-    if phase_nominal_hours is None or phase_detour_hours is None:
-        return False
-    phase_hold_hours = wait_hours + phase_nominal_hours
-    if not math.isfinite(phase_hold_hours) or phase_hold_hours <= 0.0:
-        return False
-    return phase_hold_hours < phase_detour_hours
+    return hold_hours < detour_hours
 
 
 class UserStrategy:

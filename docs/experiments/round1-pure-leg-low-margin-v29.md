@@ -138,6 +138,33 @@ control ATT hash. This is a readiness gate, not a performance result; the
 full simulation remains unauthorized until the complete preflight manifest is
 frozen.
 
+## Pre-run verification record
+
+Preflight passed before launch on the canonical `main` branch. The launch
+manifest is the ignored, non-overwriting file
+`.challenge/round1/results/pure_leg_low_margin_v29_20260820/launch_manifest.json`.
+It pins the candidate and runtime hashes, the v3 control and baseline ATT
+hashes, the stale Output metadata, package members and hash, the exact command,
+and the strict acceptance expression.
+
+- `uv lock --check` and locked all-group sync passed (29 packages resolved).
+- Ruff format and lint passed; `ty` and mypy passed.
+- Non-integration tests passed: 230 selected, 8 deselected; branch coverage
+  `90.69%` (above the 90% gate).
+- Integration tests passed: 8.
+- Round 1 sync and byte comparison passed; one-day smoke returned `SMOKE_OK`.
+- Two `V29Validation` packages were byte-identical with SHA-256
+  `ca9cd351d314c531c98bda488db9bc271f72e47f6bc5004b3a735cd665e2ff4f` and
+  contained only the README and participant strategy.
+- The active v3 control was rescored over exactly 72 periods to
+  `19.084638612143134`; its ATT and the pinned v3 snapshot share SHA-256
+  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+- Restricted-material scans, `git diff --check`, one-branch/one-worktree, and
+  no-live-simulator checks passed. The tracked working tree was clean.
+
+No full candidate simulation, candidate score, tuning, duplicate run, push,
+merge, upload, or submission has occurred at this point.
+
 ## One-run procedure
 
 Exactly one full candidate run is authorized after the preflight manifest is

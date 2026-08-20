@@ -150,9 +150,27 @@ reverted in reverse order after the result was recorded. The active
 participant/runtime strategy was synchronized back to the accepted v3 control,
 and the active Output ATT was restored byte-for-byte to the pinned v3 snapshot
 (`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`). The
-restored control was re-scored at `19.084638612143134` over 72 periods. Final
-quality, integration, smoke, packaging, restricted-material, and clean-state
-gates must be rerun after the restoration commits.
+restored control was re-scored at `19.084638612143134` over 72 periods.
+
+Result and restoration commits are `b8e5071` (result record), `3503939`
+(implementation revert), `9c80074` (formatting correction revert), and
+`7fff31e` (RED-test revert). Post-restoration verification is complete:
+
+- `uv lock --check` and locked `uv sync --all-groups`: passed;
+- Ruff format/check, Ty, and mypy: passed;
+- non-integration tests: `227 passed, 8 deselected`, `90.84%` coverage;
+- integration tests: `8 passed`;
+- Round 1 smoke: `SMOKE_OK`;
+- participant/runtime strategy files: byte-identical v3 SHA;
+- active ATT: byte-identical pinned v3 SHA and score;
+- deterministic package twice: SHA-256
+  `b839c1a451c9da43f4e94c6bf67ddcf9d526a46a7de98067e55599f789c35ff2`, with
+  only the two allowed `response_strategies` members;
+- restricted-material scans, `git diff --check`, and clean Git state: passed;
+- no live simulation/probe process remains.
+
+The checkout is clean and ready to continue from the v3 control. This
+experiment did not beat the control and must not be submitted as the strategy.
 
 ## Run contract
 

@@ -449,6 +449,45 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     return hold_hours < detour_hours
 
 
+def _suppress_pure_leg_low_margin(context: Any, now: Any, shipment: Any) -> bool:
+    """Delegate marginal pure-leg holds to the organizer fallback."""
+    state = _active_state(context, now)
+    demand = getattr(shipment, "demand", None)
+    origin = getattr(demand, "origin_port", None)
+    destination = getattr(demand, "destination_port", None)
+    graphs = _graphs(context, state) if state is not None else None
+    if state is None or graphs is None or origin is None or destination is None:
+        return False
+    nominal_path = _shortest_path(context, origin, destination, graphs[0])
+    safe_path = _shortest_path(context, origin, destination, graphs[1])
+    if nominal_path is None or safe_path is None or len(nominal_path) != 1:
+        return False
+    leg_ids = {id(leg) for leg in nominal_path[0].legs}
+    arrival_names = {
+        _port_name(port) for port in (*nominal_path[0].intermediate_ports, nominal_path[0].arrival)
+    }
+    kinds = frozenset(
+        constraint.kind
+        for constraint in state.constraints
+        if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
+        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+    )
+    if kinds != frozenset({"leg"}):
+        return False
+    recovery = _edge_constraint_recovery(nominal_path[0], state)
+    nominal_hours = _path_service_hours(nominal_path)
+    detour_hours = _path_service_hours(safe_path)
+    profile = _route_profile(safe_path[0].route) if safe_path else None
+    if recovery is None or nominal_hours is None or detour_hours is None or profile is None:
+        return False
+    wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
+    margin = detour_hours - (wait_hours + nominal_hours)
+    return (
+        all(math.isfinite(value) and value > 0.0 for value in (margin, profile.headway_hours))
+        and margin < profile.headway_hours
+    )
+
+
 class UserStrategy:
     """Deterministic participant strategy with one read-only cargo policy."""
 
@@ -471,9 +510,11 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Hold only a robust direct-service recovery instead of a detour."""
         try:
-            return False if _should_hold(context, now, shipment) else None
+            if not _should_hold(context, now, shipment):
+                return None
+            return None if _suppress_pure_leg_low_margin(context, now, shipment) else False
         except _DATA_ERRORS:
             return None
 

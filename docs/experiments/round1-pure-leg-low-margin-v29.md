@@ -204,3 +204,15 @@ Decision: **REJECTED** because the candidate did not satisfy
 permitted. The ignored manifest's decision is updated to `REJECTED`; the
 candidate implementation and tests must now be reverted and the v3 control
 restored before the final gates.
+
+## Restoration and final state
+
+The candidate implementation commit was reverted as `939322c`, followed by
+the RED-test revert `c234833`. The participant and synchronized runtime are
+byte-identical at v3 SHA
+`f04bda9d85953686e0e413590baf69dd00067b7a007b7d7a6691ee655ffbcded`. The
+pinned v3 ATT was restored to active Output with SHA
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a` and
+rescored to exactly `19.084638612143134` over 72 periods. No candidate process
+is live, no second run was started, and the final gate results are recorded in
+the hand-off state after this commit.

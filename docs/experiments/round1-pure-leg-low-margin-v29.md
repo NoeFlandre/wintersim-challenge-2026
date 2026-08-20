@@ -216,3 +216,14 @@ pinned v3 ATT was restored to active Output with SHA
 rescored to exactly `19.084638612143134` over 72 periods. No candidate process
 is live, no second run was started, and the final gate results are recorded in
 the hand-off state after this commit.
+
+Final post-restoration gates are green: locked `uv` resolution and sync;
+Ruff format/lint; `ty`; mypy; 227 non-integration tests with 8 deselected and
+`90.84%` branch coverage; 8 integration tests; Round 1 sync/cmp; smoke
+`SMOKE_OK`; and two byte-identical `V29FinalValidation` packages with SHA-256
+`02b16b7b37e9ddcbd8abebec5aec3c1fafde43926c587eb51cbdea400f7d198b`.
+The package members were only the participant README and `user_strategy.py`.
+The active v3 ATT still has SHA
+`5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`.
+Restricted-material, diff, process, one-branch, one-worktree, and clean-status
+checks all pass.

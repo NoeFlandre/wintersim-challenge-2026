@@ -2,10 +2,9 @@
 
 ## Status
 
-**PRE-RUN REVIEW.** This document freezes one candidate policy. No full
-simulation has been run for v29 and no score is claimed. The accepted v3
-strategy remains the control and must be restored if this candidate is
-rejected.
+**REJECTED.** The single authorized v29 full run completed validly but scored
+worse than the accepted v3 control. The control must be restored and remains
+the active strategy.
 
 ## Goal and fixed control
 
@@ -162,8 +161,9 @@ and the strict acceptance expression.
 - Restricted-material scans, `git diff --check`, one-branch/one-worktree, and
   no-live-simulator checks passed. The tracked working tree was clean.
 
-No full candidate simulation, candidate score, tuning, duplicate run, push,
-merge, upload, or submission has occurred at this point.
+The preflight completed without a duplicate run, tuning, push, merge, upload,
+or submission. The one authorized candidate run and its score are recorded
+below.
 
 ## One-run procedure
 
@@ -181,3 +181,26 @@ accepted v3 participant and pinned ATT, rescore the control exactly, rerun all
 final gates, and leave the repository clean. Do not tune, rerun, build a
 second candidate, submit, upload, push, merge, or rewrite history as part of
 this experiment.
+
+## Full-run result
+
+Exactly one candidate run used the frozen manifest command and completed with
+exit code 0, Period 72 (Days 356–360), Simulation Day 360, and
+`Simulation completed`. The raw log is retained privately at
+`.challenge/round1/results/pure_leg_low_margin_v29_20260820/full_run.log` and
+the fresh ATT was preserved before scoring.
+
+- Candidate ATT SHA-256:
+  `4dd194ec573dbbffcc67c9152321274b07cb5e5cee41875dba25ba129c31a05f`.
+- Candidate score over exactly 72 periods:
+  `21.32005228149211`.
+- Candidate mean numbered-period ATT: `20.507916666666667` days.
+- Compared with v3: 20 periods better, 22 equal, 30 worse.
+- Delta: `+2.2354136693489757`, or `+11.713156925730997%` (worse).
+- Historical target `18.276620672293834`: not beaten.
+
+Decision: **REJECTED** because the candidate did not satisfy
+`candidate_loss < 19.084638612143134 - 1e-9`. No second run or tuning is
+permitted. The ignored manifest's decision is updated to `REJECTED`; the
+candidate implementation and tests must now be reverted and the v3 control
+restored before the final gates.

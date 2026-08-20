@@ -40,7 +40,9 @@ def _route(
         )
         for index in range(1, len(ports))
     ]
-    route.deployed_vessels = [SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))]
+    route.deployed_vessels = [
+        SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=10.0))
+    ]
     return route
 
 

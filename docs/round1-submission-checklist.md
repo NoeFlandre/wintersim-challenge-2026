@@ -5,8 +5,8 @@
 - Registered team name: `OrtolanForever` (from the team-registration image
   supplied by the team lead).
 - File: `dist/submissions/Round1_OrtolanForever.zip`
-- SHA-256: `68b7430a8d9dce21e23badf2c73b8f87b8644a146b9b57fc6bf7b599e973db88`
-- Size: 5,923 bytes
+- SHA-256: `c882fb811e95e684e2064fe6abe772741e3e3a8a5df00e2af0a3b588b5a3e437`
+- Size: 5,351 bytes
 - Contents only:
   - `Round1_OrtolanForever/response_strategies/README.md`
   - `Round1_OrtolanForever/response_strategies/user_strategy.py`

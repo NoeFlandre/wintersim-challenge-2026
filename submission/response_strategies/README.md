@@ -1,54 +1,31 @@
-# response_strategies
+# OrtolanForever — WSC 2026 Round 1
 
-This directory is the **complete participant-owned submission surface** for the
-WSC 2026 Simulation Challenge. Per the challenge rules, only files in this
-directory are considered for evaluation.
+This directory contains the participant-owned response strategy submitted by
+team **OrtolanForever** for Round 1 of the WSC 2026 Simulation Challenge.
 
-## What is here
+## Strategy
 
-- `user_strategy.py` - the participant `UserStrategy` adapter that the
-  organizer framework imports and calls during simulation events.
+The policy is deliberately conservative. For newly generated cargo, it may
+hold a shipment on its normal direct service when that service is temporarily
+disrupted, but only when all of these conditions are clear from the live
+simulation context:
 
-## What is intentionally absent
+- the direct service is expected to recover;
+- the safe alternative would require at least two service changes; and
+- the direct service is expected to deliver sooner than that alternative.
 
-Organizer files such as `default_strategy.py`, `strategy_validation.py`, and
-the package `__init__.py` are **not** included here. They live only inside the
-local, ignored organizer tree under `.challenge/` and are overlaid at runtime
-by the `wsc2026 sync` command. Never copy organizer source into this directory.
+In every other case, including incomplete or ambiguous data, the organizer's
+default decision is used. The strategy does not create, edit, or persist
+bookings and makes no changes to the simulation state.
 
-## Current strategy: multi-transfer recovery-hold experiment
+## Runtime guarantees
 
-Three hooks return `None` and delegate completely to the organizer fallback.
-During an active disruption, `assign_associated_bookings` may return `False`
-for a newly generated shipment only when all of the following are derived from
-the live context: its normal shortest route is one disrupted direct service,
-the currently safe shortest route needs at least two changes between services
-(at least three service boardings), and the direct service is estimated to
-recover and deliver sooner than that detour.
+- Compatible with Python 3.11 and newer.
+- Deterministic and read-only.
+- Uses only the Python standard library and documented simulation interfaces.
+- Performs no network, subprocess, filesystem, environment, or wall-clock
+  access, and uses no unseeded randomness or mutable cross-run state.
 
-The strategy does not create or edit bookings. It reads runtime topology,
-disruption windows, vessel speeds, and service-route headways, makes a
-full-precision comparison, and otherwise delegates. Missing or ambiguous data
-also delegates without mutation. No performance result is claimed until the
-pre-registered full experiment finishes.
-
-## Submission boundary
-
-Only files from this directory may enter a submission archive built by
-`wsc2026 package`. The packager rejects organizer code, inputs, outputs, tests,
-caches, and development tooling.
-
-## Runtime restrictions
-
-Submission code runs under the organizer framework and must be:
-
-- Python 3.11+ compatible (the repo targets 3.11; the local default is 3.12).
-- Standard-library imports only, plus documented organizer modules such as
-  `maritime_data_context` or `simulation_model` that are available on the
-  evaluation runtime `PYTHONPATH`.
-- Free of network calls, subprocesses, filesystem access, environment-variable
-  reads, current-working-directory assumptions, wall-clock time, unseeded
-  randomness, and mutable cross-run global state.
-
-Do not import development tooling from `src/wsc2026_tools`; that package is for
-the local CLI only and is not present at evaluation time.
+The organizer's framework supplies the remaining simulation components at
+evaluation time. This archive intentionally contains only the participant
+strategy and this explanation.

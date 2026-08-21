@@ -2,16 +2,18 @@
 
 ## Prepared archive
 
-- File: `dist/submissions/Round1_NoeFlandre.zip`
-- SHA-256: `5f63fce47a5dc3e5b84cc66660b7772826bdc9b169466796f9d0e327b6068d19`
-- Size: 5,907 bytes
+- Registered team name: `OrtolanForever` (from the team-registration image
+  supplied by the team lead).
+- File: `dist/submissions/Round1_OrtolanForever.zip`
+- SHA-256: `68b7430a8d9dce21e23badf2c73b8f87b8644a146b9b57fc6bf7b599e973db88`
+- Size: 5,923 bytes
 - Contents only:
-  - `Round1_NoeFlandre/response_strategies/README.md`
-  - `Round1_NoeFlandre/response_strategies/user_strategy.py`
+  - `Round1_OrtolanForever/response_strategies/README.md`
+  - `Round1_OrtolanForever/response_strategies/user_strategy.py`
 
-The archive was built twice and was byte-identical both times. `NoeFlandre` is
-the team-name assumption taken from the repository author metadata; replace it
-only if the registered team name is different.
+The archive was built twice with the same command and was byte-identical both
+times. This is the only archive prepared for submission; the older archives in
+`dist/submissions/` are historical validation artifacts and must not be sent.
 
 ## Verified solution
 
@@ -23,24 +25,16 @@ only if the registered team name is different.
 
 ## Human steps before sending
 
-1. Confirm the registered team name and roster (maximum five members; each
-   participant may belong to only one team).
-2. Confirm with the organizers whether the archive must be named
-   `Round1_TeamName.zip` or `TeamName_Round1.zip`; the website and technical
-   PDF currently disagree. The local tool uses the first form.
-3. Confirm the current submission address and instructions. The Round 1
-   announcement specifies `wsc2026simchallenge@gmail.com` and asks for a new
-   email rather than a reply.
-4. If the team name differs, rebuild from the repository root:
-
-   ```bash
-   uv run wsc2026 package --team YourRegisteredTeam --round 1
-   ```
-
-   Run it twice and compare the printed SHA-256 values.
-5. Attach the ZIP only. Do not attach the repository, `.challenge` files,
+1. Confirm the spelling `OrtolanForever` and the final roster (maximum five
+   members; each participant may belong to only one team).
+2. Use the prepared archive with the round-first filename. If the organizers
+   explicitly require the alternative filename order, ask before renaming or
+   rebuilding it; do not change the archive contents.
+3. Create a new email (do not reply to the announcement) and send it to the
+   submission address stated by the organizers: `wsc2026simchallenge@gmail.com`.
+4. Attach the ZIP only. Do not attach the repository, `.challenge` files,
    organizer archive/source/input/output, tests, or `dist` directory.
-6. Send the new email before the organizer deadline: **23 August 2026**.
-7. Keep the sent email, final ZIP, and SHA-256 as the submission receipt.
+5. Send the new email before the organizer deadline: **23 August 2026**.
+6. Keep the sent email, final ZIP, and SHA-256 as the submission receipt.
 
 No further simulation or experiment is required for this submission.

@@ -12,8 +12,8 @@
   - `Round1_OrtolanForever/response_strategies/user_strategy.py`
 
 The archive was built twice with the same command and was byte-identical both
-times. This is the only archive prepared for submission; the older archives in
-`dist/submissions/` are historical validation artifacts and must not be sent.
+times. This is the only archive prepared for submission; older validation
+archives were moved outside the repository and must not be sent.
 
 ## Verified solution
 

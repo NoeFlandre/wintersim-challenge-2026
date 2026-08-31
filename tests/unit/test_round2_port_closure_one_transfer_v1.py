@@ -146,6 +146,25 @@ def test_below_full_headway_port_closure_one_transfer_delegates() -> None:
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
 
+def test_half_headway_port_closure_one_transfer_holds() -> None:
+    context, now, shipment, _ = _one_transfer_fixture((157.0, 157.0))
+
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is False
+
+
+def test_half_headway_equality_delegates() -> None:
+    distance = 470.0 / 3.0
+    context, now, shipment, _ = _one_transfer_fixture((distance, distance))
+
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
+
+
+def test_below_half_headway_delegates() -> None:
+    context, now, shipment, _ = _one_transfer_fixture((156.0, 156.0))
+
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
+
+
 def test_full_headway_equality_delegates() -> None:
     context, now, shipment, _ = _one_transfer_fixture((235.0, 235.0))
 

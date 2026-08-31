@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer half-headway hold (v2)
 
-**Status: PRE-RUN FROZEN**  
+**Status: REJECTED — RESTORATION IN PROGRESS**  
 **Branch:** `main`  
 **Frozen implementation commit:** `3451042`  
 **Scenario:** `create_with_disruption`  
@@ -114,3 +114,36 @@ ignored and are never submitted.
   ignored directory;
 - this tracked report records the immutable design, gates, acceptance rule,
   and final outcome after the run.
+
+## Full-run outcome
+
+The single authorized run completed successfully before scoring:
+
+- exit code `0`, Period 72, simulation day 360, and `Simulation completed`;
+- runtime `00:36:05`;
+- fresh candidate ATT SHA-256:
+  `4633263a8f0a829879eee88302f3afd0d210635f344e7cb08cee4114373191c7`;
+- candidate loss: `35.6743500877092` over 72 periods;
+- candidate mean ATT: `15.590555555555556` days;
+- control loss: `35.1039547178493` and control mean ATT
+  `15.557500000000001` days;
+- delta: `+0.5703953698598999` (`+1.625240292291681%`), with 8 periods
+  better, 57 equal, and 7 worse than control.
+
+The candidate therefore **fails** the strict acceptance rule and is rejected.
+The raw log SHA-256 is
+`5934e5b1c6bf2d659939b9b8d99cbb967cf469aec7389f3b4c318ee69cea8854`.
+Machine-readable results are in the ignored `result.json`, `score.json`, and
+`control_score.json` files beside the preserved ATT and log.
+
+The half-headway extension did not improve the aggregate score. The result is
+not evidence that the policy is universally harmful; it is evidence that this
+candidate is not an improvement under the fixed Round 2 run contract.
+
+## Restoration record
+
+The candidate is being removed from the active runtime after evidence
+preservation. The accepted full-headway control runtime and ATT are restored
+from the pre-run backup, then the control is rescored and all final gates are
+rerun. Candidate evidence remains ignored for auditability and is not part of
+the submission.

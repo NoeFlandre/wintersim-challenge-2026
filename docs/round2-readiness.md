@@ -1,8 +1,8 @@
 # Round 2 readiness
 
 **Status:** organizer archive downloaded, checksum-verified, bootstrapped,
-synchronized, and smoke-tested. Round 2 experiments are ready to begin;
-Round 1 remains unchanged.
+synchronized, and smoke-tested. The first Round 2 experiment is complete and
+accepted; Round 1 remains unchanged.
 
 ## Organizer notice
 
@@ -44,13 +44,13 @@ it in a submission archive.
   unchanged.
 - Round 2 has its own ignored source tree at `.challenge/round2/source/` and
   its own ignored results area at `.challenge/round2/results/`.
-- The tracked `submission/response_strategies/` directory is still the sole
-  participant submission surface. It currently contains the accepted Round 1
-  strategy as the starting control; a future Round 2 candidate must be
-  introduced through a reviewed, explicitly named experiment and must not be
-  mixed with Round 1 evidence.
-- No Round 2 strategy or full Round 2 experiment has been implemented or run
-  yet.
+- The tracked `submission/response_strategies/` directory remains the sole
+  participant submission surface. It now contains the accepted Round 2
+  port-closure recovery-hold strategy; Round 1 evidence remains separate.
+- The accepted experiment is documented in
+  [`round2-port-closure-one-transfer-full-headway-v1.md`](experiments/round2-port-closure-one-transfer-full-headway-v1.md).
+- Its cumulative resilience loss is `35.1039547178493`, compared with the
+  fresh v3 control `35.50366097019303` (a `1.125817%` improvement).
 
 ## Verified archive structure
 
@@ -60,9 +60,10 @@ The Round 2 archive contains the expected runtime components: `main.py`,
 The checksum and required marker paths are registered in
 `config/rounds.toml`; bootstrap must fail closed if either changes.
 
-The synchronized Round 2 runtime passed the short smoke check (`SMOKE_OK`).
-That check exercised the current Round 1 strategy as a wiring control; it was
-not a Round 2 candidate run and does not establish a Round 2 score.
+The synchronized Round 2 runtime passes the short smoke check (`SMOKE_OK`).
+The accepted Round 2 candidate completed one full 140-day warm-up plus
+360-day measured run and was scored over 72 five-day periods. Its private ATT,
+log, control, and manifests remain under `.challenge/round2/results/`.
 
 ## Commands
 

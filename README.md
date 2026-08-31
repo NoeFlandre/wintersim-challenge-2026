@@ -76,14 +76,18 @@ the public setup and compliance notes live in
 [`docs/round2-readiness.md`](docs/round2-readiness.md). The Round 2 notice
 requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
-are documented. Only a short wiring smoke check has run; no Round 2 strategy
-or full simulation has been run yet.
+are documented. The first Round 2 experiment is complete and accepted; its
+strategy, evidence, and decision are documented in
+[`docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md`](docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md).
+The candidate loss is `35.1039547178493` versus a fresh v3 control of
+`35.50366097019303` (a `1.125817%` improvement).
 
 The current `UserStrategy` keeps three decisions delegated to the organizer.
 For new cargo only, it may wait for a disrupted one-booking direct service when
-that service is estimated to recover and deliver sooner than a fragmented safe
-detour requiring at least three service boardings. Simpler safe detours remain
-delegated to the organizer. The first controlled Round 0 experiment was
+that service is estimated to recover and deliver sooner than a safe detour.
+The accepted Round 2 extension additionally holds only port-closure-only,
+one-change detours with a full-headway safety margin. All other cases remain
+delegated. The first controlled Round 0 experiment was
 completed and rejected because it increased Cumulative Resilience Loss by
 22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
 Round 1's preceding no-safe congestion-tail booking experiment produced a

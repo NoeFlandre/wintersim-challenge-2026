@@ -1,6 +1,7 @@
 # Round 2 port-closure one-transfer recovery hold v1
 
-**Status: DESIGN / PRE-RUN.** No Round 2 candidate simulation has run.
+**Status: ACCEPTED — complete.** The candidate strictly improved the fresh
+Round 2 v3 control and remains active.
 
 This report records one proposed Round 2 experiment. The private organizer
 source, inputs, outputs, activation evidence, and run logs remain under the
@@ -59,7 +60,7 @@ sole candidate comparison threshold; the Round 1 score is not reused.
 ## Frozen pre-run state
 
 The candidate implementation is committed at launch HEAD
-`9ad21988fd41e313699c3eeb349177d9e686a6f6`. Participant and Round 2 runtime
+`86de176c0251d66eeef742e85ef042ffaa929d44`. Participant and Round 2 runtime
 files are byte-identical. Locked UV resolution/sync, Ruff format/lint, Ty,
 mypy, non-integration tests (234 passed, 8 deselected; 90.36% coverage), eight
 integrations, Round 2 smoke, deterministic participant-only packaging, clean
@@ -78,8 +79,49 @@ package, stale Output metadata, exact command, and strict acceptance rule:
 candidate_loss < 35.50366097019303 - 1e-9
 ```
 
-The full candidate run is not yet launched. After launch, the fresh ATT and raw
-log must be preserved before scoring or restoration. Equality, worsening,
-invalid output, incomplete completion evidence, crash, timeout, mutation, or a
-failed gate requires the standard v3 restoration procedure described in the
-design specification.
+## Full-run result and decision
+
+Exactly one candidate run used the frozen configuration and completed with exit
+code 0. The log contains Period 72 (Days 356–360), Simulation Day 360,
+`Simulation completed.`, and the CSV-written marker. The fresh ATT was copied
+before scoring.
+
+- candidate ATT SHA-256: `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`;
+- raw log SHA-256: `136b3212ce2a12984e1d9c3e7869c4a435e6c4cdcaf2d24c39bd18cc9f0d29ee`;
+- 72 numbered periods; mean ATT: `15.5575` days;
+- candidate cumulative resilience loss: `35.1039547178493`;
+- fresh v3 control loss: `35.50366097019303`;
+- difference: `-0.3997062523437336`;
+- relative improvement: `1.1258170042782503%`;
+- periods better/equal/worse than control: `11 / 57 / 4`.
+
+The immutable acceptance rule was evaluated without alteration:
+
+```text
+35.1039547178493 < 35.50366097019303 - 1e-9
+```
+
+It is true, so the candidate is **ACCEPTED**. The private machine-readable
+result and post-run manifest are under the ignored experiment evidence
+directory. No second candidate, tuning, or restoration was performed.
+
+## Post-acceptance verification
+
+After the run, the candidate remained synchronized and active. The source ATT
+and preserved candidate ATT are byte-identical. Locked `uv` resolution/sync,
+Ruff format/lint, Ty, mypy, 234 non-integration tests (90.36% coverage), eight
+integration tests, Round 2 sync, `SMOKE_OK`, deterministic participant-only
+packaging, restricted-material scans, diff hygiene, no-live-process checks,
+and clean Git status all passed. The final package SHA-256 is
+`f9d3bdccb5b273552f6543a0632bffe1596db27c3c700f136f6b95499b07551d` and its
+only members are:
+
+```text
+Round2_OrtolanForever/response_strategies/README.md
+Round2_OrtolanForever/response_strategies/user_strategy.py
+```
+
+The accepted participant strategy is committed on `main` at
+`86de176c0251d66eeef742e85ef042ffaa929d44`. The Round 2 archive remains
+private; no organizer source, inputs, outputs, or evidence are tracked or
+published.

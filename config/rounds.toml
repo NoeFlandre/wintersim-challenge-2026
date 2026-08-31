@@ -48,3 +48,21 @@ marker_relpaths = [
   "response_strategies/strategy_validation.py",
   "o2despy/pyproject.toml",
 ]
+
+[[rounds]]
+round_id = "round2"
+# Publicly distributed archive filename (Round 2).
+archive_filename = "SimulationChallenge2026_Py_Round2.zip"
+# SHA-256 of the organizer archive received on 2026-08-31.
+expected_sha256 = "ab2d8a03ae83f5c1a8e5dcd2658d8f5df8710b202f241189d69dc7c197295013"
+# Directory name under .challenge/ where this round is extracted.
+extract_dir_name = "round2"
+practice_only = false
+marker_relpaths = [
+  "main.py",
+  "requirements.txt",
+  "response_strategies/user_strategy.py",
+  "response_strategies/default_strategy.py",
+  "response_strategies/strategy_validation.py",
+  "o2despy/pyproject.toml",
+]

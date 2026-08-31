@@ -1,6 +1,6 @@
 # Challenge rules and compliance
 
-> **Last verified:** 2026-08-03.
+> **Last verified:** 2026-08-31.
 >
 > This document paraphrases the official challenge materials for quick
 > reference. It is not the authoritative source. When anything here disagrees
@@ -29,6 +29,14 @@ The organizers' Round 1 announcement opened the round on 2026-08-01, closes
 submissions on 2026-08-23, and requires all evaluated changes to be under
 `response_strategies`. It also asks participants to create a new submission
 email rather than replying to the announcement.
+
+The organizers' Round 2 announcement requires all evaluated changes to remain
+under `response_strategies` and forbids modifying or bypassing the simulation
+model's event logic. In particular, shipments must follow the normal
+transportation process; a strategy must not complete them prematurely or move
+them to a later port without the required steps. Additional third-party
+packages are permitted only when their dependencies, installation, and
+evaluation-environment usage are documented.
 
 ## Performance criterion
 

@@ -70,6 +70,15 @@ and the paraphrased rules in [`docs/challenge-rules.md`](docs/challenge-rules.md
 - **Round 2:** September 1-23, 2026 (30% weight).
 - **Hidden round:** October 1-23, 2026 (50% weight).
 
+Round 2 is now bootstrapped locally from the organizer's newly released
+archive. Its source and outputs stay private under `.challenge/round2/`, while
+the public setup and compliance notes live in
+[`docs/round2-readiness.md`](docs/round2-readiness.md). The Round 2 notice
+requires normal event-driven logistics, forbids bypassing event logic, and
+allows additional dependencies only when their installation and runtime use
+are documented. Only a short wiring smoke check has run; no Round 2 strategy
+or full simulation has been run yet.
+
 The current `UserStrategy` keeps three decisions delegated to the organizer.
 For new cargo only, it may wait for a disrupted one-booking direct service when
 that service is estimated to recover and deliver sooner than a fragmented safe

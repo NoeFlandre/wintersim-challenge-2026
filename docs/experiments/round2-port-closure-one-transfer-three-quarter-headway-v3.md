@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer three-quarter-headway hold (v3)
 
-**Status: PRE-RUN FROZEN**  
+**Status: REJECTED — RESTORATION IN PROGRESS**  
 **Branch:** `main`  
 **Implementation commit:** `b5484cc`  
 **Scenario:** `create_with_disruption`  
@@ -84,6 +84,26 @@ candidate_loss < 35.1039547178493 - 1e-9
 
 Exactly one full run is authorized. No tuning, duplicate run, second candidate,
 or submission is part of this experiment.
+
+## Full-run outcome
+
+The single authorized run completed successfully with exit code `0`, Period 72,
+simulation day 360, and the required `Simulation completed` marker. The fresh
+ATT and raw log were copied into the ignored evidence directory before scoring.
+
+- candidate cumulative loss: `35.535225309642755`;
+- control cumulative loss: `35.1039547178493`;
+- delta: `+0.431270591793455` (`+1.228593928156787%`, worse);
+- candidate ATT SHA-256:
+  `f5ab9168337308a53d6b35404978b446b901a907c9804d5f2284109452f6aff1`;
+- raw-log SHA-256:
+  `0cbea20725967400433b04d7e00683b07682e6b159acc6545a76646809687471`;
+- candidate mean ATT: `15.582083333333335` days;
+- period comparison: 8 better, 57 equal, 7 worse than control.
+
+The strict acceptance rule was not met, so the candidate is **REJECTED**. The
+immutable run, scoring, and control-score records are in the ignored directory,
+including `result.json` and `score.json`.
 
 ## Fixed run command
 

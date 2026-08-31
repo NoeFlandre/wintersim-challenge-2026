@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer half-headway hold (v2)
 
-**Status: REJECTED — RESTORATION IN PROGRESS**  
+**Status: REJECTED — COMPLETE**  
 **Branch:** `main`  
 **Frozen implementation commit:** `3451042`  
 **Scenario:** `create_with_disruption`  
@@ -142,8 +142,12 @@ candidate is not an improvement under the fixed Round 2 run contract.
 
 ## Restoration record
 
-The candidate is being removed from the active runtime after evidence
-preservation. The accepted full-headway control runtime and ATT are restored
-from the pre-run backup, then the control is rescored and all final gates are
-rerun. Candidate evidence remains ignored for auditability and is not part of
-the submission.
+After evidence preservation, the candidate implementation and RED-only test
+surface were reverted by `a245abb` and `3f3b07b`. The accepted full-headway
+control was synchronized back into the Round 2 runtime and its pinned ATT was
+restored. The final active strategy hash is
+`b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`; the
+restored ATT hash is
+`3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`, and it
+rescores to exactly `35.1039547178493` over 72 periods. Candidate evidence
+remains ignored for auditability and is not part of the submission.

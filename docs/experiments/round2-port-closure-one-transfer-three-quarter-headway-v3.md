@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer three-quarter-headway hold (v3)
 
-**Status: REJECTED — RESTORATION IN PROGRESS**  
+**Status: REJECTED — CONTROL RESTORED**  
 **Branch:** `main`  
 **Implementation commit:** `b5484cc`  
 **Scenario:** `create_with_disruption`  
@@ -104,6 +104,16 @@ ATT and raw log were copied into the ignored evidence directory before scoring.
 The strict acceptance rule was not met, so the candidate is **REJECTED**. The
 immutable run, scoring, and control-score records are in the ignored directory,
 including `result.json` and `score.json`.
+
+## Final active state
+
+The rejected GREEN implementation (`b5484cc`) and its RED contract (`cc8ed84`)
+were reverted in reverse order (`262b909`, `68f1431`). Round 2 was synchronized
+to the accepted full-headway control, and the pinned control ATT was restored
+from its pre-run copy. The active strategy SHA is
+`b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`, the active
+ATT SHA is `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`,
+and the restored score is exactly `35.1039547178493` over 72 periods.
 
 ## Fixed run command
 

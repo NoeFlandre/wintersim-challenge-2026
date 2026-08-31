@@ -48,8 +48,7 @@ def _prepare_imports(source: Path) -> None:
     )
     for module_name in list(sys.modules):
         if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.")
-            for prefix in prefixes
+            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
         ):
             sys.modules.pop(module_name, None)
 
@@ -240,8 +239,7 @@ def _half_headway_candidate(participant: Any, context: Any, now: Any, shipment: 
     if nominal is None or safe is None or len(nominal) != 1 or len(safe) < 2:
         return False
     changes = sum(
-        left.route is not right.route
-        for left, right in zip(safe, safe[1:], strict=False)
+        left.route is not right.route for left, right in zip(safe, safe[1:], strict=False)
     )
     if changes != 1:
         return False
@@ -296,9 +294,7 @@ def test_real_round2_context_exercises_half_headway_without_mutation() -> None:
             )
             before = (_context_signature(context), _shipment_signature(shipment))
             candidate = _half_headway_candidate(participant, context, now, shipment)
-            decision = participant.UserStrategy.assign_associated_bookings(
-                context, now, shipment
-            )
+            decision = participant.UserStrategy.assign_associated_bookings(context, now, shipment)
             after = (_context_signature(context), _shipment_signature(shipment))
             assert after == before, "participant decision mutated real Round 2 state"
             observations += 1

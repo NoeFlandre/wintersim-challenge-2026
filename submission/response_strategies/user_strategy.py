@@ -2,8 +2,9 @@
 
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than a safe detour requiring at least two
-changes between service routes.
+is estimated to recover sooner than a safe detour. The established policy
+requires at least two service-route changes; Round 2 also permits exactly one
+change for a port-closure-only detour with a full-headway safety margin.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -514,7 +515,7 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct-service shipment instead of a two-transfer detour."""
+        """Hold a direct shipment only when its recovery advantage is robust."""
         try:
             return False if _should_hold(context, now, shipment) else None
         except _DATA_ERRORS:

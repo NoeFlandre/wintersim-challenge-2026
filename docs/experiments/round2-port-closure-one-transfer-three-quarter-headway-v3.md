@@ -115,6 +115,14 @@ from its pre-run copy. The active strategy SHA is
 ATT SHA is `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`,
 and the restored score is exactly `35.1039547178493` over 72 periods.
 
+Post-restoration verification passed: `uv lock --check`, locked all-group
+sync, Ruff format/lint, Ty, mypy, the full `242`-test suite, non-integration
+coverage at `90.36%`, `8` integration tests, Round 2 smoke (`SMOKE_OK`), and
+two byte-identical packages. The final package SHA is
+`f6c39e34d9dfa66abf567ca79d3c99fa9396986bacb7c766a6aecfa6a9d9a1d4` and it
+contains only the two permitted `response_strategies` files. Restricted-material
+scans, `git diff --check`, and the no-live-process check are clean.
+
 ## Fixed run command
 
 After all gates and a final manifest check, run exactly:

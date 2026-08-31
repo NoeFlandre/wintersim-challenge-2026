@@ -360,6 +360,21 @@ def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime |
     return max(recoveries) if recoveries else None
 
 
+def _matching_constraints(edge: _Edge, state: _ActiveState) -> tuple[_Constraint, ...]:
+    leg_ids = {id(leg) for leg in edge.legs}
+    arrival_names = {
+        name
+        for name in (_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
+        if name is not None
+    }
+    return tuple(
+        constraint
+        for constraint in state.constraints
+        if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
+        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
+    )
+
+
 def _route_profile(route: Any) -> _RouteProfile | None:
     route_data = _route_data(route)
     if route_data is None:
@@ -403,6 +418,22 @@ def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
     return total if total > 0.0 else None
 
 
+def _max_path_headway(path: tuple[_Edge, ...]) -> float | None:
+    profiles: dict[int, _RouteProfile] = {}
+    for edge in path:
+        route_id = id(edge.route)
+        if route_id in profiles:
+            continue
+        profile = _route_profile(edge.route)
+        if profile is None:
+            return None
+        profiles[route_id] = profile
+    if not profiles:
+        return None
+    headway = max(profile.headway_hours for profile in profiles.values())
+    return headway if math.isfinite(headway) and headway > 0.0 else None
+
+
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -432,7 +463,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     route_change_count = sum(
         left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
     )
-    if route_change_count < 2:
+    if route_change_count < 1:
         return False
 
     recovery = _edge_constraint_recovery(nominal_path[0], state)
@@ -446,7 +477,19 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     hold_hours = wait_hours + nominal_hours
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
         return False
-    return hold_hours < detour_hours
+    if route_change_count >= 2:
+        return hold_hours < detour_hours
+    if route_change_count != 1:
+        return False
+
+    matching = _matching_constraints(nominal_path[0], state)
+    if {constraint.kind for constraint in matching} != {"port"}:
+        return False
+    margin = detour_hours - hold_hours
+    if not math.isfinite(margin) or margin <= 0.0:
+        return False
+    max_headway = _max_path_headway(safe_path)
+    return max_headway is not None and margin > max_headway
 
 
 class UserStrategy:

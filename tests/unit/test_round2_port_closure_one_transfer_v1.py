@@ -8,7 +8,6 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
-
 ANCHOR = dt.datetime.min
 
 
@@ -168,9 +167,7 @@ def test_leg_only_one_transfer_never_uses_port_closure_extension() -> None:
 
 def test_mixed_leg_and_port_one_transfer_delegates() -> None:
     context, now, shipment, items = _one_transfer_fixture()
-    context.disruption_plans.append(
-        _leg_plan(items["nominal"].segments[0].associated_leg)
-    )
+    context.disruption_plans.append(_leg_plan(items["nominal"].segments[0].associated_leg))
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 

@@ -151,3 +151,20 @@ restored ATT hash is
 `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`, and it
 rescores to exactly `35.1039547178493` over 72 periods. Candidate evidence
 remains ignored for auditability and is not part of the submission.
+
+Final post-restoration verification passed:
+
+- lock/sync, Ruff format/lint, Ty, and mypy;
+- full pytest: 242 passed;
+- non-integration branch-coverage gate: 234 passed, 90.36%;
+- integration suite: 8 passed;
+- Round 2 smoke: `SMOKE_OK`;
+- deterministic `Round2_ValidationTeam` package twice, SHA-256
+  `f6c39e34d9dfa66abf567ca79d3c99fa9396986bacb7c766a6aecfa6a9d9a1d4`,
+  containing only the two participant files;
+- restricted-material scans, `git diff --check`, and no-live-process check;
+- clean tracked working tree on `main`.
+
+The rejected candidate ATT and raw log remain preserved under the ignored
+experiment directory. The source ATT used for the active control is
+byte-identical to the pinned control snapshot.

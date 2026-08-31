@@ -164,10 +164,10 @@ def test_below_three_quarter_headway_delegates() -> None:
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
 
-def test_full_headway_equality_delegates() -> None:
+def test_full_headway_equality_holds_under_three_quarter_policy() -> None:
     context, now, shipment, _ = _one_transfer_fixture((235.0, 235.0))
 
-    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is False
 
 
 def test_maximum_safe_route_headway_is_used() -> None:

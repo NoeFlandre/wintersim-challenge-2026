@@ -165,14 +165,14 @@ def test_below_half_headway_delegates() -> None:
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
 
-def test_full_headway_equality_holds_under_half_headway_policy() -> None:
+def test_full_headway_equality_delegates() -> None:
     context, now, shipment, _ = _one_transfer_fixture((235.0, 235.0))
 
-    assert UserStrategy.assign_associated_bookings(context, now, shipment) is False
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
 
 def test_maximum_safe_route_headway_is_used() -> None:
-    context, now, shipment, _ = _one_transfer_fixture((50.0, 250.0))
+    context, now, shipment, _ = _one_transfer_fixture((100.0, 500.0))
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 

@@ -4,7 +4,7 @@ The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour. The established policy
 requires at least two service-route changes; Round 2 also permits exactly one
-change for a port-closure-only detour with a half-headway safety margin.
+change for a port-closure-only detour with a full-headway safety margin.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -490,7 +490,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not math.isfinite(margin) or margin <= 0.0:
         return False
     max_headway = _max_path_headway(safe_path)
-    return max_headway is not None and margin > 0.5 * max_headway
+    return max_headway is not None and margin > max_headway
 
 
 class UserStrategy:

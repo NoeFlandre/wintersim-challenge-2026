@@ -1,7 +1,6 @@
 # Round 2: upper-quartile TEU half-headway closure hold (v7)
 
-**Status: PRE-RUN FROZEN — implementation and structural gates are complete; one
-full candidate run is authorized only after the manifest recheck below.**
+**Status: RUN COMPLETE — REJECTED; the accepted v1 control is being restored.**
 
 ## Hypothesis
 
@@ -156,3 +155,28 @@ The exact manifest command is:
 ```text
 PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache uv run wsc2026 run --round round2 --full > .challenge/round2/results/port_closure_one_transfer_teu_dominance_buffer_v7_20260901/full_run.log 2>&1
 ```
+
+## Full-run result (rejected)
+
+The manifest recheck passed and exactly one full run was executed with the
+command above. The log contained `Period Result Output: Period 72 (Days
+356-360)`, `Output Simulation Day: 360`, `Simulation completed.`, and a fresh
+CSV write with exit code 0. The fresh ATT was copied before scoring.
+
+- Candidate ATT SHA-256:
+  `1cfa99659bc5df7703a8a6ef2b7a60b90e817acd5d241fa011e1f4234cb4f2ed`;
+  72 numbered periods; mean ATT 15.573472222222222 days.
+- Raw log SHA-256:
+  `4233c42a720ed0582ac9c6d8d1507e036483f0b7fb6eea3e9038043024a99122`.
+- Candidate cumulative resilience loss: `35.41374495066942`.
+- Accepted-control loss: `35.1039547178493`.
+- Delta: `+0.3097902328201201` (`+0.8824938252971285%`; higher is worse).
+- Acceptance expression `candidate_loss < 35.1039547178493 - 1e-9` was not
+  met. The candidate is therefore rejected; no tuning or duplicate run is
+  permitted.
+- Preserved evidence: `ATT_By_Statistics_Interval.csv`, `raw_run.log`,
+  `full_run.log`, and `score.json` in the ignored v7 evidence directory.
+
+The result indicates that extending the hold to the high-volume half-headway
+band increased network-wide loss despite 39 structurally isolated candidate-
+only activations. The control restoration and final gates below are required.

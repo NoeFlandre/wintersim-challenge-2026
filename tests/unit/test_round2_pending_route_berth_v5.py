@@ -191,13 +191,10 @@ def test_selector_fails_closed_on_unexpected_data_error() -> None:
         def disruption_plans(self) -> Any:
             raise AttributeError("broken context")
 
-    assert (
-        UserStrategy.select_vessel_for_berth(
-            BrokenContext(),
-            _port("Berth"),
-            [SimpleNamespace(carried_shipments=[])],
-            [],
-            ANCHOR,
-        )
-        is None
-    )
+    assert UserStrategy.select_vessel_for_berth(
+        BrokenContext(),
+        _port("Berth"),
+        [SimpleNamespace(carried_shipments=[])],
+        [],
+        ANCHOR,
+    ) is None

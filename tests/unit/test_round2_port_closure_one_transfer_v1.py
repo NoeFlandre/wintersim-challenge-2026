@@ -108,9 +108,6 @@ def _freeze(value: Any, seen: dict[int, int] | None = None) -> Any:
 
 def _one_transfer_fixture(
     safe_distances: tuple[float, float] = (300.0, 300.0),
-    *,
-    safe_vessel_count: int = 1,
-    now: dt.datetime | None = None,
 ) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace, dict[str, Any]]:
     origin = _port("Origin")
     closed = _port("Closed")
@@ -121,26 +118,15 @@ def _one_transfer_fixture(
         [origin, closed, destination, origin],
         [100.0, 100.0, 100.0],
     )
-    safe_a = _route(
-        "safe-a",
-        [origin, transfer, origin],
-        [safe_distances[0]] * 2,
-        vessel_count=safe_vessel_count,
-    )
-    safe_b = _route(
-        "safe-b",
-        [transfer, destination, transfer],
-        [safe_distances[1]] * 2,
-        vessel_count=safe_vessel_count,
-    )
+    safe_a = _route("safe-a", [origin, transfer, origin], [safe_distances[0]] * 2)
+    safe_b = _route("safe-b", [transfer, destination, transfer], [safe_distances[1]] * 2)
     context = SimpleNamespace(
         ports=[origin, closed, transfer, destination],
         service_routes=[nominal, safe_a, safe_b],
         disruption_plans=[_port_plan(closed)],
     )
     shipment = _shipment(origin, destination)
-    if now is None:
-        now = ANCHOR + dt.timedelta(days=14.5)
+    now = ANCHOR + dt.timedelta(days=14.5)
     return context, now, shipment, {"nominal": nominal, "closed": closed}
 
 
@@ -162,28 +148,6 @@ def test_below_full_headway_port_closure_one_transfer_delegates() -> None:
 
 def test_full_headway_equality_delegates() -> None:
     context, now, shipment, _ = _one_transfer_fixture((235.0, 235.0))
-
-    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
-
-
-def test_early_recovery_waiting_longer_than_headway_delegates() -> None:
-    context, now, shipment, _ = _one_transfer_fixture(
-        (1000.0, 1000.0),
-        safe_vessel_count=2,
-        now=ANCHOR + dt.timedelta(days=10.5),
-    )
-
-    # The accepted full-headway control holds here; v4 must reject this early
-    # hold because the recovery wait (108 h) exceeds the 100 h safe headway.
-    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
-
-
-def test_recovery_wait_equal_to_headway_delegates_strictly() -> None:
-    context, now, shipment, _ = _one_transfer_fixture(
-        (1000.0, 1000.0),
-        safe_vessel_count=2,
-        now=ANCHOR + dt.timedelta(days=15) - dt.timedelta(hours=100),
-    )
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 

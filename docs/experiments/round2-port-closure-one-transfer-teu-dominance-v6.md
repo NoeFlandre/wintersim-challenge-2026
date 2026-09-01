@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer TEU-dominance guard (v6)
 
-**Status: RESULT RECORDED — REJECTED; control restoration is pending.**
+**Status: REJECTED — control restored; exactly one candidate run completed.**
 
 ## Hypothesis
 
@@ -123,9 +123,30 @@ before scoring or restoration.
   `63f8ea6ca128d9f942b4ca2bee8f2f7bff73b9b3481b9616175e2a00cf861439`.
 
 The complete machine-readable result is retained at the ignored
-`result.json`; no tuning or duplicate candidate run was performed. The
-candidate must be reverted and the accepted v1 control restored before this
-experiment is complete.
+`result.json`; no tuning or duplicate candidate run was performed.
+
+## Final restoration (2026-09-01)
+
+The candidate and its v6 RED tests were reverted only after the result was
+recorded:
+
+- `796d113` reverts the v6 implementation, integration test, README, and
+  control-fixture support change;
+- `72fa96e` reverts the v6 RED contract tests;
+- `uv run wsc2026 sync --round round2` restored the accepted v1 participant
+  strategy;
+- the accepted v1 ATT snapshot was restored to the runtime Output path and is
+  byte-identical to the pinned control.
+
+Post-restoration verification passed: control strategy SHA
+`b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`, active
+ATT SHA `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`,
+and re-scored loss `35.1039547178493` over 72 periods. Lock/check and sync,
+Ruff format/lint, Ty, mypy, 234 non-integration tests with 90.36% branch
+coverage, 8 integration tests, Round 2 smoke, deterministic two-run package
+(SHA `f9d3bdccb5b273552f6543a0632bffe1596db27c3c700f136f6b95499b07551d`),
+diff hygiene, and restricted-material scans all passed. The working tree is
+clean and no simulator is running.
 
 ## Frozen run contract
 

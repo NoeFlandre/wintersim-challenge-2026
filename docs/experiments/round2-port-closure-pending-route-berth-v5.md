@@ -1,7 +1,6 @@
 # Round 2: port-closure pending-route berth activation (v5)
 
-**Status: PRE-RUN REVIEW — exactly one candidate run authorized after this
-record.**
+**Status: REJECTED — control restored; exactly one candidate run completed.**
 
 ## Hypothesis
 
@@ -66,7 +65,7 @@ activation evidence, not a prediction of the full trajectory.  Its ignored
 JSON and script are under
 `.challenge/round2/results/port_closure_pending_route_berth_v5_20260901/`;
 the JSON SHA-256 is
-`7de7df1aaa0343ca4647215e40998d93ec1a85281a025165165acc09a0aaf138a52`.
+`7de7df1aaa0343ca4647215e40998d93ec1a85281a025165acc09a0aaf138a52`.
 
 At the review checkpoint the participant and synchronized Round 2 runtime
 files are byte-identical with strategy SHA-256
@@ -90,9 +89,12 @@ PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache uv run wsc2026 run \
   > .challenge/round2/results/port_closure_pending_route_berth_v5_20260901/full_run.log 2>&1
 ```
 
-The non-overwriting pre-run manifest will pin the final HEAD, hashes, package,
+The non-overwriting pre-run manifest pinned the launch HEAD, hashes, package,
 control/baseline scores, stale Output metadata, audit evidence, and this
-acceptance expression.  No full run has occurred for v5 at this checkpoint.
+acceptance expression.  The completed-run evidence is in the same ignored
+directory.  The accepted control path is the v1 candidate snapshot; the older
+`control_v3_20260831` snapshot has a different SHA and is not the active
+control.
 
 ## Fixed Round 2 run contract
 
@@ -108,8 +110,8 @@ acceptance expression.  No full run has occurred for v5 at this checkpoint.
 - strict acceptance expression:
   `candidate_loss < 35.1039547178493 - 1e-9`
 
-The pinned control snapshot is kept privately at
-`.challenge/round2/results/control_v3_20260831/ATT_By_Statistics_Interval.csv`.
+The accepted control snapshot is kept privately at
+`.challenge/round2/results/port_closure_one_transfer_full_headway_v1_20260831/ATT_By_Statistics_Interval.csv`.
 Candidate evidence belongs only under the ignored directory
 `.challenge/round2/results/port_closure_pending_route_berth_v5_20260901/`.
 No organizer source, input, output, archive, or private evidence may be
@@ -137,6 +139,30 @@ and baseline hashes/losses, package hash and members, audit hash, stale Output
 metadata, exact command, and acceptance rule.  Run exactly one monitored full
 simulation after all lock/sync, Ruff, Ty, mypy, coverage, integration, sync,
 smoke, deterministic package, restricted-material, diff, and process gates pass.
+
+## Full-run result and decision
+
+Exactly one v5 candidate run used the frozen configuration.  The process
+completed with the required Day 360, Period 72, `Simulation completed.`, and
+CSV-written markers.  The fresh ATT was copied before scoring and has SHA-256
+`3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`; the raw
+log SHA-256 is
+`8ec22beec42fbd65d012b7a7d9f81d96ce75be734f34292d211920b10ffe50bc`.
+It contains 72 numbered periods with mean ATT `15.557500000000001` days.
+Scoring against the authoritative Round 2 baseline produced cumulative
+resilience loss `35.1039547178493`, exactly equal to the accepted control.
+All 72 periods were equal (0 better, 72 equal, 0 worse), so the immutable rule
+
+```text
+35.1039547178493 < 35.1039547178493 - 1e-9
+```
+
+is false and the candidate is **REJECTED**.  The machine-readable result,
+fresh ATT, score, and log remain under the ignored evidence directory.
+
+The candidate-only strategy/tests were reverted in reverse order.  The
+accepted v1 participant strategy and its ATT were restored; the accepted
+control SHA and score are `3d02322b...` and `35.1039547178493`.
 
 ## Rejection and restoration
 

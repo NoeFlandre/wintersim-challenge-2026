@@ -50,11 +50,7 @@ def _route(
 
 def _shipment(origin: Any, destination: Any) -> SimpleNamespace:
     return SimpleNamespace(
-        demand=SimpleNamespace(
-            origin_port=origin,
-            destination_port=destination,
-            annual_teus=4000.0,
-        ),
+        demand=SimpleNamespace(origin_port=origin, destination_port=destination),
         associated_bookings=[],
         current_booking_index=None,
     )
@@ -124,13 +120,12 @@ def _one_transfer_fixture(
     )
     safe_a = _route("safe-a", [origin, transfer, origin], [safe_distances[0]] * 2)
     safe_b = _route("safe-b", [transfer, destination, transfer], [safe_distances[1]] * 2)
-    shipment = _shipment(origin, destination)
     context = SimpleNamespace(
         ports=[origin, closed, transfer, destination],
-        demands=[shipment.demand],
         service_routes=[nominal, safe_a, safe_b],
         disruption_plans=[_port_plan(closed)],
     )
+    shipment = _shipment(origin, destination)
     now = ANCHOR + dt.timedelta(days=14.5)
     return context, now, shipment, {"nominal": nominal, "closed": closed}
 

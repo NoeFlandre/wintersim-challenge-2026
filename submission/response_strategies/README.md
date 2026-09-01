@@ -15,13 +15,7 @@ live simulation context:
 - the nominal service is affected only by an active port closure;
 - the safe alternative requires exactly one service-route change; and
 - the direct service is expected to recover more than one full safe-route
-  headway sooner than that alternative;
-- the demand's annual TEU volume is in the upper quartile of the live demand
-  population.
-
-The upper-quartile guard focuses the additional one-change protection on the
-flows with the greatest TEU-weighted objective exposure.  The established
-multi-change recovery hold is unchanged.
+  headway sooner than that alternative.
 
 In every other case, including incomplete or ambiguous data, the organizer's
 default decision is used. The strategy never creates, edits, or persists

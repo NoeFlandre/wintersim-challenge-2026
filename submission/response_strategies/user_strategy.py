@@ -4,8 +4,7 @@ The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour. The established policy
 requires at least two service-route changes; Round 2 also permits exactly one
-change for a port-closure-only detour with a full-headway safety margin, now
-limited to upper-quartile annual-TEU demands.
+change for a port-closure-only detour with a full-headway safety margin.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -436,29 +435,6 @@ def _max_path_headway(path: tuple[_Edge, ...]) -> float | None:
     return headway if math.isfinite(headway) and headway > 0.0 else None
 
 
-def _is_upper_quartile_demand(context: Any, demand: Any) -> bool:
-    demands = getattr(context, "demands", None)
-    if not isinstance(demands, (list, tuple)) or not demands:
-        return False
-
-    volumes: list[float] = []
-    demand_present = False
-    for candidate in demands:
-        volume = _positive_real(getattr(candidate, "annual_teus", None))
-        if volume is None:
-            return False
-        volumes.append(volume)
-        demand_present = demand_present or candidate is demand
-    if not demand_present:
-        return False
-
-    volumes.sort()
-    quartile_index = (3 * (len(volumes) - 1)) // 4
-    threshold = volumes[quartile_index]
-    target_volume = _positive_real(getattr(demand, "annual_teus", None))
-    return target_volume is not None and target_volume >= threshold
-
-
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -514,11 +490,7 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not math.isfinite(margin) or margin <= 0.0:
         return False
     max_headway = _max_path_headway(safe_path)
-    return (
-        max_headway is not None
-        and margin > max_headway
-        and _is_upper_quartile_demand(context, demand)
-    )
+    return max_headway is not None and margin > max_headway
 
 
 class UserStrategy:

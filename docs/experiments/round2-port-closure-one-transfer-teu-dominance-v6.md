@@ -1,7 +1,6 @@
 # Round 2: port-closure one-transfer TEU-dominance guard (v6)
 
-**Status: PRE-RUN FROZEN — one candidate run authorized by the experiment
-protocol; no full simulation has started.**
+**Status: RESULT RECORDED — REJECTED; control restoration is pending.**
 
 ## Hypothesis
 
@@ -102,6 +101,31 @@ All lock, sync, Ruff, Ty, mypy, unit-coverage, integration, smoke, package,
 parity, restricted-material, and diff checks passed. The single authorized
 command is recorded in the frozen run contract below; no tuning or duplicate
 run is permitted.
+
+## Full-run result (2026-09-01)
+
+The one authorized candidate run completed normally. The log contains Period
+72 (Days 356–360), Output Simulation Day 360, `Simulation completed.`, and the
+CSV-written marker. The fresh ATT was copied to the ignored evidence directory
+before scoring or restoration.
+
+- candidate ATT SHA-256: `1680c9ae89882a1897d63dbf771e29dfcdaff27fa2442a88392bfc5cbe260d56`;
+- candidate mean ATT: `15.596944444444444` days across 72 numbered periods;
+- candidate cumulative resilience loss: `35.84344929789106`;
+- accepted-control loss: `35.1039547178493`;
+- delta: `+0.7394945800417645` (`+2.1065848163989154%`);
+- ATT periods versus control: 10 better, 59 equal, 3 worse;
+- strict acceptance expression: `candidate_loss < 35.1039547178493 - 1e-9`;
+- decision: **REJECTED** because the candidate is worse than the control;
+- raw log SHA-256:
+  `2dcb3f3cacf449d556712259de24aad1c99cf0f13eaae15d3a33b3f67d838793`;
+- score JSON SHA-256:
+  `63f8ea6ca128d9f942b4ca2bee8f2f7bff73b9b3481b9616175e2a00cf861439`.
+
+The complete machine-readable result is retained at the ignored
+`result.json`; no tuning or duplicate candidate run was performed. The
+candidate must be reverted and the accepted v1 control restored before this
+experiment is complete.
 
 ## Frozen run contract
 

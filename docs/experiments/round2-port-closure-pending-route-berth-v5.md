@@ -1,6 +1,7 @@
 # Round 2: port-closure pending-route berth activation (v5)
 
-**Status: DESIGN — implementation and run not yet authorized.**
+**Status: PRE-RUN REVIEW — exactly one candidate run authorized after this
+record.**
 
 ## Hypothesis
 
@@ -46,6 +47,52 @@ queue.  The strategy does not alter queues, routes, vessels, cargo, ports,
 berths, context, or pending assignments.  It does not bypass transportation or
 complete a shipment.  A non-`None` result is used only by the organizer's
 existing berth-assignment path.
+
+## Pre-run review
+
+The design was committed before the candidate implementation.  RED unit and
+real-context integration tests failed only because the no-op selector returned
+`None`; the implementation then passed all focused tests.  Candidate commits
+are `2429af5` (implementation) and `853b2ac`/`702d7de` (failure-mode tests and
+formatting).  No organizer file was modified.
+
+The fresh non-mutating audit used every valid Round 2 disruption timestamp,
+created alternative routes only as setup, and evaluated fresh real objects.
+It observed 21 closure-only timestamps and 14 candidate-only selections: the
+pending alternative vessel at Shanghai was selected while the fallback chose a
+different queue member.  The audit reported `no_mutation=true`,
+`model_advanced=false`, and `output_written=false`.  This is structural
+activation evidence, not a prediction of the full trajectory.  Its ignored
+JSON and script are under
+`.challenge/round2/results/port_closure_pending_route_berth_v5_20260901/`;
+the JSON SHA-256 is
+`7de7df1aaa0343ca4647215e40998d93ec1a85281a025165165acc09a0aaf138a52`.
+
+At the review checkpoint the participant and synchronized Round 2 runtime
+files are byte-identical with strategy SHA-256
+`1c7de2a1e6a59a6a24d446fdb048cd1c609aa19b66802f7dd539539f03e3c82a`.
+Locked UV resolution/sync, Ruff format/lint, Ty, mypy, non-integration tests
+(`248` passed; `90.70%` branch coverage), integration tests (`9` passed),
+Round 2 sync/cmp, smoke, and restricted-material scans passed.  Two packages
+for the actual team `OrtolanForever` were byte-identical, with SHA-256
+`b335413b1d0a438fc088ef256e4b5acb2650605736e57f9ec3c176f70278bc58`; each
+contains only `response_strategies/README.md` and `user_strategy.py`.  The
+active stale Output ATT remains the pinned control SHA
+`3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5` (1,262
+bytes; mtime `1788224146`).  No simulator process is running and the tracked
+worktree is clean before this documentation commit.
+
+The exact launch command, after the final manifest is written, is:
+
+```bash
+PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache uv run wsc2026 run \
+  --round round2 --full \
+  > .challenge/round2/results/port_closure_pending_route_berth_v5_20260901/full_run.log 2>&1
+```
+
+The non-overwriting pre-run manifest will pin the final HEAD, hashes, package,
+control/baseline scores, stale Output metadata, audit evidence, and this
+acceptance expression.  No full run has occurred for v5 at this checkpoint.
 
 ## Fixed Round 2 run contract
 
@@ -103,4 +150,3 @@ rerun every final gate.  Do not tune, rerun, change the threshold, launch a
 second candidate, push, merge, submit, or rewrite history under this
 experiment.  If accepted, retain the candidate, document the evidence, rerun
 final gates, and leave the clean participant package active.
-

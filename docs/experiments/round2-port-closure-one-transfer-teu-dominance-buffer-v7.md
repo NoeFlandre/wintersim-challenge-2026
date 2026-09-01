@@ -1,6 +1,6 @@
 # Round 2: upper-quartile TEU half-headway closure hold (v7)
 
-**Status: RUN COMPLETE — REJECTED; the accepted v1 control is being restored.**
+**Status: RUN COMPLETE — REJECTED; accepted v1 control restored and verified.**
 
 ## Hypothesis
 
@@ -180,3 +180,35 @@ CSV write with exit code 0. The fresh ATT was copied before scoring.
 The result indicates that extending the hold to the high-volume half-headway
 band increased network-wide loss despite 39 structurally isolated candidate-
 only activations. The control restoration and final gates below are required.
+
+## Final restoration and verification
+
+The rejected candidate was restored without manual reconstruction. The three
+v7 commits were reverted in dependency order (integration test, implementation,
+then RED tests), the accepted v1 participant was synchronized into the ignored
+Round 2 runtime, and the pinned control ATT snapshot was copied back to
+`Output/`.
+
+- Revert commits: `e7c2eed`, `5e27106`, `db99628`.
+- Final control strategy SHA-256 (submission and runtime):
+  `b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`.
+- Final control README SHA-256 (submission and runtime):
+  `37c083c9fc4b6ee16a87783f503c4fb07e12bfa77ea40fa27839b31985434f3d`.
+- Active Output ATT SHA-256:
+  `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`.
+- Re-score after restoration: 72 periods, cumulative loss
+  `35.1039547178493` (exact control value).
+- Final deterministic control package (two identical runs) SHA-256:
+  `f9d3bdccb5b273552f6543a0632bffe1596db27c3c700f136f6b95499b07551d`;
+  it contains only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` under the package root.
+- Final gates: lock/check and locked sync, Ruff format/check, Ty, mypy, 234
+  non-integration tests with 90.36% branch coverage, 8 integration tests,
+  smoke, deterministic packaging, diff check, restricted-material scans, and
+  no-live-process check all pass.
+- Final Git state before this documentation commit: clean on `main`; no
+  simulator, probe, or audit process remains live.
+
+The v7 candidate evidence remains ignored and preserved for audit. No tuning,
+duplicate run, second candidate, push, merge, submission, or history rewrite
+was performed.

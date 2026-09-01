@@ -48,14 +48,14 @@ def _pending_route(start: Any, key: Any) -> SimpleNamespace:
         disruption_key=key,
         segments=[
             SimpleNamespace(
-                sequence_index=2,
+                sequence_index=1,
                 associated_leg=SimpleNamespace(
                     departure_port=start,
                     arrival_port=_port("route middle"),
                 ),
             ),
             SimpleNamespace(
-                sequence_index=1,
+                sequence_index=2,
                 associated_leg=SimpleNamespace(
                     departure_port=_port("route end"),
                     arrival_port=start,

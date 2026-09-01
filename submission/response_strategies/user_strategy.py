@@ -493,6 +493,63 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     return max_headway is not None and margin > max_headway
 
 
+def _pending_route_berth_candidate(
+    context: Any,
+    port: Any,
+    waiting_vessels: Any,
+    now: Any,
+) -> Any | None:
+    """Return a queued empty vessel for the active closure's pending route."""
+    if not isinstance(waiting_vessels, (list, tuple)) or not waiting_vessels:
+        return None
+    if len({id(vessel) for vessel in waiting_vessels}) != len(waiting_vessels):
+        return None
+    state = _active_state(context, now)
+    if state is None or not state.closed_port_names or state.congested_leg_keys:
+        return None
+
+    for index, vessel in enumerate(waiting_vessels):
+        if vessel is None:
+            return None
+        carried = getattr(vessel, "carried_shipments", None)
+        if not isinstance(carried, (list, tuple)):
+            return None
+        pending_route = getattr(vessel, "pending_assigned_service_route", None)
+        if pending_route is None:
+            continue
+        if getattr(pending_route, "source_service_route", None) is None:
+            return None
+        if getattr(pending_route, "disruption_key", None) != state.disruption_key:
+            return None
+        segments = getattr(pending_route, "segments", None)
+        if not isinstance(segments, (list, tuple)) or not segments:
+            return None
+        seen_indexes: set[int] = set()
+        first_segment: Any | None = None
+        for segment in segments:
+            sequence_index = getattr(segment, "sequence_index", None)
+            if (
+                isinstance(sequence_index, bool)
+                or not isinstance(sequence_index, int)
+                or sequence_index in seen_indexes
+            ):
+                return None
+            seen_indexes.add(sequence_index)
+            if first_segment is None or sequence_index < first_segment.sequence_index:
+                first_segment = segment
+        if first_segment is None:
+            return None
+        first_leg = getattr(first_segment, "associated_leg", None)
+        if first_leg is None:
+            return None
+        start_port = getattr(first_leg, "departure_port", None)
+        if start_port is None:
+            return None
+        if not carried and start_port is port and index > 0:
+            return vessel
+    return None
+
+
 class UserStrategy:
     """Deterministic participant strategy with one read-only cargo policy."""
 
@@ -505,8 +562,16 @@ class UserStrategy:
         current_time: Any,
         waiting_since_by_vessel: Any = None,
     ) -> Any:
-        """Delegate vessel selection to the organizer fallback."""
-        return None
+        """Activate a matching pending route during a closure-only disruption."""
+        try:
+            return _pending_route_berth_candidate(
+                maritime_data_context,
+                port,
+                waiting_vessels,
+                current_time,
+            )
+        except _DATA_ERRORS:
+            return None
 
     @staticmethod
     def create_alternative_service_routes(context: Any, now: Any, vessel: Any = None) -> Any:

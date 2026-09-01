@@ -15,7 +15,12 @@ live simulation context:
 - the nominal service is affected only by an active port closure;
 - the safe alternative requires exactly one service-route change; and
 - the direct service is expected to recover more than one full safe-route
-  headway sooner than that alternative.
+  headway sooner than that alternative; or
+- for an upper-quartile annual-TEU demand, the positive recovery advantage is
+  greater than half a safe-route headway.
+
+The last condition is an intentionally narrow extension for high-volume flows;
+the full-headway rule remains in force for every demand.
 
 In every other case, including incomplete or ambiguous data, the organizer's
 default decision is used. The strategy never creates, edits, or persists

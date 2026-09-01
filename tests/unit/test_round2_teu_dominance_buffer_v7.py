@@ -74,7 +74,7 @@ def _port_plan(port: Any) -> SimpleNamespace:
 def _half_headway_fixture(
     annual_teus: float,
     *,
-    safe_distance: float = 125.0,
+    safe_distance: float = 170.0,
 ) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace]:
     origin = _port("Origin")
     closed = _port("Closed")

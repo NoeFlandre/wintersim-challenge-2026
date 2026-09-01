@@ -15,8 +15,7 @@ live simulation context:
 - the nominal service is affected only by an active port closure;
 - the safe alternative requires exactly one service-route change; and
 - the direct service is expected to recover more than one full safe-route
-  headway sooner than that alternative, with less than one safe-route headway
-  remaining until recovery.
+  headway sooner than that alternative.
 
 In every other case, including incomplete or ambiguous data, the organizer's
 default decision is used. The strategy never creates, edits, or persists

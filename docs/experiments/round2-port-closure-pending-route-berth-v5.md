@@ -164,7 +164,26 @@ The candidate-only strategy/tests were reverted in reverse order.  The
 accepted v1 participant strategy and its ATT were restored; the accepted
 control SHA and score are `3d02322b...` and `35.1039547178493`.
 
-## Rejection and restoration
+## Post-run restoration gates
+
+After restoration, the participant and synchronized Round 2 runtime strategy
+files were byte-identical at SHA-256
+`b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`, and the
+active ATT was byte-identical to the accepted control.  The restored score
+JSON is under the ignored evidence directory (SHA-256
+`1bc7da1925d2d49fd3e4d51d62e4392b16421f2d32770789aaca1f7d1aadf8b9`).
+
+The final gates passed: `uv lock --check`; locked `uv sync`; Ruff format and
+lint; `ty check src/wsc2026_tools submission`; mypy; 234 non-integration tests
+with 90.36% branch coverage; 8 integration tests; Round 2 smoke (`SMOKE_OK`);
+and two deterministic participant packages.  Both packages had SHA-256
+`f9d3bdccb5b273552f6543a0632bffe1596db27c3c700f136f6b95499b07551d` and
+contained only the README and `user_strategy.py`.  Restricted-material scans,
+diff hygiene, strategy/runtime byte parity, and clean Git status also passed.
+No simulator process remains.  The v5 candidate is rejected and the accepted
+v1 control is the active participant state.
+
+## Rejection and restoration procedure
 
 Preserve the fresh ATT and raw log before scoring or any overwrite.  Require
 exit 0, Day 360, Period 72, explicit completion, a fresh CSV, and a full

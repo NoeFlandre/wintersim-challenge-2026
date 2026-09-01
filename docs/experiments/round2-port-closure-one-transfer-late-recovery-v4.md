@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer late-recovery hold (v4)
 
-**Status: PRE-RUN FROZEN — one full run authorized by this protocol**
+**Status: RESULT — REJECTED; control restoration in progress**
 **Branch:** `main`  
 **Scenario:** `create_with_disruption`  
 **Seed:** `2026` with `PYTHONHASHSEED=0`
@@ -117,6 +117,27 @@ coverage, 9 integration tests, Round 2 sync, `SMOKE_OK`, deterministic
 packaging, clean restricted-material scans, and a clean Git tree. The frozen
 manifest is the ignored
 `.challenge/round2/results/port_closure_one_transfer_late_recovery_v4_20260901/pre_run_manifest.json`.
+
+## Full-run result
+
+The single frozen run completed successfully with exit code 0, Period 72,
+simulation Day 360, `Simulation completed`, and a fresh 72-period ATT. The
+preserved raw log and CSV are private evidence in the v4 result directory.
+
+- candidate loss: `35.8691309610454`;
+- control loss: `35.1039547178493`;
+- delta: `+0.7651762431961018` (`+2.179743705078997%`, worse);
+- candidate ATT SHA-256:
+  `6ffe1d416ee6709f4bbf2edcd2ccf9d6ebc0bea8c113367dba9d2a413ccf864c`;
+- raw-log SHA-256:
+  `475cb8bb2cc7c9a91e1246c67992b234bd3310ea02daa61ee13fffe8f83a9863`;
+- candidate mean ATT: `15.598194444444443` days;
+- control mean ATT: `15.557500000000001` days;
+- period comparison: 4 better, 59 equal, 9 worse.
+
+The strict acceptance rule is not met, so this candidate is **REJECTED**. The
+complete machine-readable result is the ignored
+`.challenge/round2/results/port_closure_one_transfer_late_recovery_v4_20260901/result.json`.
 
 ## One-run contract
 

@@ -131,3 +131,4 @@ def test_real_round2_pending_route_selection_is_live_and_read_only() -> None:
     assert result is pending
     assert result in (ordinary, pending)
     assert _snapshot(context) == before
+

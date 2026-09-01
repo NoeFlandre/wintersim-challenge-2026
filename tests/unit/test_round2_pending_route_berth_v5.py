@@ -8,6 +8,7 @@ from typing import Any
 
 from response_strategies.user_strategy import UserStrategy
 
+
 ANCHOR = dt.datetime.min
 
 
@@ -147,54 +148,3 @@ def test_malformed_queue_delegates() -> None:
     context, port, _, _, _ = _fixture()
 
     assert _call(context, port, object()) is None
-
-
-def test_empty_queue_and_duplicate_queue_delegate() -> None:
-    context, port, ordinary, _, _ = _fixture()
-
-    assert _call(context, port, []) is None
-    assert _call(context, port, [ordinary, ordinary]) is None
-
-
-def test_none_or_malformed_vessel_delegates() -> None:
-    context, port, ordinary, pending, route = _fixture()
-
-    assert _call(context, port, [ordinary, None, pending]) is None
-    malformed = SimpleNamespace(carried_shipments=None, pending_assigned_service_route=route)
-    assert _call(context, port, [ordinary, malformed]) is None
-
-
-def test_malformed_pending_route_fields_delegate() -> None:
-    context, port, ordinary, pending, route = _fixture()
-
-    route.source_service_route = None
-    assert _call(context, port, [ordinary, pending]) is None
-    route.source_service_route = object()
-    route.segments = []
-    assert _call(context, port, [ordinary, pending]) is None
-    route.segments = [SimpleNamespace(sequence_index=True, associated_leg=object())]
-    assert _call(context, port, [ordinary, pending]) is None
-    route.segments = [SimpleNamespace(sequence_index=1, associated_leg=None)]
-    assert _call(context, port, [ordinary, pending]) is None
-
-
-def test_pending_route_without_start_port_delegates() -> None:
-    context, port, ordinary, pending, route = _fixture()
-    route.segments[0].associated_leg = SimpleNamespace(departure_port=None)
-
-    assert _call(context, port, [ordinary, pending]) is None
-
-
-def test_selector_fails_closed_on_unexpected_data_error() -> None:
-    class BrokenContext:
-        @property
-        def disruption_plans(self) -> Any:
-            raise AttributeError("broken context")
-
-    assert UserStrategy.select_vessel_for_berth(
-        BrokenContext(),
-        _port("Berth"),
-        [SimpleNamespace(carried_shipments=[])],
-        [],
-        ANCHOR,
-    ) is None

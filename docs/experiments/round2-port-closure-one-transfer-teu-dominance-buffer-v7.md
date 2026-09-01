@@ -1,6 +1,7 @@
 # Round 2: upper-quartile TEU half-headway closure hold (v7)
 
-**Status: DESIGN — no candidate implementation or full run is authorized yet.**
+**Status: PRE-RUN FROZEN — implementation and structural gates are complete; one
+full candidate run is authorized only after the manifest recheck below.**
 
 ## Hypothesis
 
@@ -108,3 +109,50 @@ with `git revert`, synchronize the accepted v1 control, restore its pinned ATT,
 re-score exactly, rerun all final gates, and leave `main` clean. No tuning,
 duplicate run, second candidate, push, merge, submission, or history rewrite
 belongs to v7.
+
+## Pre-run freeze record
+
+The candidate is frozen on the single canonical checkout and has passed the
+pre-run gates. No simulation has been launched for v7.
+
+- Implementation HEAD: `8483d95` (`test: add real TEU half-headway v7 contract`).
+- Participant strategy SHA-256:
+  `745af10409c11ee55d9ad31db7cf7fea6b4608c497e66b922bc66cb2de513021`.
+- Participant README SHA-256:
+  `2985e74081052ee9b757623a9120e8eccce6deefd53e610645924f25c291ab37`.
+- `wsc2026 sync --round round2` produced byte-identical participant files in
+  `.challenge/round2/source/response_strategies/` (strategy SHA
+  `745af10409c11ee55d9ad31db7cf7fea6b4608c497e66b922bc66cb2de513021`).
+- Activation audit script SHA-256:
+  `e34cfa9e740cbab97ce31074984b7a90563d7327278968cc15ba74ffda4b5157`.
+- Activation evidence SHA-256:
+  `6d1c585df26bf5fb87a4d17d09c03e32cd03d04243d5dff364ba4ee5e3d6cda2`.
+- Activation audit result: GO. It covered 166 disruption midpoints × 380
+  demands = 63,080 observations; accepted-v1 holds were 285, candidate holds
+  were 324, with 39 declared upper-quartile half-headway candidate-only holds,
+  zero control-only decisions, zero unexpected decisions, zero malformed
+  classifications, no mutation, no model advancement, and no Output write.
+- Stale active Output ATT SHA-256:
+  `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`;
+  size 1,262 bytes; modification time (nanoseconds)
+  `1788200950277334004`. The pinned control snapshot has the same SHA.
+- Authoritative baseline ATT SHA-256:
+  `1dc6e2dc9067f6b9f34760c65aba85d9431de2f187d8704100b7e018d9edfa3f`.
+- Deterministic package (two identical runs) SHA-256:
+  `91932c2614ba61e48d2056a0845c70137095b0555d4cdd93c71e2d11005e797e`;
+  members are only `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` under the package root.
+- Quality gates: `uv lock --check`, locked `uv sync`, Ruff format/check, Ty,
+  mypy, 245 non-integration tests with 90.47% branch coverage, and 9
+  integration tests all pass.
+
+The audit JSON was normalized after its atomic write to replace a literal
+escape in its final newline; this changed serialization only, not the audit
+logic, observations, or result. The final script hash above is the hash to
+retain with the pre-run manifest.
+
+The exact manifest command is:
+
+```text
+PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache uv run wsc2026 run --round round2 --full > .challenge/round2/results/port_closure_one_transfer_teu_dominance_buffer_v7_20260901/full_run.log 2>&1
+```

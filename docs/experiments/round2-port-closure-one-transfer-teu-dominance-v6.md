@@ -1,6 +1,7 @@
 # Round 2: port-closure one-transfer TEU-dominance guard (v6)
 
-**Status: DESIGN — no candidate run authorized yet.**
+**Status: PRE-RUN FROZEN — one candidate run authorized by the experiment
+protocol; no full simulation has started.**
 
 ## Hypothesis
 
@@ -68,6 +69,39 @@ oracle with the candidate, record candidate-only delegations and annual-TEU
 exposure by quartile, and prove no participant mutation, model advancement, or
 `Output` write.  Positive candidate/control differences and unchanged output
 are required for GO; activation is not a score prediction.
+
+## Pre-run review record (2026-09-01)
+
+The candidate was implemented only after the design and RED tests were
+committed. The existing one-transfer control fixture was updated to include
+the real `annual_teus` field and demand population required by the new guard;
+this does not alter organizer code or the control policy.
+
+- implementation HEAD: `a7029ce`;
+- participant strategy SHA-256: `df6399104bc44645b739afc187eb475ef2e21ea13186b0f43b435665ef8f3377`;
+- synchronized runtime copy matches the participant byte-for-byte;
+- activation audit: 166 valid timestamps × 380 demands = 63,080 observations;
+- accepted-v1 control holds: 285; candidate holds: 168;
+- candidate-only delegations: 117, all below the third-quartile threshold;
+- candidate-only lower-quartile annual-TEU proxy: 162,903;
+- unexpected candidate holds: 0; malformed populations: 0;
+- participant mutation: none; model advanced: false; Output write: false;
+- activation audit script SHA-256:
+  `a10889cecb1c32455cb89f44c715baab62e5112455d02a63bbfd67fa3577537d`;
+- activation audit JSON SHA-256:
+  `e1859414d7d39546df36e268eb1149eb3b0ea26dc98c696169598229b696dd92`;
+- pre-run package SHA-256 (both runs identical):
+  `7b9d1dba7b5644e2ab0479ea709f98ef85df5bab313aa889d38cacd310cf419a`;
+- package members are exactly `response_strategies/README.md` and
+  `response_strategies/user_strategy.py` under the Round 2 archive root;
+- pre-run Output ATT is the accepted-control snapshot SHA
+  `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`;
+- no live simulation was observed before launch.
+
+All lock, sync, Ruff, Ty, mypy, unit-coverage, integration, smoke, package,
+parity, restricted-material, and diff checks passed. The single authorized
+command is recorded in the frozen run contract below; no tuning or duplicate
+run is permitted.
 
 ## Frozen run contract
 

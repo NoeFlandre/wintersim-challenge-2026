@@ -1,6 +1,6 @@
 # Round 2: port-closure one-transfer late-recovery hold (v4)
 
-**Status: RESULT — REJECTED; control restoration in progress**
+**Status: REJECTED — CONTROL RESTORED**
 **Branch:** `main`  
 **Scenario:** `create_with_disruption`  
 **Seed:** `2026` with `PYTHONHASHSEED=0`
@@ -138,6 +138,26 @@ preserved raw log and CSV are private evidence in the v4 result directory.
 The strict acceptance rule is not met, so this candidate is **REJECTED**. The
 complete machine-readable result is the ignored
 `.challenge/round2/results/port_closure_one_transfer_late_recovery_v4_20260901/result.json`.
+
+## Restoration and final state
+
+The v4 implementation and its RED contracts were reverted in reverse order by
+commits `25ab1bc`, `013f64f`, and `c80309a`. Round 2 was synchronized from the
+tracked control, and the pinned control ATT was restored from the pre-run
+backup and re-scored:
+
+- active strategy SHA-256: `b4857197a73d7eae4a1d6d1bde3d31e50aa09aff8fcb9a08849d0ea53207ce41`;
+- active ATT SHA-256: `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`;
+- restored control loss: `35.1039547178493` over 72 periods.
+
+The final gates pass: lock and locked sync, Ruff format/check, Ty, mypy, 242
+tests, 234 non-integration tests at 90.36% coverage, 8 integration tests,
+Round 2 sync, `SMOKE_OK`, deterministic `Round2_OrtolanForever.zip` packaging
+(SHA `f9d3bdccb5b273552f6543a0632bffe1596db27c3c700f136f6b95499b07551d`),
+restricted-material scans, no live WSC process, and a clean Git tree.
+
+No tuning, duplicate run, second candidate, push, submission, or history
+rewrite occurred.
 
 ## One-run contract
 

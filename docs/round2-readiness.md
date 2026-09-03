@@ -46,7 +46,7 @@ it in a submission archive.
   its own ignored results area at `.challenge/round2/results/`.
 - The tracked `submission/response_strategies/` directory remains the sole
   participant submission surface. It now contains the accepted Round 2
-  port-closure recovery-hold strategy; Round 1 evidence remains separate.
+  time-aware booking strategy; Round 1 evidence remains separate.
 - Every Round 2 experiment is tabulated in the
   [experiment ledger](experiments/round2-ledger.md).
 - The active strategy is the accepted

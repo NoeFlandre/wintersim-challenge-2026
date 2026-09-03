@@ -5,8 +5,8 @@ cargo. The organizer's fallback chooses that chain by minimising sailing
 distance, which ignores how often each service actually departs; a booking that
 saves a few nautical miles by adding a transshipment can cost days of waiting
 for the next vessel. This strategy instead minimises *estimated transport
-time* - sailing time at the live leg multipliers, one expected departure wait
-per service route used, and the organizer's fixed berthing time for each
+time* - sailing time at the live leg multipliers, one departure wait per
+service route used, and the organizer's fixed berthing time for each
 intermediate port call.
 
 Every quantity is read from the supplied runtime objects. The strategy is
@@ -179,7 +179,13 @@ def _route_edges(
     cycle_hours = math.fsum(leg_hours)
     if not math.isfinite(cycle_hours) or cycle_hours <= 0.0:
         return None
-    boarding_hours = 0.5 * cycle_hours / vessel_count
+    # Waiting for a departure costs one headway, not half of one. Cargo is
+    # loaded only if it is already waiting when a vessel begins its port call,
+    # so cargo that becomes ready during the connecting vessel's handling misses
+    # it and waits a further headway; and because sailing duration varies by
+    # +/-5%, vessels on a route drift out of even spacing, which lifts the mean
+    # wait for a random arrival to E[gap^2] / (2 * E[gap]) above headway / 2.
+    boarding_hours = cycle_hours / vessel_count
     if not math.isfinite(boarding_hours) or boarding_hours <= 0.0:
         return None
 

@@ -110,12 +110,12 @@ def _transfer_penalty_fixture(
 
     ``direct`` covers Origin->Destination as a single 1000 nm edge on a 2000 nm
     rotation. ``feeder`` + ``trunk`` reach the destination in 400 + 450 = 850 nm,
-    which wins on distance, but boarding the low-frequency trunk costs half of
-    its 45-hour headway, so the direct service wins on time:
+    which wins on distance, but boarding the low-frequency trunk costs its full
+    45-hour headway, so the direct service wins on time:
 
-      direct  = 0.5 * (2000/20)/4 + 1000/20                     = 62.5 h
-      transfer= 0.5 * (800/20)/4 + 400/20
-                + 0.5 * (900/20)/1 + 450/20                     = 70.0 h
+      direct  = (2000/20)/4 + 1000/20                           = 75.0 h
+      transfer= (800/20)/4 + 400/20
+                + (900/20)/1 + 450/20                           = 97.5 h
     """
     origin = _port("Origin")
     destination = _port("Destination")
@@ -136,8 +136,9 @@ def test_prefers_direct_service_over_shorter_distance_with_a_transfer() -> None:
 
 
 def test_takes_the_transfer_when_frequent_services_make_it_genuinely_faster() -> None:
-    # Nine vessels on the trunk shrink its boarding wait from 22.5 h to 2.5 h,
-    # so the shorter-distance two-leg path becomes the faster one as well.
+    # Nine vessels on the trunk shrink its boarding wait from 45 h to 5 h, so
+    # the shorter-distance two-leg path becomes the faster one as well
+    # (30.0 + 27.5 = 57.5 h against the direct service's 75.0 h).
     context, shipment = _transfer_penalty_fixture(trunk_vessels=9)
 
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
@@ -557,3 +558,35 @@ def test_a_long_way_round_edge_is_costed_with_intermediate_berthing() -> None:
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
     # Segments 1 and 2 carry the shipment from Origin through A to Destination.
     assert _chain(shipment) == [("RING", 1, 2)]
+
+
+def _headway_coefficient_fixture() -> tuple[Any, Any]:
+    """A network whose cheapest chain depends on the price of one boarding.
+
+    ``direct`` is a high-frequency 800 nm service; ``feeder`` + ``trunk`` reach
+    the destination in 200 + 200 nm but each runs a single vessel, so each
+    boarding is expensive:
+
+      direct   = (1600/20)/8 + 800/20                     = 10 + 40 = 50.0 h
+      transfer = (400/20)/1 + 200/20  (feeder)
+               + (400/20)/1 + 200/20  (trunk)             = 30 + 30 = 60.0 h
+
+    Charging only half a headway per boarding would instead make the transfer
+    look cheaper (40.0 h against 45.0 h) and would pick it, so this fixture
+    discriminates between the two costings.
+    """
+    origin = _port("Origin")
+    destination = _port("Destination")
+    hub = _port("Hub")
+    direct = _route("DIRECT", [origin, destination], [800.0, 800.0], vessels=8)
+    feeder = _route("FEEDER", [origin, hub], [200.0, 200.0], vessels=1)
+    trunk = _route("TRUNK", [hub, destination], [200.0, 200.0], vessels=1)
+    context = _context([origin, hub, destination], [direct, feeder, trunk])
+    return context, _shipment(origin, destination)
+
+
+def test_a_boarding_costs_a_full_headway_not_half() -> None:
+    context, shipment = _headway_coefficient_fixture()
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("DIRECT", 1, 1)]

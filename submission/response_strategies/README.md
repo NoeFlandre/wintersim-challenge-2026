@@ -19,10 +19,14 @@ entirely from the live simulation context:
 - sailing time per leg is `sailing_distance * sailing_time_multiplier` divided
   by the mean speed of the route's currently deployed vessels, so an active
   congestion multiplier is priced rather than merely avoided;
-- boarding a service costs `0.5 * headway`, where
+- boarding a service costs one full `headway`, where
   `headway = route cycle hours / deployed vessel count`. Cargo loads only onto
   a vessel whose next segment matches the booking's departure segment, so
-  departures on a given segment are one headway apart;
+  departures on a given segment are one headway apart. A full headway rather
+  than the textbook half is used because cargo is loaded only if it is already
+  waiting when a vessel begins its port call, and because the simulation's ±5%
+  sailing variation makes vessels bunch, which lifts the mean wait for a random
+  arrival above half a headway;
 - each intermediate port call inside a single booking costs the simulation's
   fixed three-hour berthing time.
 

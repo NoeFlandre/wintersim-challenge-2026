@@ -131,6 +131,8 @@ def _qualifying_fixture(
         disruption_plans=[plan],
     )
     shipment = _shipment(origin, destination)
+    shipment.demand.annual_teus = 400.0
+    context.demands = [shipment.demand]
     now = ANCHOR + dt.timedelta(days=14.5)
     return (
         context,
@@ -300,12 +302,15 @@ def test_closed_intermediate_port_on_direct_service_can_trigger_hold() -> None:
         service_routes=[nominal, safe_a, safe_b, safe_c],
         disruption_plans=[_berth_plan(closed)],
     )
+    shipment = _shipment(origin, destination)
+    shipment.demand.annual_teus = 400.0
+    context.demands = [shipment.demand]
 
     assert (
         _decision(
             context,
             ANCHOR + dt.timedelta(days=14.5),
-            _shipment(origin, destination),
+            shipment,
         )
         is False
     )
@@ -368,7 +373,10 @@ def _tie_fixture(port_order: list[str]) -> tuple[SimpleNamespace, dt.datetime, A
         service_routes=[nominal, fast_a, fast_b, fast_c, slow_a, slow_b, slow_c],
         disruption_plans=[_leg_plan(_leg(nominal))],
     )
-    return context, ANCHOR + dt.timedelta(days=14.5), _shipment(ports["O"], ports["D"])
+    shipment = _shipment(ports["O"], ports["D"])
+    shipment.demand.annual_teus = 400.0
+    context.demands = [shipment.demand]
+    return context, ANCHOR + dt.timedelta(days=14.5), shipment
 
 
 def test_equal_distance_ties_follow_context_port_order() -> None:

@@ -83,8 +83,8 @@ def _fixture(
         if demands is not None
         else [
             SimpleNamespace(origin_port=origin, destination_port=transfer_a, annual_teus=100.0),
-            SimpleNamespace(origin_port=origin, destination_port=transfer_b, annual_teus=200.0),
-            SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=300.0),
+            SimpleNamespace(origin_port=origin, destination_port=transfer_b, annual_teus=300.0),
+            SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=400.0),
             target,
         ]
     )

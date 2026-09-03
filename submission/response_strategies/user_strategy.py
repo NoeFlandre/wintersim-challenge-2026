@@ -3,7 +3,8 @@
 The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour. The established policy
-requires at least two service-route changes; Round 2 also permits exactly one
+requires at least two service-route changes; pure leg-congestion detours also
+require an upper-quartile annual TEU demand. Round 2 permits exactly one
 change for a port-closure-only detour with a full-headway safety margin.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
@@ -435,6 +436,37 @@ def _max_path_headway(path: tuple[_Edge, ...]) -> float | None:
     return headway if math.isfinite(headway) and headway > 0.0 else None
 
 
+def _is_upper_quartile_demand(context: Any, demand: Any) -> bool:
+    """Return whether ``demand`` is in the deterministic upper quartile."""
+    demands = getattr(context, "demands", None)
+    if not isinstance(demands, (list, tuple)) or not demands:
+        return False
+
+    volumes: list[float] = []
+    demand_count = 0
+    seen_identities: set[int] = set()
+    for candidate in demands:
+        identity = id(candidate)
+        if identity in seen_identities:
+            return False
+        seen_identities.add(identity)
+        volume = _positive_real(getattr(candidate, "annual_teus", None))
+        if volume is None:
+            return False
+        volumes.append(volume)
+        if candidate is demand:
+            demand_count += 1
+    if demand_count != 1:
+        return False
+
+    target_volume = _positive_real(getattr(demand, "annual_teus", None))
+    if target_volume is None:
+        return False
+    volumes.sort()
+    quartile_index = (3 * (len(volumes) - 1)) // 4
+    return target_volume >= volumes[quartile_index]
+
+
 def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not isinstance(now, dt.datetime):
         return False
@@ -479,7 +511,12 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
     if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
         return False
     if route_change_count >= 2:
-        return hold_hours < detour_hours
+        if hold_hours >= detour_hours:
+            return False
+        matching = _matching_constraints(nominal_path[0], state)
+        if {constraint.kind for constraint in matching} == {"leg"}:
+            return _is_upper_quartile_demand(context, demand)
+        return True
     if route_change_count != 1:
         return False
 

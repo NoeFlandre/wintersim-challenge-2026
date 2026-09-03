@@ -1,4 +1,4 @@
-\"\"\"RED contract for the Round 2 v8 pure-leg TEU guard.\"\"\"
+"""RED contract for the Round 2 v8 pure-leg TEU guard."""
 
 from __future__ import annotations
 
@@ -78,16 +78,22 @@ def _fixture(
         destination_port=destination,
         annual_teus=annual_teus,
     )
-    population = demands if demands is not None else [
-        SimpleNamespace(origin_port=origin, destination_port=transfer_a, annual_teus=100.0),
-        SimpleNamespace(origin_port=origin, destination_port=transfer_b, annual_teus=200.0),
-        SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=300.0),
-        target,
-    ]
+    population = (
+        demands
+        if demands is not None
+        else [
+            SimpleNamespace(origin_port=origin, destination_port=transfer_a, annual_teus=100.0),
+            SimpleNamespace(origin_port=origin, destination_port=transfer_b, annual_teus=200.0),
+            SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=300.0),
+            target,
+        ]
+    )
     context = SimpleNamespace(
         ports=[origin, transfer_a, transfer_b, destination],
         service_routes=[nominal, safe_a, safe_b, safe_c],
-        disruption_plans=plans if plans is not None else [_leg_plan(nominal.segments[0].associated_leg)],
+        disruption_plans=plans
+        if plans is not None
+        else [_leg_plan(nominal.segments[0].associated_leg)],
         demands=population,
     )
     shipment = SimpleNamespace(
@@ -95,6 +101,42 @@ def _fixture(
         associated_bookings=[],
         current_booking_index=None,
     )
+    return context, ANCHOR + dt.timedelta(days=14.5), shipment
+
+
+def _constraint_fixture(
+    *,
+    mixed: bool = False,
+) -> tuple[SimpleNamespace, dt.datetime, SimpleNamespace]:
+    """Build a multi-transfer fixture whose nominal edge really matches the plan."""
+    origin = _port("Origin")
+    closed = _port("Closed")
+    transfer_a = _port("Transfer A")
+    transfer_b = _port("Transfer B")
+    destination = _port("Destination")
+    nominal = _route(
+        "nominal",
+        [origin, closed, destination, origin],
+        [100.0, 100.0, 100.0],
+    )
+    safe_a = _route("safe-a", [origin, transfer_a, origin], [1000.0, 1000.0])
+    safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [1000.0, 1000.0])
+    safe_c = _route("safe-c", [transfer_b, destination, transfer_b], [1000.0, 1000.0])
+    target = SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=400.0)
+    context = SimpleNamespace(
+        ports=[origin, closed, transfer_a, transfer_b, destination],
+        service_routes=[nominal, safe_a, safe_b, safe_c],
+        disruption_plans=[_port_plan(closed)],
+        demands=[
+            SimpleNamespace(origin_port=origin, destination_port=transfer_a, annual_teus=100.0),
+            SimpleNamespace(origin_port=origin, destination_port=transfer_b, annual_teus=200.0),
+            SimpleNamespace(origin_port=origin, destination_port=destination, annual_teus=300.0),
+            target,
+        ],
+    )
+    if mixed:
+        context.disruption_plans.append(_leg_plan(nominal.segments[0].associated_leg))
+    shipment = SimpleNamespace(demand=target, associated_bookings=[], current_booking_index=None)
     return context, ANCHOR + dt.timedelta(days=14.5), shipment
 
 
@@ -156,25 +198,28 @@ def test_demand_identity_is_required_for_the_new_guard() -> None:
 
 
 def test_malformed_demand_population_delegates_only_new_pure_leg_case() -> None:
-    context, now, shipment = _fixture(annual_teus=400.0, demands=[SimpleNamespace(annual_teus=float("nan"))])
+    context, now, shipment = _fixture(
+        annual_teus=400.0, demands=[SimpleNamespace(annual_teus=float("nan"))]
+    )
+
+    assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
+
+
+def test_missing_demand_population_delegates_only_new_pure_leg_case() -> None:
+    context, now, shipment = _fixture(annual_teus=400.0)
+    del context.demands
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
 
 def test_port_closure_multi_transfer_remains_unchanged() -> None:
-    context, now, shipment = _fixture(plans=[_port_plan(context_port := _port("Closed"))])
-    nominal = context.service_routes[0]
-    context.ports.insert(1, context_port)
-    nominal.segments[0].associated_leg.arrival_port = context_port
-    nominal.segments[1].associated_leg.departure_port = context_port
-    shipment.demand.destination_port = context.ports[-1]
+    context, now, shipment = _constraint_fixture()
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is False
 
 
 def test_mixed_constraints_remain_unchanged() -> None:
-    context, now, shipment = _fixture()
-    context.disruption_plans.append(_port_plan(context.ports[1]))
+    context, now, shipment = _constraint_fixture(mixed=True)
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is False
 

@@ -1,55 +1,52 @@
 """Participant-owned response strategy for the WSC 2026 challenge.
 
-The active experiment is deliberately narrow: while a disruption is active,
-new cargo may remain at origin when an interrupted one-booking direct service
-is estimated to recover sooner than a safe detour. The established policy
-requires at least two service-route changes; Round 2 also permits exactly one
-change for a port-closure-only detour with a full-headway safety margin.
-Every decision is derived from the supplied runtime objects. The strategy is
-read-only, deterministic, standard-library-only, and delegates on uncertainty.
+The strategy owns one decision: the initial booking chain for newly generated
+cargo. The organizer's fallback chooses that chain by minimising sailing
+distance, which ignores how often each service actually departs; a booking that
+saves a few nautical miles by adding a transshipment can cost days of waiting
+for the next vessel. This strategy instead minimises *estimated transport
+time* - sailing time at the live leg multipliers, one expected departure wait
+per service route used, and the organizer's fixed berthing time for each
+intermediate port call.
+
+Every quantity is read from the supplied runtime objects. The strategy is
+deterministic, standard-library-only, performs no I/O, keeps no state between
+calls, and delegates to the organizer fallback whenever the runtime data is
+malformed, ambiguous, or would force cargo across a congested leg that no
+alternative path avoids. The other three decision points stay delegated.
 """
 
 from __future__ import annotations
 
-import datetime as dt
+import heapq
 import math
 import numbers
 from typing import Any, NamedTuple
 
+from maritime_data_context import Booking
 
-class _Constraint(NamedTuple):
-    kind: str
-    target_identity: int
-    departure_name: str | None
-    arrival_name: str
-    recovery: dt.datetime
-
-
-class _ActiveState(NamedTuple):
-    constraints: tuple[_Constraint, ...]
-    closed_port_names: frozenset[str]
-    congested_leg_identities: frozenset[int]
-    congested_leg_keys: frozenset[tuple[str, str]]
-    disruption_key: tuple[tuple[str, ...], tuple[tuple[str, str], ...]]
+# The organizer's BerthBerthing activity has a fixed three-hour duration. It is
+# charged once for every intermediate port call inside a single booking, so a
+# long way round the same rotation is not treated as free.
+_BERTHING_HOURS = 3.0
 
 
 class _Edge(NamedTuple):
-    departure: Any
-    arrival: Any
-    intermediate_ports: tuple[Any, ...]
-    route: Any
-    distance: float
-    legs: tuple[Any, ...]
+    """One bookable ride: route ``route_index`` from one port to another."""
+
+    departure_index: int
+    arrival_index: int
+    route_index: int
+    departure_segment_index: int
+    arrival_segment_index: int
+    hours: float
+    crosses_congestion: bool
 
 
-class _RouteData(NamedTuple):
+class _Network(NamedTuple):
     edges: tuple[_Edge, ...]
-    cycle_distance: float
-
-
-class _RouteProfile(NamedTuple):
-    mean_speed: float
-    headway_hours: float
+    routes: tuple[Any, ...]
+    boarding_hours: tuple[float, ...]
 
 
 _DATA_ERRORS = (
@@ -76,425 +73,340 @@ def _positive_real(value: Any) -> float | None:
     return result if result is not None and result > 0.0 else None
 
 
-def _port_name(port: Any) -> str | None:
-    name = getattr(port, "name", None)
-    if not isinstance(name, str) or not name:
+def _sequence(value: Any) -> tuple[Any, ...] | None:
+    return tuple(value) if isinstance(value, (list, tuple)) else None
+
+
+def _port_indexes(context: Any) -> dict[int, int] | None:
+    """Map port identity to its position in ``context.ports``."""
+    ports = _sequence(getattr(context, "ports", None))
+    if not ports:
         return None
-    folded = name.casefold()
-    return folded if folded else None
-
-
-def _leg_key(leg: Any) -> tuple[str, str] | None:
-    departure = _port_name(getattr(leg, "departure_port", None))
-    arrival = _port_name(getattr(leg, "arrival_port", None))
-    if departure is None or arrival is None or departure == arrival:
-        return None
-    return departure, arrival
-
-
-def _active_state(context: Any, now: Any) -> _ActiveState | None:
-    if not isinstance(now, dt.datetime):
-        return None
-    plans = getattr(context, "disruption_plans", None)
-    if not isinstance(plans, (list, tuple)):
-        return None
-
-    constraints: list[_Constraint] = []
-    for plan in plans:
-        close_berth = getattr(plan, "close_berth", None)
-        multiplier = _finite_real(getattr(plan, "multiplier", None))
-        if not isinstance(close_berth, bool) or multiplier is None:
+    indexes: dict[int, int] = {}
+    for position, port in enumerate(ports):
+        if not isinstance(getattr(port, "name", None), str):
             return None
-        relevant = close_berth or multiplier > 1.0
-        if not relevant:
-            continue
-
-        start_days = _finite_real(getattr(plan, "start_offset_days", None))
-        duration_days = _positive_real(getattr(plan, "duration_days", None))
-        if start_days is None or duration_days is None:
+        identity = id(port)
+        if identity in indexes:
             return None
-        start = dt.datetime.min + dt.timedelta(days=start_days)
-        end = start + dt.timedelta(days=duration_days)
-        if not start <= now < end:
-            continue
+        indexes[identity] = position
+    return indexes
 
-        target_leg = getattr(plan, "target_leg", None)
-        target_berth = getattr(plan, "target_berth", None)
-        is_closed_port = close_berth
-        is_congested_leg = multiplier > 1.0
-        if is_closed_port == is_congested_leg:
+
+def _port_is_closed(port: Any) -> bool | None:
+    """A port is closed when it has berths and none of them is available."""
+    berths = _sequence(getattr(port, "berths", None))
+    if berths is None:
+        return None
+    available = 0
+    for berth in berths:
+        state = getattr(berth, "is_available", None)
+        if not isinstance(state, bool):
             return None
-        if is_closed_port:
-            if target_berth is None or target_leg is not None:
-                return None
-            port_name = _port_name(getattr(target_berth, "port", None))
-            if port_name is None:
-                return None
-            constraints.append(
-                _Constraint(
-                    "port",
-                    id(target_berth.port),
-                    None,
-                    port_name,
-                    end,
-                )
-            )
-        else:
-            if target_leg is None or target_berth is not None:
-                return None
-            key = _leg_key(target_leg)
-            if key is None:
-                return None
-            constraints.append(_Constraint("leg", id(target_leg), key[0], key[1], end))
-
-    if not constraints:
-        return None
-    closed_names = frozenset(
-        constraint.arrival_name for constraint in constraints if constraint.kind == "port"
-    )
-    congested_keys = frozenset(
-        (constraint.departure_name, constraint.arrival_name)
-        for constraint in constraints
-        if constraint.kind == "leg" and constraint.departure_name is not None
-    )
-    ordered_leg_keys = tuple(sorted(congested_keys))
-    congested_identities = frozenset(
-        constraint.target_identity for constraint in constraints if constraint.kind == "leg"
-    )
-    disruption_key = (tuple(sorted(closed_names)), ordered_leg_keys)
-    return _ActiveState(
-        tuple(constraints),
-        closed_names,
-        congested_identities,
-        congested_keys,
-        disruption_key,
-    )
+        available += int(state)
+    return bool(berths) and available == 0
 
 
-def _route_data(route: Any) -> _RouteData | None:
-    raw_segments = getattr(route, "segments", None)
-    if not isinstance(raw_segments, (list, tuple)) or len(raw_segments) < 2:
-        return None
-    segments = list(raw_segments)
-    indexes: list[int] = []
-    for segment in segments:
-        index = getattr(segment, "sequence_index", None)
-        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
-            return None
-        indexes.append(index)
-    if len(set(indexes)) != len(indexes):
-        return None
-    segments.sort(key=lambda segment: segment.sequence_index)
-
-    legs: list[Any] = []
-    distances: list[float] = []
-    for segment in segments:
-        leg = getattr(segment, "associated_leg", None)
-        if leg is None or _leg_key(leg) is None:
-            return None
-        distance = _positive_real(getattr(leg, "sailing_distance", None))
-        if distance is None:
-            return None
-        legs.append(leg)
-        distances.append(distance)
-    for index, leg in enumerate(legs):
-        next_leg = legs[(index + 1) % len(legs)]
-        if getattr(leg, "arrival_port", None) is not getattr(next_leg, "departure_port", None):
-            return None
-
-    cycle_distance = math.fsum(distances)
-    if not math.isfinite(cycle_distance) or cycle_distance <= 0.0:
-        return None
-
-    edges: list[_Edge] = []
-    segment_count = len(segments)
-    for start_index in range(segment_count):
-        traversed_legs: list[Any] = []
-        traversed_distances: list[float] = []
-        departure = getattr(legs[start_index], "departure_port", None)
-        for step in range(1, segment_count):
-            leg_index = (start_index + step - 1) % segment_count
-            leg = legs[leg_index]
-            traversed_legs.append(leg)
-            traversed_distances.append(distances[leg_index])
-            arrival = getattr(leg, "arrival_port", None)
-            if departure is arrival:
-                continue
-            distance = math.fsum(traversed_distances)
-            if not math.isfinite(distance) or distance <= 0.0:
-                return None
-            intermediate_ports = tuple(
-                getattr(item, "arrival_port", None) for item in traversed_legs[:-1]
-            )
-            if any(_port_name(port) is None for port in intermediate_ports):
-                return None
-            edges.append(
-                _Edge(
-                    departure,
-                    arrival,
-                    intermediate_ports,
-                    route,
-                    distance,
-                    tuple(traversed_legs),
-                )
-            )
-    return _RouteData(tuple(edges), cycle_distance)
-
-
-def _edge_is_safe(edge: _Edge, state: _ActiveState) -> bool:
-    for leg in edge.legs:
-        key = _leg_key(leg)
-        if key is None or id(leg) in state.congested_leg_identities:
-            return False
-    arrivals = (*edge.intermediate_ports, edge.arrival)
-    for port in arrivals:
-        name = _port_name(port)
-        if name is None or name in state.closed_port_names:
-            return False
-    return True
-
-
-def _graphs(
-    context: Any, state: _ActiveState
-) -> tuple[tuple[_Edge, ...], tuple[_Edge, ...]] | None:
-    raw_routes = getattr(context, "service_routes", None)
-    if not isinstance(raw_routes, (list, tuple)):
-        return None
-    nominal_edges: list[_Edge] = []
-    safe_edges: list[_Edge] = []
-    for route in raw_routes:
-        route_data = _route_data(route)
-        if route_data is None:
-            return None
-        source = getattr(route, "source_service_route", None)
-        if source is None:
-            nominal_edges.extend(route_data.edges)
-            safe_edges.extend(edge for edge in route_data.edges if _edge_is_safe(edge, state))
-            continue
-        disruption_key = getattr(route, "disruption_key", None)
-        deployed = getattr(route, "deployed_vessels", None)
-        if (
-            disruption_key == state.disruption_key
-            and isinstance(deployed, (list, tuple))
-            and bool(deployed)
-        ):
-            safe_edges.extend(edge for edge in route_data.edges if _edge_is_safe(edge, state))
-    return tuple(nominal_edges), tuple(safe_edges)
-
-
-def _shortest_path(
-    context: Any, origin: Any, destination: Any, edges: tuple[_Edge, ...]
-) -> tuple[_Edge, ...] | None:
-    raw_ports = getattr(context, "ports", None)
-    if not isinstance(raw_ports, (list, tuple)):
-        return None
-    ports = list(raw_ports)
-    port_ids = [id(port) for port in ports]
-    if len(set(port_ids)) != len(port_ids):
-        return None
-    origin_id = id(origin)
-    destination_id = id(destination)
-    if origin_id not in port_ids or destination_id not in port_ids:
-        return None
-    if origin_id == destination_id:
-        return ()
-
-    distances: dict[int, float] = dict.fromkeys(port_ids, math.inf)
-    previous: dict[int, _Edge] = {}
-    unvisited = list(port_ids)
-    unvisited_members = set(unvisited)
-    distances[origin_id] = 0.0
-    outgoing: dict[int, list[_Edge]] = {}
-    for edge in edges:
-        departure_id = id(edge.departure)
-        arrival_id = id(edge.arrival)
-        if departure_id not in distances or arrival_id not in distances:
-            return None
-        outgoing.setdefault(departure_id, []).append(edge)
-
-    while unvisited:
-        current_index = min(range(len(unvisited)), key=lambda index: distances[unvisited[index]])
-        current_id = unvisited.pop(current_index)
-        unvisited_members.remove(current_id)
-        current_distance = distances[current_id]
-        if not math.isfinite(current_distance) or current_id == destination_id:
-            break
-        for edge in outgoing.get(current_id, []):
-            next_id = id(edge.arrival)
-            if next_id not in unvisited_members:
-                continue
-            alternative = current_distance + edge.distance
-            if not math.isfinite(alternative):
-                return None
-            if alternative < distances[next_id]:
-                distances[next_id] = alternative
-                previous[next_id] = edge
-
-    if destination_id not in previous:
-        return None
-    path: list[_Edge] = []
-    cursor = destination_id
-    visited: set[int] = set()
-    while cursor != origin_id:
-        if cursor in visited:
-            return None
-        visited.add(cursor)
-        predecessor = previous.get(cursor)
-        if predecessor is None:
-            return None
-        path.append(predecessor)
-        cursor = id(predecessor.departure)
-    path.reverse()
-    return tuple(path)
-
-
-def _edge_constraint_recovery(edge: _Edge, state: _ActiveState) -> dt.datetime | None:
-    leg_identities = tuple(id(leg) for leg in edge.legs)
-    arrival_names = tuple(_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
-    recoveries: list[dt.datetime] = []
-    for constraint in state.constraints:
-        if constraint.kind == "leg":
-            if constraint.target_identity in leg_identities:
-                recoveries.append(constraint.recovery)
-        elif constraint.arrival_name in arrival_names:
-            recoveries.append(constraint.recovery)
-    return max(recoveries) if recoveries else None
-
-
-def _matching_constraints(edge: _Edge, state: _ActiveState) -> tuple[_Constraint, ...]:
-    leg_ids = {id(leg) for leg in edge.legs}
-    arrival_names = {
-        name
-        for name in (_port_name(port) for port in (*edge.intermediate_ports, edge.arrival))
-        if name is not None
-    }
-    return tuple(
-        constraint
-        for constraint in state.constraints
-        if (constraint.kind == "leg" and constraint.target_identity in leg_ids)
-        or (constraint.kind == "port" and constraint.arrival_name in arrival_names)
-    )
-
-
-def _route_profile(route: Any) -> _RouteProfile | None:
-    route_data = _route_data(route)
-    if route_data is None:
-        return None
-    deployed = getattr(route, "deployed_vessels", None)
-    if not isinstance(deployed, (list, tuple)) or not deployed:
+def _mean_speed(route: Any) -> float | None:
+    vessels = _sequence(getattr(route, "deployed_vessels", None))
+    if not vessels:
         return None
     speeds: list[float] = []
-    for vessel in deployed:
+    for vessel in vessels:
         vessel_class = getattr(vessel, "vessel_class", None)
         speed = _positive_real(getattr(vessel_class, "sailing_speed", None))
         if speed is None:
             return None
         speeds.append(speed)
-    speed_sum = math.fsum(speeds)
-    mean_speed = speed_sum / len(speeds)
-    headway = route_data.cycle_distance / speed_sum
-    if not all(math.isfinite(value) and value > 0.0 for value in (mean_speed, headway)):
+    mean = math.fsum(speeds) / len(speeds)
+    return mean if math.isfinite(mean) and mean > 0.0 else None
+
+
+def _ordered_legs(route: Any) -> tuple[tuple[Any, ...], tuple[int, ...]] | None:
+    """Return the route's legs in rotation order plus their sequence indexes."""
+    segments = _sequence(getattr(route, "segments", None))
+    if segments is None or len(segments) < 2:
         return None
-    return _RouteProfile(mean_speed, headway)
+    ordered: list[tuple[int, Any]] = []
+    seen: set[int] = set()
+    for segment in segments:
+        index = getattr(segment, "sequence_index", None)
+        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+            return None
+        if index in seen:
+            return None
+        seen.add(index)
+        leg = getattr(segment, "associated_leg", None)
+        if leg is None:
+            return None
+        ordered.append((index, leg))
+    ordered.sort(key=lambda item: item[0])
+    legs = tuple(leg for _index, leg in ordered)
+    indexes = tuple(index for index, _leg in ordered)
+    for position, leg in enumerate(legs):
+        following = legs[(position + 1) % len(legs)]
+        if getattr(leg, "arrival_port", None) is not getattr(following, "departure_port", None):
+            return None
+    return legs, indexes
 
 
-def _path_service_hours(path: tuple[_Edge, ...]) -> float | None:
-    profiles: dict[int, _RouteProfile] = {}
-    total = 0.0
-    previous_route: Any = None
-    for edge in path:
-        route_id = id(edge.route)
-        profile = profiles.get(route_id)
-        if profile is None:
-            profile = _route_profile(edge.route)
-            if profile is None:
+def _route_edges(
+    route: Any,
+    route_index: int,
+    port_indexes: dict[int, int],
+    closed: frozenset[int],
+) -> tuple[tuple[_Edge, ...], float] | None:
+    """Build every bookable edge of one route and its expected boarding wait."""
+    resolved = _ordered_legs(route)
+    speed = _mean_speed(route)
+    if resolved is None or speed is None:
+        return None
+    legs, sequence_indexes = resolved
+    vessel_count = len(tuple(route.deployed_vessels))
+
+    leg_hours: list[float] = []
+    for leg in legs:
+        distance = _positive_real(getattr(leg, "sailing_distance", None))
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if distance is None or multiplier is None:
+            return None
+        departure = getattr(leg, "departure_port", None)
+        arrival = getattr(leg, "arrival_port", None)
+        if id(departure) not in port_indexes or id(arrival) not in port_indexes:
+            return None
+        leg_hours.append(distance * multiplier / speed)
+
+    cycle_hours = math.fsum(leg_hours)
+    if not math.isfinite(cycle_hours) or cycle_hours <= 0.0:
+        return None
+    boarding_hours = 0.5 * cycle_hours / vessel_count
+    if not math.isfinite(boarding_hours) or boarding_hours <= 0.0:
+        return None
+
+    count = len(legs)
+    edges: list[_Edge] = []
+    for start in range(count):
+        departure = getattr(legs[start], "departure_port", None)
+        departure_index = port_indexes[id(departure)]
+        sailing = 0.0
+        congested = False
+        blocked = False
+        for step in range(1, count):
+            position = (start + step - 1) % count
+            leg = legs[position]
+            sailing += leg_hours[position]
+            if leg.sailing_time_multiplier > 1.0:
+                congested = True
+            arrival = getattr(leg, "arrival_port", None)
+            arrival_index = port_indexes[id(arrival)]
+            if blocked:
+                break
+            if arrival_index in closed:
+                # Any later edge from this start would call here on the way.
+                blocked = True
+                continue
+            if arrival is departure:
+                continue
+            hours = sailing + _BERTHING_HOURS * (step - 1)
+            if not math.isfinite(hours) or hours <= 0.0:
                 return None
-            profiles[route_id] = profile
-        if previous_route is not edge.route:
-            total += 0.5 * profile.headway_hours
-        total += edge.distance / profile.mean_speed
-        if not math.isfinite(total):
-            return None
-        previous_route = edge.route
-    return total if total > 0.0 else None
+            edges.append(
+                _Edge(
+                    departure_index,
+                    arrival_index,
+                    route_index,
+                    sequence_indexes[start],
+                    sequence_indexes[position],
+                    hours,
+                    congested,
+                )
+            )
+    return tuple(edges), boarding_hours
 
 
-def _max_path_headway(path: tuple[_Edge, ...]) -> float | None:
-    profiles: dict[int, _RouteProfile] = {}
-    for edge in path:
-        route_id = id(edge.route)
-        if route_id in profiles:
-            continue
-        profile = _route_profile(edge.route)
-        if profile is None:
+def _network(context: Any, port_indexes: dict[int, int]) -> _Network | None:
+    """Build the bookable network from the live nominal service routes."""
+    ports = tuple(context.ports)
+    closed_indexes: set[int] = set()
+    for index, port in enumerate(ports):
+        state = _port_is_closed(port)
+        if state is None:
             return None
-        profiles[route_id] = profile
-    if not profiles:
+        if state:
+            closed_indexes.add(index)
+    closed = frozenset(closed_indexes)
+
+    raw_routes = _sequence(getattr(context, "service_routes", None))
+    if raw_routes is None:
         return None
-    headway = max(profile.headway_hours for profile in profiles.values())
-    return headway if math.isfinite(headway) and headway > 0.0 else None
+    edges: list[_Edge] = []
+    routes: list[Any] = []
+    boarding: list[float] = []
+    for route in raw_routes:
+        # Alternative routes carry a single reserved vessel and are withdrawn
+        # when the disruption ends, which would orphan a booking made on them.
+        if getattr(route, "source_service_route", None) is not None:
+            continue
+        if not _sequence(getattr(route, "deployed_vessels", None)):
+            continue
+        if not isinstance(getattr(route, "associated_bookings", None), list):
+            return None
+        built = _route_edges(route, len(routes), port_indexes, closed)
+        if built is None:
+            return None
+        route_edges, boarding_hours = built
+        edges.extend(route_edges)
+        routes.append(route)
+        boarding.append(boarding_hours)
+    if not routes:
+        return None
+    return _Network(tuple(edges), tuple(routes), tuple(boarding))
 
 
-def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
-    if not isinstance(now, dt.datetime):
-        return False
+def _fastest_path(
+    network: _Network,
+    origin_index: int,
+    destination_index: int,
+    *,
+    allow_congestion: bool,
+) -> tuple[_Edge, ...] | None:
+    """Least-estimated-time chain of bookings, one booking per route change.
+
+    Dijkstra over ``(port, route)`` states so that boarding a different service
+    is charged its own expected wait. Consecutive edges on the same route are
+    not allowed: the candidate set already holds the direct edge for every
+    ordered pair of distinct ports on a rotation, so nothing is lost and every
+    edge in the result becomes exactly one booking.
+    """
+    outgoing: dict[int, list[_Edge]] = {}
+    for edge in network.edges:
+        if edge.crosses_congestion and not allow_congestion:
+            continue
+        outgoing.setdefault(edge.departure_index, []).append(edge)
+
+    best: dict[tuple[int, int], float] = {}
+    previous: dict[tuple[int, int], tuple[int, int] | None] = {}
+    arriving: dict[tuple[int, int], _Edge] = {}
+    # Heap entries are fully ordered by numbers only, so the traversal order
+    # never depends on object identity or hashing.
+    heap: list[tuple[float, int, int, int, int]] = []
+
+    def offer(edge: _Edge, cost: float, source: tuple[int, int] | None) -> None:
+        state = (edge.arrival_index, edge.route_index)
+        if state in best and best[state] <= cost + 1e-12:
+            return
+        best[state] = cost
+        previous[state] = source
+        arriving[state] = edge
+        heapq.heappush(
+            heap,
+            (
+                cost,
+                edge.arrival_index,
+                edge.route_index,
+                edge.departure_segment_index,
+                edge.arrival_segment_index,
+            ),
+        )
+
+    for edge in outgoing.get(origin_index, []):
+        offer(edge, network.boarding_hours[edge.route_index] + edge.hours, None)
+
+    goal: tuple[int, int] | None = None
+    while heap:
+        cost, port_index, route_index, _departure, _arrival = heapq.heappop(heap)
+        state = (port_index, route_index)
+        if best.get(state, math.inf) < cost - 1e-12:
+            continue
+        if port_index == destination_index:
+            goal = state
+            break
+        for edge in outgoing.get(port_index, []):
+            if edge.route_index == route_index:
+                continue
+            step = network.boarding_hours[edge.route_index] + edge.hours
+            offer(edge, cost + step, state)
+    if goal is None:
+        return None
+
+    path: list[_Edge] = []
+    cursor: tuple[int, int] | None = goal
+    while cursor is not None:
+        edge = arriving[cursor]
+        path.append(edge)
+        cursor = previous[cursor]
+        if len(path) > len(network.edges):
+            return None
+    path.reverse()
+    return tuple(path)
+
+
+def _plan(context: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | None:
+    """Choose the booking chain for one newly generated shipment."""
     bookings = getattr(shipment, "associated_bookings", None)
     if not isinstance(bookings, list) or bookings:
-        return False
+        return None
     if getattr(shipment, "current_booking_index", None) is not None:
-        return False
+        return None
     demand = getattr(shipment, "demand", None)
     origin = getattr(demand, "origin_port", None)
     destination = getattr(demand, "destination_port", None)
     if origin is None or destination is None or origin is destination:
-        return False
+        return None
 
-    state = _active_state(context, now)
-    if state is None:
-        return False
-    graphs = _graphs(context, state)
-    if graphs is None:
-        return False
-    nominal_path = _shortest_path(context, origin, destination, graphs[0])
-    safe_path = _shortest_path(context, origin, destination, graphs[1])
-    if nominal_path is None or safe_path is None:
-        return False
-    if len(nominal_path) != 1 or len(safe_path) < 2:
-        return False
-    route_change_count = sum(
-        left.route is not right.route for left, right in zip(safe_path, safe_path[1:], strict=False)
-    )
-    if route_change_count < 1:
-        return False
+    port_indexes = _port_indexes(context)
+    if port_indexes is None:
+        return None
+    origin_index = port_indexes.get(id(origin))
+    destination_index = port_indexes.get(id(destination))
+    if origin_index is None or destination_index is None:
+        return None
 
-    recovery = _edge_constraint_recovery(nominal_path[0], state)
-    if recovery is None:
-        return False
-    nominal_hours = _path_service_hours(nominal_path)
-    detour_hours = _path_service_hours(safe_path)
-    if nominal_hours is None or detour_hours is None:
-        return False
-    wait_hours = max(0.0, (recovery - now).total_seconds() / 3600.0)
-    hold_hours = wait_hours + nominal_hours
-    if not all(math.isfinite(value) and value > 0.0 for value in (hold_hours, detour_hours)):
-        return False
-    if route_change_count >= 2:
-        return hold_hours < detour_hours
-    if route_change_count != 1:
-        return False
+    network = _network(context, port_indexes)
+    if network is None:
+        return None
 
-    matching = _matching_constraints(nominal_path[0], state)
-    if {constraint.kind for constraint in matching} != {"port"}:
-        return False
-    margin = detour_hours - hold_hours
-    if not math.isfinite(margin) or margin <= 0.0:
-        return False
-    max_headway = _max_path_headway(safe_path)
-    return max_headway is not None and margin > max_headway
+    # A path avoiding every congested leg must exist. When none does, the only
+    # option would be to sail a multiplied leg for an unknown remaining
+    # duration, so the organizer's protective wait keeps control instead.
+    if _fastest_path(network, origin_index, destination_index, allow_congestion=False) is None:
+        return None
+    path = _fastest_path(network, origin_index, destination_index, allow_congestion=True)
+    return None if path is None else (network, path)
+
+
+def _assign(context: Any, shipment: Any) -> bool | None:
+    """Build and register the chosen chain, or return ``None`` to delegate."""
+    planned = _plan(context, shipment)
+    if planned is None:
+        return None
+    network, path = planned
+    created: list[tuple[Any, Booking]] = []
+    for position, edge in enumerate(path, start=1):
+        route = network.routes[edge.route_index]
+        created.append(
+            (
+                route,
+                Booking(
+                    sequence_index=position,
+                    shipment=shipment,
+                    service_route=route,
+                    departure_segment_index=edge.departure_segment_index,
+                    arrival_segment_index=edge.arrival_segment_index,
+                ),
+            )
+        )
+    # Only mutate once the whole chain exists, so a failure cannot leave a
+    # partially booked shipment behind.
+    for route, booking in created:
+        shipment.associated_bookings.append(booking)
+        route.associated_bookings.append(booking)
+    shipment.current_booking_index = 1
+    return True
 
 
 class UserStrategy:
-    """Deterministic participant strategy with one read-only cargo policy."""
+    """Deterministic participant strategy with one time-aware booking policy."""
 
     @staticmethod
     def select_vessel_for_berth(
@@ -515,9 +427,9 @@ class UserStrategy:
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
-        """Hold a direct shipment only when its recovery advantage is robust."""
+        """Assign the fastest booking chain available to new cargo."""
         try:
-            return False if _should_hold(context, now, shipment) else None
+            return _assign(context, shipment)
         except _DATA_ERRORS:
             return None
 

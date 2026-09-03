@@ -1,0 +1,338 @@
+"""Real Round 2 context contract for the time-aware booking policy.
+
+Loads the organizer's own disruption scenario, applies the runtime disruption
+state exactly as ``DisruptionManager`` does, and checks that the participant
+strategy produces booking chains that are valid against the organizer's data
+model and strictly faster than the organizer's distance-optimal chain. Nothing
+is advanced and no ``Output`` file is written.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import importlib.util
+import math
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from wsc2026_tools.paths import round_source_dir, submission_strategies_dir
+
+pytestmark = pytest.mark.integration
+
+SIM_START = dt.datetime.min
+
+
+def _bootstrap_or_skip() -> Path:
+    source = round_source_dir("round2")
+    if not source.is_dir():
+        pytest.skip(
+            "Round 2 source is unavailable; bootstrap the organizer archive "
+            "to run this integration contract."
+        )
+    return source
+
+
+def _prepare_imports(source: Path) -> None:
+    for path in (str(source), str(source / "o2despy")):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    prefixes = (
+        "config",
+        "main",
+        "maritime_data_context",
+        "o2des",
+        "o2despy",
+        "response_strategies",
+        "scenario_builders",
+        "simulation_model",
+    )
+    for module_name in list(sys.modules):
+        if any(
+            module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes
+        ):
+            sys.modules.pop(module_name, None)
+
+
+def _load_participant_module() -> Any:
+    participant_file = submission_strategies_dir() / "user_strategy.py"
+    spec = importlib.util.spec_from_file_location(
+        "wsc_round2_time_aware_booking_v9_participant", participant_file
+    )
+    if spec is None or spec.loader is None:
+        pytest.fail(f"cannot load participant strategy from {participant_file}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _apply_runtime_disruption_state(context: Any, now: dt.datetime) -> None:
+    """Mirror ``DisruptionManager._check_plans`` for a single instant."""
+    for plan in context.disruption_plans:
+        if plan.start_offset_days is None or plan.duration_days is None:
+            continue
+        start = SIM_START + dt.timedelta(days=plan.start_offset_days)
+        end = start + dt.timedelta(days=plan.duration_days)
+        active = start <= now < end
+        if plan.target_leg is not None:
+            plan.target_leg.sailing_time_multiplier = plan.multiplier if active else 1.0
+        if plan.target_berth is not None and plan.close_berth:
+            plan.target_berth.is_available = not active
+
+
+def _new_shipment(context: Any, demand: Any) -> Any:
+    from maritime_data_context.shipment import Shipment
+
+    return Shipment(
+        index=1,
+        teu_size=10,
+        demand=demand,
+        current_storage_port=demand.origin_port,
+        generated_time=SIM_START,
+    )
+
+
+def _chain_hours(module: Any, context: Any, shipment: Any) -> float:
+    """Estimated hours of an assigned chain, using the strategy's own model."""
+    port_indexes = module._port_indexes(context)
+    network = module._network(context, port_indexes)
+    assert network is not None
+    total = 0.0
+    previous = None
+    for booking in sorted(shipment.associated_bookings, key=lambda b: b.sequence_index):
+        route_index = network.routes.index(booking.service_route)
+        edge = next(
+            edge
+            for edge in network.edges
+            if edge.route_index == route_index
+            and edge.departure_segment_index == booking.departure_segment_index
+            and edge.arrival_segment_index == booking.arrival_segment_index
+        )
+        if previous != route_index:
+            total += network.boarding_hours[route_index]
+        total += edge.hours
+        previous = route_index
+    return total
+
+
+@pytest.fixture(scope="module")
+def real_context_environment() -> Any:
+    source = _bootstrap_or_skip()
+    _prepare_imports(source)
+    module = _load_participant_module()
+    import scenario_builders  # noqa: PLC0415
+
+    return module, scenario_builders
+
+
+def test_assigned_chain_is_valid_against_the_organizer_model(
+    real_context_environment: Any,
+) -> None:
+    module, scenario_builders = real_context_environment
+    context = scenario_builders.create_with_disruption()
+    now = SIM_START + dt.timedelta(days=200.5)
+    _apply_runtime_disruption_state(context, now)
+
+    assigned = 0
+    for demand in context.demands:
+        if demand.origin_port is demand.destination_port:
+            continue
+        shipment = _new_shipment(context, demand)
+        result = module.UserStrategy.assign_associated_bookings(context, now, shipment)
+        if result is None:
+            assert shipment.associated_bookings == []
+            continue
+        assert result is True
+        assigned += 1
+        bookings = sorted(shipment.associated_bookings, key=lambda b: b.sequence_index)
+        assert [b.sequence_index for b in bookings] == list(range(1, len(bookings) + 1))
+        assert shipment.current_booking_index == 1
+        # Each booking must name real segments of its own route, and the chain
+        # must connect origin to destination through matching ports.
+        cursor = demand.origin_port
+        for booking in bookings:
+            route = booking.service_route
+            assert route.source_service_route is None
+            assert route.deployed_vessels
+            assert booking in route.associated_bookings
+            assert booking.shipment is shipment
+            departure = next(
+                segment
+                for segment in route.segments
+                if segment.sequence_index == booking.departure_segment_index
+            )
+            arrival = next(
+                segment
+                for segment in route.segments
+                if segment.sequence_index == booking.arrival_segment_index
+            )
+            assert departure.associated_leg.departure_port is cursor
+            cursor = arrival.associated_leg.arrival_port
+        assert cursor is demand.destination_port
+        # Consecutive bookings always change service route.
+        routes = [booking.service_route for booking in bookings]
+        assert all(left is not right for left, right in zip(routes, routes[1:], strict=False))
+
+    assert assigned > 0, "the policy must assign at least one real chain"
+
+
+def test_assigned_chain_is_never_slower_than_the_organizer_choice(
+    real_context_environment: Any,
+) -> None:
+    module, scenario_builders = real_context_environment
+    # simulation_model must be imported first: response_strategies and
+    # simulation_model import each other at module scope.
+    import simulation_model  # noqa: F401, PLC0415
+    from response_strategies import default_strategy as organizer  # noqa: PLC0415
+
+    context = scenario_builders.create_with_disruption()
+    now = SIM_START + dt.timedelta(days=200.5)
+    _apply_runtime_disruption_state(context, now)
+
+    close_plans, leg_plans = organizer._get_active_disruption_plans(context, now)
+    avoid = organizer._get_avoid_port_names(close_plans)
+    congested = organizer._get_congested_legs(leg_plans)
+    organizer_edges = organizer._build_all_candidate_bookings(context, avoid, congested)
+
+    strictly_faster = 0
+    compared = 0
+    for demand in context.demands:
+        if demand.origin_port is demand.destination_port:
+            continue
+        if demand.destination_port.name.casefold() in avoid:
+            continue
+        organizer_path = organizer._find_shortest_booking_path(
+            context, demand.origin_port, demand.destination_port, organizer_edges
+        )
+        if not organizer_path:
+            continue
+        shipment = _new_shipment(context, demand)
+        if module.UserStrategy.assign_associated_bookings(context, now, shipment) is not True:
+            continue
+        reference = _new_shipment(context, demand)
+        for index, edge in enumerate(organizer_path, start=1):
+            from maritime_data_context import Booking  # noqa: PLC0415
+
+            reference.associated_bookings.append(
+                Booking(
+                    sequence_index=index,
+                    shipment=reference,
+                    service_route=edge.service_route,
+                    departure_segment_index=edge.departure_segment_index,
+                    arrival_segment_index=edge.arrival_segment_index,
+                )
+            )
+        try:
+            organizer_hours = _chain_hours(module, context, reference)
+        except StopIteration:
+            # The organizer chose an alternative route, which the policy
+            # deliberately never books; nothing to compare.
+            continue
+        chosen_hours = _chain_hours(module, context, shipment)
+        compared += 1
+        assert chosen_hours <= organizer_hours + 1e-6, (
+            f"{demand.origin_port.name}->{demand.destination_port.name}: "
+            f"chose {chosen_hours:.2f} h over the organizer's {organizer_hours:.2f} h"
+        )
+        if chosen_hours < organizer_hours - 1e-6:
+            strictly_faster += 1
+
+    assert compared > 0
+    assert strictly_faster > 0, "the policy must improve on at least one real chain"
+
+
+def test_policy_does_not_advance_the_model_or_write_output(
+    real_context_environment: Any,
+) -> None:
+    module, scenario_builders = real_context_environment
+    source = round_source_dir("round2")
+    att_path = source / "Output" / "Scenario_ATT_By_Statistics_Interval.csv"
+    before = att_path.stat().st_mtime_ns if att_path.exists() else None
+
+    context = scenario_builders.create_with_disruption()
+    now = SIM_START + dt.timedelta(days=460.5)
+    _apply_runtime_disruption_state(context, now)
+    vessel_total = len(context.vessels)
+    route_total = len(context.service_routes)
+
+    for demand in context.demands[:40]:
+        if demand.origin_port is demand.destination_port:
+            continue
+        module.UserStrategy.assign_associated_bookings(context, now, _new_shipment(context, demand))
+
+    assert len(context.vessels) == vessel_total
+    assert len(context.service_routes) == route_total
+    after = att_path.stat().st_mtime_ns if att_path.exists() else None
+    assert after == before
+
+
+def test_closed_port_window_delegates_for_that_destination(
+    real_context_environment: Any,
+) -> None:
+    module, scenario_builders = real_context_environment
+    context = scenario_builders.create_with_disruption()
+    # Day 400.5 falls inside the Piraeus closure window.
+    now = SIM_START + dt.timedelta(days=400.5)
+    _apply_runtime_disruption_state(context, now)
+
+    piraeus = next(port for port in context.ports if port.name == "Piraeus")
+    assert all(not berth.is_available for berth in piraeus.berths)
+
+    inbound = [
+        demand
+        for demand in context.demands
+        if demand.destination_port is piraeus and demand.origin_port is not piraeus
+    ]
+    assert inbound
+    for demand in inbound:
+        shipment = _new_shipment(context, demand)
+        assert module.UserStrategy.assign_associated_bookings(context, now, shipment) is None
+        assert shipment.associated_bookings == []
+
+    # Cargo that merely used to transit Piraeus must still be routed.
+    routed = 0
+    for demand in context.demands:
+        if demand.destination_port is piraeus or demand.origin_port is demand.destination_port:
+            continue
+        shipment = _new_shipment(context, demand)
+        if module.UserStrategy.assign_associated_bookings(context, now, shipment) is True:
+            routed += 1
+            for booking in shipment.associated_bookings:
+                route = booking.service_route
+                segments = sorted(route.segments, key=lambda s: s.sequence_index)
+                count = len(segments)
+                start = next(
+                    index
+                    for index, segment in enumerate(segments)
+                    if segment.sequence_index == booking.departure_segment_index
+                )
+                end = next(
+                    index
+                    for index, segment in enumerate(segments)
+                    if segment.sequence_index == booking.arrival_segment_index
+                )
+                index = start
+                while True:
+                    assert segments[index].associated_leg.arrival_port is not piraeus
+                    if index == end:
+                        break
+                    index = (index + 1) % count
+    assert routed > 0
+
+
+def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) -> None:
+    module, scenario_builders = real_context_environment
+    context = scenario_builders.create_with_disruption()
+    now = SIM_START + dt.timedelta(days=300.5)
+    _apply_runtime_disruption_state(context, now)
+
+    port_indexes = module._port_indexes(context)
+    network = module._network(context, port_indexes)
+    assert network is not None
+    assert network.edges
+    for edge in network.edges:
+        assert math.isfinite(edge.hours) and edge.hours > 0.0
+    for hours in network.boarding_hours:
+        assert math.isfinite(hours) and hours > 0.0

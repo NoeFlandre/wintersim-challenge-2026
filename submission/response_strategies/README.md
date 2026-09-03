@@ -5,29 +5,62 @@ team **OrtolanForever** for Round 2 of the WSC 2026 Simulation Challenge.
 
 ## Strategy
 
-The policy is deliberately conservative. For newly generated cargo, it may
-hold a shipment on its normal direct service when that service is temporarily
-disrupted. The established recovery hold applies when the safe alternative
-requires at least two service changes. Round 2 additionally permits a
-one-change recovery hold only when all of these conditions are clear from the
-live simulation context:
+The strategy owns exactly one decision: the initial booking chain for newly
+generated cargo (`assign_associated_bookings`). The other three decision points
+are delegated to the organizer's default implementation.
 
-- the nominal service is affected only by an active port closure;
-- the safe alternative requires exactly one service-route change; and
-- the direct service is expected to recover more than one full safe-route
-  headway sooner than that alternative.
+The organizer's fallback selects a booking chain by minimising **sailing
+distance**. Distance ignores how often each service actually departs, so the
+fallback will buy a marginally shorter route at the price of an extra
+transshipment — and a transfer costs, on average, half of the next service's
+headway. This strategy instead minimises **estimated transport time**, built
+entirely from the live simulation context:
 
-In every other case, including incomplete or ambiguous data, the organizer's
-default decision is used. The strategy never creates, edits, or persists
-bookings and makes no changes to simulation state.
+- sailing time per leg is `sailing_distance * sailing_time_multiplier` divided
+  by the mean speed of the route's currently deployed vessels, so an active
+  congestion multiplier is priced rather than merely avoided;
+- boarding a service costs `0.5 * headway`, where
+  `headway = route cycle hours / deployed vessel count`. Cargo loads only onto
+  a vessel whose next segment matches the booking's departure segment, so
+  departures on a given segment are one headway apart;
+- each intermediate port call inside a single booking costs the simulation's
+  fixed three-hour berthing time.
+
+The chain is chosen by a shortest-path search over `(port, service route)`
+states, so each change of service is charged its own boarding wait. Two
+consecutive bookings never use the same service route.
+
+The strategy declines and lets the organizer decide whenever:
+
+- the shipment is not newly generated cargo, or origin and destination match;
+- a port has berths and none of them is available — it is not booked as an
+  arrival or an intermediate call, and a closed destination is delegated so the
+  organizer's wait-and-retry keeps control;
+- the only available path would cross a congested leg. Congested legs are
+  used when a congestion-free path also exists and the congested one is still
+  faster, but never as the sole option;
+- a service route is an organizer-created disruption alternative, or currently
+  has no deployed vessels — booking either could be orphaned when the
+  organizer restores vessels at recovery;
+- any runtime value is missing, malformed, non-finite, ambiguous, or the
+  destination is unreachable.
+
+Bookings are constructed only after the complete chain has been validated and
+are then registered in one pass, so no partially booked shipment can be left
+behind.
 
 ## Runtime guarantees
 
 - Compatible with Python 3.11 and newer.
-- Deterministic and read-only.
-- Uses only the Python standard library and documented simulation interfaces.
+- Deterministic: no randomness, no wall clock, no iteration order that depends
+  on object identity or hashing, and integer-only tie-breaks.
+- Uses only the Python standard library plus `Booking` from the organizer's
+  `maritime_data_context`, which the organizer's own interface documentation
+  directs a custom strategy to create.
+- Read-only apart from the booking chain the interface requires it to create:
+  it changes no route, vessel, berth, disruption, or simulation state.
 - Performs no network, subprocess, filesystem, environment, or wall-clock
-  access, and uses no unseeded randomness or mutable cross-run state.
+  access, and keeps no state between calls.
 
 The organizer's framework supplies the remaining simulation components at
 evaluation time. This archive intentionally contains only the participant

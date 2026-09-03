@@ -1,6 +1,7 @@
 # Round 2: a boarding costs a full headway (v10)
 
-**Status: DESIGN — frozen before the authoritative run.**
+**Status: ACCEPTED — complete. The candidate strictly improved the accepted
+v9 control and is now the active strategy.**
 
 ## Hypothesis
 
@@ -100,3 +101,81 @@ This is a direction check, not the decision. For v9 the same exploratory
 method produced an ATT byte-identical to its authoritative run, which is why it
 is trusted enough to be worth reporting; the acceptance decision still rests on
 one authoritative run in the real round source under the frozen command.
+
+## Full-run result and decision
+
+Exactly one authoritative candidate run used the frozen configuration and the
+fixed command, exiting `0` after `00:39:32` with Period 72, Simulation Day 360
+and `Simulation completed.` The ATT was preserved before scoring and its write
+is proved fresh: the manifest pinned the stale pre-run `Output` ATT at mtime
+`1788472226137910850` with the v9 control's hash, and the scored file has mtime
+`1788475552620326918`.
+
+- candidate ATT SHA-256: `4f22259de77c2e77477ba21f0f7c36c988ee9c5e80cca425984fe65aa0ad6eb4`;
+- raw log SHA-256: `834a1441616b3a0c7bcc2c37654367b3c200a99aa5325a3c40b3805372bbd86f`;
+- 72 numbered periods; candidate mean ATT `14.541944444444445` days against the
+  v9 control's `14.79388888888889` days;
+- **candidate cumulative resilience loss: `14.897068731156086`**;
+- accepted v9 control loss: `20.248013560766417`;
+- difference: `-5.350944829610331`;
+- relative improvement: `26.427011289535063%`;
+- periods better/equal/worse: `54 / 2 / 16`.
+
+The immutable acceptance rule was evaluated unchanged:
+
+```text
+14.897068731156086 < 20.248013560766417 - 1e-9
+```
+
+It is true, so the candidate is **ACCEPTED**.
+
+The authoritative ATT is byte-identical to the exploratory run's ATT
+(`4f22259d...`), so two independent full runs of this frozen candidate agree
+exactly — as they did for v9.
+
+## Where the improvement comes from
+
+| window | periods | v9 loss | v10 loss | delta |
+| --- | --- | --- | --- | --- |
+| no active disruption | 33 | `12.6009` | `9.7485` | `-2.8524` |
+| Shanghai->Kaohsiung congestion | 13 | `4.9317` | `3.5510` | `-1.3807` |
+| Colombo->New Jersey congestion | 13 | `-0.0164` | `-0.8973` | `-0.8808` |
+| Piraeus closure | 4 | `0.8916` | `0.5696` | `-0.3220` |
+| Tianjin closure | 3 | `1.2781` | `1.3131` | `+0.0350` |
+| Qingdao->Busan congestion | 6 | `0.5622` | `0.6122` | `+0.0500` |
+
+The distribution confirms the hypothesis rather than merely rewarding it. The
+prediction was that under-pricing each boarding makes the policy take transfers
+it should decline, that this error is not disruption-specific, and that it
+accumulates over the run. All three hold:
+
+- the largest single gain, `-2.8524`, is in the `33` periods with **no active
+  disruption**, which is where a general mis-costing of transfers should show
+  up and where no disruption-specific policy could ever help;
+- the v9 regression cluster the measurement was derived from — periods 56-63
+  and 70-72 — improves from `9.8975` to `8.1145`, a `-1.7830` recovery of
+  exactly the ground v9 had lost;
+- the Piraeus closure window, the one window v9 made worse than the old v1 hold
+  policy, improves by `-0.3220` and is now better than it was under v1. Pricing
+  the wait correctly repaired that without any closure-specific rule.
+
+The `16` worse periods (2, 4, 6, 12-14, 27, 35, 36, 46-50, 64, 69) are scattered
+rather than clustered and total far less than the gains, with the two smallest
+windows, Tianjin (`+0.0350`) and Qingdao-Busan (`+0.0500`), marginally worse.
+
+## Post-acceptance verification
+
+- `uv lock --check`, locked all-group sync, Ruff format and lint, mypy, ty:
+  clean;
+- 234 non-integration tests, `92.29%` branch coverage (gate `90%`), including
+  a test whose fixture is decided by the coefficient: the half-headway costing
+  picks the two-booking feeder/trunk chain, the full-headway costing picks the
+  direct service;
+- 6 real-context integration tests against the organizer's Round 2 scenario;
+- participant and runtime `user_strategy.py` byte-identical at
+  `a02c8d791d0624fe0ff23c6e30fd787624f47f3ceb40aae57cc1049f4b8fbe69`;
+- Round 2 smoke: `smoke: OK`;
+- deterministic participant-only package, twice, SHA-256
+  `793617df6a47f2f96fc9952fc184a2effcf8edb04fb40f11e1b09c0bd917e232`, with only
+  the two permitted `response_strategies` files;
+- restricted-material scan of tracked files clean; clean Git working tree.

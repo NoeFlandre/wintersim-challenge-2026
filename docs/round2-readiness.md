@@ -47,10 +47,16 @@ it in a submission archive.
 - The tracked `submission/response_strategies/` directory remains the sole
   participant submission surface. It now contains the accepted Round 2
   port-closure recovery-hold strategy; Round 1 evidence remains separate.
-- The accepted experiment is documented in
-  [`round2-port-closure-one-transfer-full-headway-v1.md`](experiments/round2-port-closure-one-transfer-full-headway-v1.md).
-- Its cumulative resilience loss is `35.1039547178493`, compared with the
-  fresh v3 control `35.50366097019303` (a `1.125817%` improvement).
+- Every Round 2 experiment is tabulated in the
+  [experiment ledger](experiments/round2-ledger.md).
+- The active strategy is the accepted
+  [v10 full-headway boarding cost](experiments/round2-full-headway-boarding-v10.md),
+  built on the accepted
+  [v9 time-aware booking assignment](experiments/round2-time-aware-booking-v9.md).
+- Its cumulative resilience loss is `14.897068731156086` over 72 periods,
+  `57.56%` below the `35.1039547178493` reached by the earlier hold-based v1
+  policy. The v1 control was reproduced bit for bit in the current environment
+  before the comparison.
 
 ## Verified archive structure
 

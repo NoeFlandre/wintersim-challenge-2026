@@ -76,49 +76,43 @@ the public setup and compliance notes live in
 [`docs/round2-readiness.md`](docs/round2-readiness.md). The Round 2 notice
 requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
-are documented. The first Round 2 experiment is complete and accepted; its
-strategy, evidence, and decision are documented in
-[`docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md`](docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md).
-The candidate loss is `35.1039547178493` versus a fresh v3 control of
-`35.50366097019303` (a `1.125817%` improvement).
+are documented.
 
-The current `UserStrategy` keeps three decisions delegated to the organizer.
-For new cargo only, it may wait for a disrupted one-booking direct service when
-that service is estimated to recover and deliver sooner than a safe detour.
-The accepted Round 2 extension additionally holds only port-closure-only,
-one-change detours with a full-headway safety margin. All other cases remain
-delegated. The first controlled Round 0 experiment was
-completed and rejected because it increased Cumulative Resilience Loss by
-22.12%; see [`docs/experiments/round0-first-result.md`](docs/experiments/round0-first-result.md).
-Round 1's preceding no-safe congestion-tail booking experiment produced a
-`25.80681018404835` loss against the `20.436668751255972` fallback, worse by
-`26.27699014039333%`, and was rejected under the strict improvement rule; its
-candidate evidence remains preserved in the ignored results directory.
+Ten Round 2 experiments are complete. Every experiment, its behavioural delta,
+activation statistics, score, per-period comparison and decision is tabulated in
+the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
 
-- The preceding Round 1 carried-TEU berth-priority experiment produced the exact
-  fallback loss `20.436668751255972` and byte-identical ATT, so it was rejected
-  by strict equality; its candidate ATT, log, and scorer JSON remain in the
-  ignored results directory.
-- The accepted Round 1 multi-transfer recovery-hold experiment produced
-  `19.084638612143134` over all 72 periods, improving the preceding accepted
-  v2 result by `3.7529484181856874%`. Its ATT SHA-256 is
-  `5838993882ca36ff91bebeecfd23865e1d612c8ac846c206ac81f732bbf1522a`;
-  the tested v3 candidate remains active.
-- The latest Round 1 pure-congestion exclusion experiment scored
-  `22.38757990186231` against the active v3 control
-  `19.084638612143134` and was rejected; its ignored candidate evidence is
-  preserved in the v9 results directory.
-- The latest Round 1 port-closure exclusion experiment retained v3 holds only
-  for pure leg-congestion constraints and delegated port-involved holds. It
-  scored `22.096980694905298` against the active v3 control
-  `19.084638612143134` and was rejected; its candidate ATT and log remain in
-  the ignored v10 results directory, and v3 was restored byte-for-byte.
-- The latest Round 1 port-involved margin-guard experiment delegated only
-  low-margin port-involved v3 holds when the timing advantage was below one
-  safe-route headway. Its single full run scored `20.548930262023504` against
-  the active v3 control, `7.672619218205541%` worse, so it was rejected. The
-  candidate ATT and log remain in the ignored v11 evidence directory, and v3
-  was restored byte-for-byte with score `19.084638612143134`.
+The first eight experiments all tuned one binary predicate: whether to hold new
+cargo at its origin during a disruption. The accepted
+[v1 port-closure hold](docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md)
+reached `35.1039547178493`; relaxing or tightening its margin lost every time.
+
+The last two changed the architecture and are both accepted:
+
+- [v9 time-aware booking assignment](docs/experiments/round2-time-aware-booking-v9.md)
+  stops delegating routing to the organizer's distance-based shortest path and
+  builds the booking chain itself, minimising estimated transport time. Score
+  `20.248013560766417`, an improvement of `42.320%`.
+- [v10 full-headway boarding cost](docs/experiments/round2-full-headway-boarding-v10.md)
+  charges one full headway per boarding rather than half, a correction derived
+  from [measuring the cost model against realized transit
+  time](docs/experiments/round2-cost-model-fidelity.md). Score
+  `14.897068731156086`, a further `26.427%`.
+
+The active Round 2 strategy therefore scores `14.897068731156086`, which is
+`57.56%` below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
+`4f22259de77c2e77477ba21f0f7c36c988ee9c5e80cca425984fe65aa0ad6eb4`, reproduced
+byte-identically by two independent full runs.
+
+The current `UserStrategy` keeps three decisions delegated to the organizer and
+owns one: the initial booking chain for newly generated cargo. It selects the
+chain with the least estimated transport time, computed from live runtime state
+(sailing time at current leg multipliers, one full headway per service route
+boarded, and the simulation's fixed berthing time per intermediate port call).
+It fails closed to the organizer fallback on closed destinations, paths that can
+only cross a congested leg, disruption-alternative or vessel-less routes, and
+any malformed or ambiguous data. Round 0 and Round 1 evidence remains as
+background only; see the ledger and per-experiment reports for the full record.
 
 ## Prerequisites
 

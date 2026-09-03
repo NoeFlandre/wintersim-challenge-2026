@@ -128,6 +128,66 @@ submission import and supplies `Booking`. The strategy is deterministic
 tie-breaks only), read-only apart from the booking chain the interface requires
 it to create, performs no I/O, and keeps no cross-call state.
 
+## Pre-run gates (recorded before the authoritative run)
+
+Frozen implementation commit: `047895b`. Participant strategy SHA-256
+`bc7989ffec898742e6805c3c99d5fba8b7f72abf38f36275b7831a50450af0a6`.
+
+- `uv lock --check`, locked sync, Ruff format/lint, mypy, and ty all clean. A
+  participant-owned stub under `stubs/` declares the organizer-supplied
+  `Booking` surface so both type checkers can resolve an import that exists
+  only in the evaluation runtime; it is never packaged.
+- 233 non-integration tests pass with `92.29%` branch coverage
+  (`96%` for the strategy itself).
+- 6 real-context integration tests pass against the organizer's own Round 2
+  disruption scenario. They assert that every assigned chain is valid against
+  the organizer data model (contiguous sequence indexes, real segments,
+  origin-to-destination port continuity, one route per booking, registered on
+  its route), that no chain is ever slower than the organizer's own choice
+  under the same cost model while at least one is strictly faster, that closed
+  destinations delegate while transit cargo is still routed around the closure,
+  and that no vessel, route, or `Output` file changes.
+- Deterministic participant-only package, twice, SHA-256
+  `b0eb25abae3669011931e248e84ce58b0df55240d8059f42924f1ed337459b41`, members
+  `response_strategies/README.md` and `response_strategies/user_strategy.py`.
+
+### Activation audit
+
+A read-only audit loaded both the accepted control strategy and the candidate
+by path, built a fresh context per sampled instant, applied the runtime
+disruption state, and evaluated every demand at all 166 disruption days plus
+10 undisrupted days. Evidence:
+`.challenge/round2/results/audit_20260903/activation.json`.
+
+| control decision | candidate decision | observations |
+| --- | --- | --- |
+| `None` (delegate) | `True` (own chain) | 66,070 |
+| `False` (hold) | `True` (own chain) | 285 |
+| `None` (delegate) | `None` (delegate) | 525 |
+
+The 285 former holds match the accepted v1 policy's documented hold count
+exactly. Candidate chain lengths were 23,646 single bookings, 28,070 two-booking
+chains, 14,304 three-booking chains and 335 four-booking chains, so the policy
+still transfers when a transfer is genuinely faster. The audit reported
+`mutation_free=true`, `model_advanced=false` and `output_written=false`.
+
+### Isolated partial A/B pre-check
+
+Two isolated copies of the organizer tree, identical except for
+`response_strategies`, each ran the organizer's own measurement loop for a
+140-day warm-up plus 60 measured days. This is a breakage and direction check
+only; it is not the acceptance criterion.
+
+- control: 170,517 of 188,300 shipments completed, `0` unbooked;
+- candidate: 171,129 of 188,300 shipments completed, `0` unbooked;
+- periods 1-12 cumulative loss: control `+0.21935`, candidate `-0.43175`,
+  delta `-0.65110`.
+
+Zero unbooked shipments in both arms is the important safety result: the chain
+builder never strands cargo. The candidate's negative partial loss is the
+predicted mechanism, since these early periods carry no active disruption and
+the improvement therefore comes from routing quality alone.
+
 ## Control and acceptance
 
 - accepted control loss: `35.1039547178493` over exactly 72 five-day periods;

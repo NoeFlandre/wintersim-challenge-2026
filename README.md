@@ -79,6 +79,10 @@ and runtime use are documented. The current accepted strategy is documented in
 [`docs/experiments/round2-multi-transfer-leg-teu-guard-v8.md`](docs/experiments/round2-multi-transfer-leg-teu-guard-v8.md).
 Its loss is `34.62237395179777`, improving the previous accepted Round 2
 control (`35.1039547178493`) by `1.3718704058339608%`.
+The subsequent v9 pure-leg half-headway timing refinement was fully run once,
+matched v8 byte-for-byte at `34.62237395179777`, and was rejected by the strict
+equality rule; its audit and result remain in
+[`docs/experiments/round2-pure-leg-high-teu-half-headway-v9.md`](docs/experiments/round2-pure-leg-high-teu-half-headway-v9.md).
 
 The current `UserStrategy` keeps three decisions delegated to the organizer.
 For new cargo only, it may wait for a disrupted one-booking direct service when

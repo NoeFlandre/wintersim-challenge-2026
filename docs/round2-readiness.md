@@ -55,6 +55,10 @@ it in a submission archive.
   [`round2-multi-transfer-leg-teu-guard-v8.md`](experiments/round2-multi-transfer-leg-teu-guard-v8.md).
   Its cumulative resilience loss is `34.62237395179777`, improving the
   accepted control by `1.3718704058339608%` over all 72 five-day periods.
+- The next v9 pure-leg half-headway refinement was run once and matched v8
+  byte-for-byte, so it was rejected by the strict equality rule. Its complete
+  audit and restoration record is
+  [`round2-pure-leg-high-teu-half-headway-v9.md`](experiments/round2-pure-leg-high-teu-half-headway-v9.md).
 
 ## Verified archive structure
 

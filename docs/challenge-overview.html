@@ -848,6 +848,11 @@
               <td>We kept the accepted control and the proven multi-transfer recovery hold, but delegated only lower-volume cases where a direct shipment was slowed by a sailing-leg congestion event and its safe route needed several service changes. The upper quartile is computed from the live demand population, so the rule targets large shipments without hard-coded routes or values.</td>
               <td><strong>34.62237</strong><br><span class="status better">1.37% better; accepted and current</span></td>
             </tr>
+            <tr>
+              <td><a href="experiments/round2-pure-leg-high-teu-half-headway-v9.md">Gate marginal high-volume pure-leg holds (v9)</a></td>
+              <td>We tested one narrower timing safeguard on the v8 policy: an upper-quartile shipment affected only by leg congestion stayed at origin only when its recovery advantage exceeded half of the safe path's largest service headway. The audit found three live delegations, but the complete run followed exactly the same measured trajectory as v8.</td>
+              <td><strong>34.62237</strong><br><span class="status equal">No change; rejected by strict equality and v8 restored</span></td>
+            </tr>
           </tbody>
         </table>
       </div>

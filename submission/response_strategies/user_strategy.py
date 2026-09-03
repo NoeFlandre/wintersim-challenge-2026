@@ -5,7 +5,10 @@ new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour. The established policy
 requires at least two service-route changes; pure leg-congestion detours also
 require an upper-quartile annual TEU demand. Round 2 permits exactly one
-change for a port-closure-only detour with a full-headway safety margin.
+change for a port-closure-only detour with a full-headway safety margin. For
+upper-quartile pure-leg multi-transfer cases, the active policy additionally
+requires a positive advantage greater than half the safe path's maximum
+headway.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -436,6 +439,14 @@ def _max_path_headway(path: tuple[_Edge, ...]) -> float | None:
     return headway if math.isfinite(headway) and headway > 0.0 else None
 
 
+def _has_half_headway_margin(path: tuple[_Edge, ...], margin: float) -> bool:
+    """Return whether a finite recovery margin clears half a safe headway."""
+    if not math.isfinite(margin) or margin <= 0.0:
+        return False
+    max_headway = _max_path_headway(path)
+    return max_headway is not None and margin > 0.5 * max_headway
+
+
 def _is_upper_quartile_demand(context: Any, demand: Any) -> bool:
     """Return whether ``demand`` is in the deterministic upper quartile."""
     demands = getattr(context, "demands", None)
@@ -515,7 +526,9 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
             return False
         matching = _matching_constraints(nominal_path[0], state)
         if {constraint.kind for constraint in matching} == {"leg"}:
-            return _is_upper_quartile_demand(context, demand)
+            if not _is_upper_quartile_demand(context, demand):
+                return False
+            return _has_half_headway_margin(safe_path, detour_hours - hold_hours)
         return True
     if route_change_count != 1:
         return False

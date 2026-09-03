@@ -77,12 +77,16 @@ def _fixture(
         destination_port=destination,
         annual_teus=annual_teus,
     )
-    population = demands if demands is not None else [
-        SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=100.0),
-        SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=200.0),
-        SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=300.0),
-        target,
-    ]
+    population = (
+        demands
+        if demands is not None
+        else [
+            SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=100.0),
+            SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=200.0),
+            SimpleNamespace(origin_port=origin, destination_port=transfer, annual_teus=300.0),
+            target,
+        ]
+    )
     context = SimpleNamespace(
         ports=[origin, transfer, destination],
         service_routes=[nominal, safe_a, safe_b],
@@ -112,7 +116,7 @@ def test_upper_quartile_equality_is_inclusive_for_one_transfer() -> None:
 
 
 def test_lower_quartile_pure_leg_one_transfer_delegates() -> None:
-    context, now, shipment = _fixture(annual_teus=200.0)
+    context, now, shipment = _fixture(annual_teus=100.0)
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 
@@ -151,7 +155,7 @@ def test_port_only_one_transfer_remains_unchanged() -> None:
 
 def test_mixed_one_transfer_remains_delegated() -> None:
     context, now, shipment = _fixture()
-    context.disruption_plans.append(_leg_plan(context.service_routes[0].segments[0].associated_leg))
+    context.disruption_plans.append(_port_plan(context.ports[-1]))
 
     assert UserStrategy.assign_associated_bookings(context, now, shipment) is None
 

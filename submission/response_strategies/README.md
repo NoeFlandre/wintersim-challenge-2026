@@ -8,11 +8,16 @@ team **OrtolanForever** for Round 2 of the WSC 2026 Simulation Challenge.
 The policy is deliberately conservative. For newly generated cargo, it may
 hold a shipment on its normal direct service when that service is temporarily
 disrupted. The established recovery hold applies when the safe alternative
-requires at least two service changes. Round 2 additionally permits a
-one-change recovery hold only when all of these conditions are clear from the
-live simulation context:
+requires at least two service changes, retaining pure-leg holds only for
+upper-quartile annual-TEU demands. Round 2 additionally permits a one-change
+pure-leg recovery hold for an upper-quartile demand when recovery is sooner
+than the safe detour, and permits a one-change port-only hold only when all of
+these conditions are clear from the live simulation context:
 
-- the nominal service is affected only by an active port closure;
+- for the pure-leg case, the nominal service is affected only by an active
+  leg-congestion plan and the demand is in the deterministic upper quartile;
+- for the port-only case, the nominal service is affected only by an active
+  port closure;
 - the safe alternative requires exactly one service-route change; and
 - the direct service is expected to recover more than one full safe-route
   headway sooner than that alternative.

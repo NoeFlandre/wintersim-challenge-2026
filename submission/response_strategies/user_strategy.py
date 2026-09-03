@@ -4,8 +4,10 @@ The active experiment is deliberately narrow: while a disruption is active,
 new cargo may remain at origin when an interrupted one-booking direct service
 is estimated to recover sooner than a safe detour. The established policy
 requires at least two service-route changes; pure leg-congestion detours also
-require an upper-quartile annual TEU demand. Round 2 permits exactly one
-change for a port-closure-only detour with a full-headway safety margin.
+require an upper-quartile annual TEU demand. Round 2 additionally extends that
+demand guard to a positive-margin, exactly one-change pure-leg detour and
+permits exactly one change for a port-closure-only detour with a full-headway
+safety margin.
 Every decision is derived from the supplied runtime objects. The strategy is
 read-only, deterministic, standard-library-only, and delegates on uncertainty.
 """
@@ -521,7 +523,10 @@ def _should_hold(context: Any, now: Any, shipment: Any) -> bool:
         return False
 
     matching = _matching_constraints(nominal_path[0], state)
-    if {constraint.kind for constraint in matching} != {"port"}:
+    matching_kinds = {constraint.kind for constraint in matching}
+    if matching_kinds == {"leg"}:
+        return hold_hours < detour_hours and _is_upper_quartile_demand(context, demand)
+    if matching_kinds != {"port"}:
         return False
     margin = detour_hours - hold_hours
     if not math.isfinite(margin) or margin <= 0.0:

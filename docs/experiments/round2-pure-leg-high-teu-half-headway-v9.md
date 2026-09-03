@@ -1,6 +1,6 @@
 # Round 2: pure-leg high-TEU half-headway recovery gate (v9)
 
-**Status: DESIGN FROZEN — pre-implementation.**
+**Status: REJECTED — complete; v8 incumbent restored.**
 
 This document freezes one new, independently named Round 2 experiment. It is
 not a score claim and it authorizes no second candidate, tuning, publication,
@@ -129,3 +129,37 @@ commit the result report, revert only this candidate's implementation/tests in
 reverse order, synchronize and re-score the pinned v8 ATT, rerun final gates,
 and leave v8 active. No tuning, duplicate run, second candidate within v9,
 push, merge, PR, upload, submission, or history rewrite is authorized.
+
+## Full-run result and decision
+
+The frozen candidate was run exactly once after all preflight gates:
+
+- command exit: `0`;
+- final markers: Period 72 (Days 356–360), Day 360, `Simulation completed`;
+- candidate log:
+  `.challenge/round2/results/pure_leg_high_teu_half_headway_v9_20260903/full_run.log`;
+- log SHA-256:
+  `590d5d04632a13f14309385efbe857706142761d6cda583f7bc09465fe0efb54`;
+- preserved candidate ATT SHA-256:
+  `616a8b07870d9de0b2597cb317ee14d4743455f5d4b34f315adf15895fc95700`;
+- candidate cumulative resilience loss: `34.62237395179777` over 72 periods;
+- candidate mean ATT: `15.532083333333333` days.
+
+The candidate ATT is byte-identical to the v8 incumbent ATT, so all 72 periods
+are equal (0 better, 72 equal, 0 worse) and the delta is exactly `0.0`.
+The immutable acceptance expression
+`candidate_loss < 34.62237395179777 - 1e-9` is not met. The experiment is
+therefore **REJECTED**. The three declared control-only decisions were live in
+the activation audit, but they did not change the measured trajectory under
+this run; activation is not score evidence.
+
+Machine-readable result, score, comparison, and raw evidence remain privately
+ignored under
+`.challenge/round2/results/pure_leg_high_teu_half_headway_v9_20260903/`.
+
+## Restoration
+
+The v9 participant change and v9 tests are reverted in reverse order after this
+result record. The exact v8 participant/runtime bytes and pinned v8 ATT are
+then restored and re-scored. Final verification must leave v8 active, with no
+simulation process, no restricted material in Git, and a clean working tree.

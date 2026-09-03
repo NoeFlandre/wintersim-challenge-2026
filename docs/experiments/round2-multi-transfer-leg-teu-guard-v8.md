@@ -1,6 +1,6 @@
 # Round 2: upper-quartile pure-leg multi-transfer recovery hold (v8)
 
-**Status: DESIGN — implementation and full run not yet authorized.**
+**Status: IMPLEMENTED — PRE-RUN REVIEW (activation audit GO; full run not yet launched).**
 
 ## Hypothesis
 
@@ -57,13 +57,30 @@ port, berth, context, or event state is edited.
 
 ## TDD and activation gate
 
-Commit this design before implementation. RED tests must fail against the
-accepted v1 adapter only for the new lower-quartile pure-leg delegation. GREEN
-tests must cover upper-quartile equality inclusion, lower-quartile delegation,
-port-closure preservation, mixed-constraint preservation, malformed/missing
-demand populations, demand identity, existing one-transfer behavior, exact
-timing equality, public signatures, and complete no-mutation behavior. Add a
-real Round 2 integration assertion derived from the organizer context.
+The design was committed before implementation. The initial RED file had an
+escaped docstring and two topology fixtures that did not actually match their
+declared constraints; commit `ac567dd` repaired those test-only defects. The
+participant implementation is `dc47966`. The focused v8 suite is green, the
+existing recovery-hold suite remains green, and
+`tests/integration/test_round2_multi_transfer_leg_teu_guard_v8_real_context.py`
+exercises the real Round 2 context.
+
+Tests cover upper-quartile equality inclusion, lower-quartile delegation,
+port-closure and mixed-constraint preservation, malformed/missing demand
+populations, demand identity, no mutation, and the existing one-transfer and
+timing contracts.
+
+The fresh non-mutating activation audit is recorded privately at
+`.challenge/round2/results/multi_transfer_leg_teu_guard_v8_20260901/`:
+
+- 166 valid disruption midpoints × 380 demands = 63,080 observations;
+- accepted-v1 holds: 285; candidate holds: 266;
+- exactly 19 control-only decisions, all pure-leg multi-transfer holds below
+  the 1,801-TEU third quartile; zero candidate-only or unexpected decisions;
+- participant state was unchanged for every call and the pre-existing Output
+  ATT file remained byte-identical.
+
+This is a GO gate for the full run, not a prediction of the score.
 
 Before a full run, perform a fresh non-mutating audit at every valid Round 2
 disruption midpoint and every demand. Compare an independent accepted-v1

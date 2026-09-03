@@ -17,11 +17,6 @@ live simulation context:
 - the direct service is expected to recover more than one full safe-route
   headway sooner than that alternative.
 
-For an upper-quartile demand whose direct service is affected only by leg
-congestion and whose safe alternative requires at least two service-route
-changes, the strategy keeps the shipment at origin only when the recovery
-advantage is strictly greater than half of the safe path's maximum headway.
-
 In every other case, including incomplete or ambiguous data, the organizer's
 default decision is used. The strategy never creates, edits, or persists
 bookings and makes no changes to simulation state.

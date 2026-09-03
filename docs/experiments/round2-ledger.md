@@ -67,14 +67,17 @@ that started the round.
    `1.0` was taken because it is the mechanism value, not because it scored
    best; no sweep was run.
 
-Open questions now:
+9. **Check the mechanism before building the fix.** The natural explanation
+   for v10's late-run excursion was that vessels stuck at a closed port make
+   the headway statistic lie. The run's own statistics refuted it: vessels
+   waiting for a berth never exceed `0.22` on average while waiting cargo
+   climbs steadily. A plausible-sounding correction would have addressed a
+   cause that is not present.
 
-- the wait is still a statistic. Reading the next departure from live vessel
-  positions and segment occupancy would remove the calibration question
-  entirely, and it is the natural successor to v10;
-- `adjust_bookings_before_cargo_handling` remains fully delegated, so cargo
-  already in transit is still replanned by the organizer's distance-based
-  search. Nothing has yet been tried there;
-- `9.7485` of the remaining `14.897` loss sits in the 33 periods with no active
-  disruption, so general routing quality, not disruption response, is still
-  where most of the objective lives.
+Open questions are attributed with evidence in
+[`round2-remaining-loss-attribution.md`](round2-remaining-loss-attribution.md):
+`9.7485` of the remaining `14.897` sits in periods with no active disruption,
+`0` unfinished shipments are unbooked, `69%` of aged backlog is already in
+transit, and no OD pair exceeds `2.2%` of it. The two widest remaining levers
+are reading the next departure from live vessel state instead of estimating it,
+and taking over in-transit replanning.

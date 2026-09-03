@@ -1,4 +1,4 @@
-"""Behavioral contract for the Round 2 v9 pure-leg timing guard."""
+"""RED contract for the Round 2 v9 pure-leg timing guard."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Any
 
 import response_strategies.user_strategy as strategy_module
 from response_strategies.user_strategy import UserStrategy
+
 
 ANCHOR = dt.datetime.min
 
@@ -59,9 +60,15 @@ def _fixture(
     transfer_b = _port("Transfer B")
     destination = _port("Destination")
     nominal = _route("nominal", [origin, destination, origin], [100.0, 100.0])
-    safe_a = _route("safe-a", [origin, transfer_a, origin], [safe_distance, safe_distance])
-    safe_b = _route("safe-b", [transfer_a, transfer_b, transfer_a], [safe_distance, safe_distance])
-    safe_c = _route("safe-c", [transfer_b, destination, transfer_b], [safe_distance, safe_distance])
+    safe_a = _route(
+        "safe-a", [origin, transfer_a, origin], [safe_distance, safe_distance]
+    )
+    safe_b = _route(
+        "safe-b", [transfer_a, transfer_b, transfer_a], [safe_distance, safe_distance]
+    )
+    safe_c = _route(
+        "safe-c", [transfer_b, destination, transfer_b], [safe_distance, safe_distance]
+    )
     target = SimpleNamespace(
         origin_port=origin,
         destination_port=destination,
@@ -120,12 +127,8 @@ def _margin(context: Any, now: dt.datetime, shipment: Any) -> float:
     graphs = strategy_module._graphs(context, state)
     assert graphs is not None
     demand = shipment.demand
-    nominal = strategy_module._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[0]
-    )
-    safe = strategy_module._shortest_path(
-        context, demand.origin_port, demand.destination_port, graphs[1]
-    )
+    nominal = strategy_module._shortest_path(context, demand.origin_port, demand.destination_port, graphs[0])
+    safe = strategy_module._shortest_path(context, demand.origin_port, demand.destination_port, graphs[1])
     assert nominal is not None and safe is not None
     recovery = strategy_module._edge_constraint_recovery(nominal[0], state)
     nominal_hours = strategy_module._path_service_hours(nominal)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, Round 1 setup, and Round 0 experiments.">
+  <meta name="description" content="A concise overview of the Winter Simulation Conference 2026 Simulation Challenge, its rules, Round 1 and Round 2 setup, and controlled experiments.">
   <title>Winter Simulation Conference 2026 Challenge — Context &amp; Experiment Log</title>
   <style>
     :root {
@@ -377,7 +377,7 @@
 <body>
   <header class="topbar">
     <nav class="nav" aria-label="Page sections">
-      <a class="brand" href="#top">WSC 2026 / Round 1</a>
+      <a class="brand" href="#top">WSC 2026 / Round 2</a>
       <a href="#context">Context</a>
       <a href="#glossary">Terms</a>
       <a href="#rules">Rules</a>
@@ -387,7 +387,7 @@
 
   <main id="top">
     <header>
-      <p class="eyebrow">Challenge context &amp; experiment log · 17 August 2026</p>
+      <p class="eyebrow">Challenge context &amp; experiment log · 3 September 2026</p>
       <h1>Make disrupted maritime shipping recover faster.</h1>
       <p class="lede">
         In the <strong>Winter Simulation Conference
@@ -396,25 +396,23 @@
         supplied by the challenge organizer.
         The single objective is to minimize <strong>Cumulative Resilience Loss</strong>
         without breaking simulation integrity or submission rules.
-        Round 1 has its own private source tree; eighteen scored and one
-        incomplete controlled Round 1 strategy experiments are recorded below.
-        The tenth scored candidate first beat fallback; the eleventh improved
-        that result. The twelfth through eighteenth extensions were rejected, so
-        the eleventh remains active.
+        Round 1 and Round 2 each have their own private source tree. The
+        accepted Round 1 multi-transfer policy remains documented below, while
+        Round 2's current accepted policy is the v8 pure-leg TEU guard.
       </p>
 
       <div class="snapshot" aria-label="Current project snapshot">
         <div class="metric">
-          <strong>19.0846</strong>
-          <span>accepted Round 1 loss</span>
+          <strong>34.6224</strong>
+          <span>accepted Round 2 loss</span>
         </div>
         <div class="metric">
-          <strong>20.4367</strong>
-          <span>Round 1 fallback loss</span>
+          <strong>35.1040</strong>
+          <span>Round 2 incumbent before v8</span>
         </div>
         <div class="metric">
-          <strong>2</strong>
-          <span>controlled candidates accepted</span>
+          <strong>1.37%</strong>
+          <span>Round 2 improvement</span>
         </div>
         <div class="metric">
           <strong>72</strong>
@@ -437,7 +435,7 @@
         <article class="card">
           <span class="number">1</span>
           <h3>Run the network</h3>
-          <p>Round 0 used a 140-day warm-up followed by 360 measured days. Round 1 has its own private source tree and must be measured separately.</p>
+          <p>Each official round uses its own private source tree, a 140-day warm-up and 360 measured days. Round 0 is practice only.</p>
         </article>
         <article class="card">
           <span class="number">2</span>
@@ -564,7 +562,8 @@
 
       <ul class="rules">
         <li><strong>Round 0 is practice only.</strong> It must never be submitted as an official entry.</li>
-        <li><strong>Round 1 is official.</strong> It closes on 23 August 2026 and carries 20% of the final weighting.</li>
+        <li><strong>Round 1 is official.</strong> It closed on 23 August 2026 and carries 20% of the final weighting.</li>
+        <li><strong>Round 2 is official.</strong> Its submission window is 1–23 September 2026 and it carries 30% of the final weighting.</li>
         <li><strong>Lower loss wins.</strong> Mean <abbr title="Average Transport Time">ATT</abbr> alone cannot accept a candidate.</li>
         <li><strong>Only response strategies ship.</strong> Everything required must live in <code>response_strategies/</code>, the submission folder containing our hooks.</li>
         <li><strong>Organizer assets stay private.</strong> Source, inputs and outputs are ignored and never redistributed.</li>
@@ -597,18 +596,12 @@
         <strong>Round-specific fallback references:</strong>
         candidates are compared with the fallback for their own round.
         Equality is rejection; lower is better. Round 0 uses the
-        <strong>18.6735778198</strong> fallback; the paired Round 1 no-op
-        fallback is <strong>20.4366687513</strong>. Eighteen Round 1 candidates
-        were scored, one run was interrupted before measured output,
-        the tenth scored candidate was accepted at <strong>19.8288033747</strong>,
-        and the eleventh improved it to <strong>19.0846386121</strong>. The
-        twelfth scored <strong>22.3925</strong> and the thirteenth scored
-        <strong>20.8105</strong>. The fourteenth scored
-        <strong>21.4284</strong>, the fifteenth scored
-        <strong>20.2295</strong>, and the sixteenth scored
-        <strong>22.3876</strong>. The seventeenth scored
-        <strong>22.0970</strong>, and the eighteenth scored
-        <strong>20.5489</strong>; all seven were rejected, leaving v3 active.
+        <strong>18.6735778198</strong> fallback. Round 1's no-op fallback is
+        <strong>20.4366687513</strong>, and its accepted v3 policy reached
+        <strong>19.0846386121</strong>. Round 2's accepted control was
+        <strong>35.1039547178</strong>; the current v8 policy reached
+        <strong>34.6223739518</strong>, a strict <strong>1.37%</strong>
+        improvement. Full experiment details are below.
       </div>
     </section>
 
@@ -616,14 +609,13 @@
       <p class="eyebrow">04 · Experiments</p>
       <h2>What we tried</h2>
       <p class="section-intro">
-        Each Round 0 experiment changed one decision rule, then ran the same
-        complete 360-day disruption simulation. We compared its loss with the
-        <strong>18.6736 Round 0 fallback</strong>. Round 1 trials used their own
-        complete simulation and <strong>20.4367 Round 1 fallback</strong>.
-        Lower is better; equality is not an improvement. Eighteen scored Round 1
-        trials included sixteen rejections and one incomplete attempt. Two were accepted in
-        sequence; the eleventh remains active at 6.62% below fallback after
-        the twelfth through eighteenth were rejected.
+        Each experiment changed one participant decision rule, then used the
+        same complete simulation and scoring formula for its round. Round 0
+        compared with <strong>18.6736</strong>; Round 1 with
+        <strong>20.4367</strong>; and Round 2 with its accepted control
+        <strong>35.1040</strong>. Lower is better and equality is not an
+        improvement. The tables summarize the question each trial answered and
+        its measured result; rejected code was restored before the next trial.
       </p>
 
       <div class="table-wrap">
@@ -804,16 +796,75 @@
           </tbody>
         </table>
       </div>
+
+      <h3>Round 2 · controlled trials</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Experiment</th>
+              <th scope="col">What we tested and why</th>
+              <th scope="col">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="experiments/round2-port-closure-one-transfer-full-headway-v1.md">Hold cargo for a closed port when a safe transfer is slower</a></td>
+              <td>For a new direct shipment whose route touched a closed port, we kept it at origin when the direct service's recovery plus a full safe-route headway was still faster than leaving on a one-transfer detour. This became the Round 2 control.</td>
+              <td><strong>35.10395</strong><br><span class="status better">1.13% better than the fresh no-op; accepted control</span></td>
+            </tr>
+            <tr>
+              <td>Use a smaller recovery margin</td>
+              <td>We repeated the control policy but allowed a hold with only half of the safe route's headway as its safety margin. The smaller buffer released cargo too optimistically and increased later congestion.</td>
+              <td><strong>35.67435</strong><br><span class="status worse">Rejected; worse than the control</span></td>
+            </tr>
+            <tr>
+              <td>Use a three-quarter recovery margin</td>
+              <td>We tested an intermediate headway margin to balance waiting for recovery against taking a transfer. It still held the wrong cases often enough to worsen the complete score.</td>
+              <td><strong>35.53523</strong><br><span class="status worse">Rejected; worse than the control</span></td>
+            </tr>
+            <tr>
+              <td>Hold only near late recovery</td>
+              <td>We restricted the control hold to disruptions close to their scheduled end, expecting a late recovery to make a detour particularly wasteful. The narrower timing rule missed useful holds and performed worse.</td>
+              <td><strong>35.86913</strong><br><span class="status worse">Rejected; worse than the control</span></td>
+            </tr>
+            <tr>
+              <td>Prioritize a pending-route berth</td>
+              <td>We changed berth selection so a waiting vessel already reserved for a disruption alternative could be served first. The real cases did not alter the final output.</td>
+              <td><strong>35.10395</strong><br><span class="status equal">No change; rejected by strict equality</span></td>
+            </tr>
+            <tr>
+              <td>Hold only high-volume one-transfer cargo</td>
+              <td>We added a TEU threshold to the one-transfer hold, hoping to protect the largest shipments while avoiding small-cargo side effects. The complete run was worse.</td>
+              <td><strong>35.84345</strong><br><span class="status worse">Rejected; worse than the control</span></td>
+            </tr>
+            <tr>
+              <td>Combine high volume with a half-headway margin</td>
+              <td>We combined the volume filter with the smaller recovery margin. The combination changed real decisions but still increased total loss.</td>
+              <td><strong>35.41374</strong><br><span class="status worse">Rejected; worse than the control</span></td>
+            </tr>
+            <tr>
+              <td>Protect high-volume pure-leg multi-transfer cargo (v8)</td>
+              <td>We kept the accepted control and the proven multi-transfer recovery hold, but delegated only lower-volume cases where a direct shipment was slowed by a sailing-leg congestion event and its safe route needed several service changes. The upper quartile is computed from the live demand population, so the rule targets large shipments without hard-coded routes or values.</td>
+              <td><strong>34.62237</strong><br><span class="status better">1.37% better; accepted and current</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        Round 2 v8 improved 14 periods, matched 52 and worsened 6; its net
+        score gain is the official acceptance measure.
+      </p>
     </section>
 
   </main>
 
   <footer>
-    Concise project map derived from the tracked rules, architecture, experiment
-    reports, nine completed Round 0 experiments, twenty-five scored Round 1
-    experiments, and one incomplete Round 1 attempt. See the <a href="round1-readiness.md">Round 1 readiness record</a>,
-    the <a href="experiments/round1-deferred-in-transit-rebooking-v1.md">first Round 1 result</a>,
-    and the <a href="experiments/round1-pending-alternative-activation-v26.md">latest Round 1 result</a>.
+    Concise project map derived from the tracked rules, architecture, and
+    documented Round 0, Round 1 and Round 2 experiments. See the
+    <a href="round1-readiness.md">Round 1 readiness record</a>,
+    the <a href="round2-readiness.md">Round 2 readiness record</a>,
+    and the <a href="experiments/round2-multi-transfer-leg-teu-guard-v8.md">accepted Round 2 v8 result</a>.
     Official challenge materials remain authoritative.
   </footer>
 </body>

@@ -1,6 +1,6 @@
 # Round 2: upper-quartile pure-leg multi-transfer recovery hold (v8)
 
-**Status: IMPLEMENTED — PRE-RUN REVIEW (activation audit GO; full run not yet launched).**
+**Status: ACCEPTED — strict improvement; incumbent Round 2 strategy.**
 
 ## Hypothesis
 
@@ -80,15 +80,44 @@ The fresh non-mutating activation audit is recorded privately at
 - participant state was unchanged for every call and the pre-existing Output
   ATT file remained byte-identical.
 
-This is a GO gate for the full run, not a prediction of the score.
+This was a GO gate for the full run, not a prediction of the score.
 
-Before a full run, perform a fresh non-mutating audit at every valid Round 2
-disruption midpoint and every demand. Compare an independent accepted-v1
-oracle with the candidate. Require the candidate-only difference to be zero,
-the control-only differences to be exactly the declared pure-leg,
-below-third-quartile slice, and no unexpected decisions, mutation, model
-advancement, or `Output` write. Activation is a GO gate only and does not
-predict the score.
+## Full-run result
+
+The frozen candidate was run once with the fixed Round 2 configuration:
+
+- command: `PYTHONHASHSEED=0 UV_CACHE_DIR=/tmp/wsc-uv-cache uv run wsc2026 run --round round2 --full`;
+- exit `0`, Period 72 / Day 360, and `Simulation completed`;
+- simulation runtime: `00:21:46`;
+- candidate ATT SHA-256: `616a8b07870d9de0b2597cb317ee14d4743455f5d4b34f315adf15895fc95700`;
+- candidate cumulative resilience loss: `34.62237395179777` over 72 periods;
+- candidate mean ATT (the CSV's two-decimal period values): `15.532083333333333` days.
+
+Against the accepted control (`35.1039547178493`, ATT SHA
+`3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`), the
+candidate is lower by `0.481580766051529`, a `1.3718704058339608%`
+improvement. Fourteen periods improved, 52 were equal, and six worsened; the
+net gain comes from the later disruption periods, including a `0.46`-day ATT
+reduction in Period 58 and a `0.47`-day reduction in Period 63. The candidate
+was therefore **accepted** under the strict rule
+`candidate_loss < 35.1039547178493 - 1e-9` and remains active.
+
+Private evidence is retained under
+`.challenge/round2/results/multi_transfer_leg_teu_guard_v8_20260901/`:
+
+- `full_run.log` (SHA-256 `ae83183f8b111cc8ad17aa93c0eb9e92e5db17361f4568b10c91df0fae08f0cb`);
+- `ATT_By_Statistics_Interval.csv` (SHA-256 above);
+- `score.json`, `comparison_to_control.json`, and the pre-run manifests.
+
+The first invocation attempted before the run exited before simulator
+initialization because `uv` selected an unwritable default cache; its
+diagnostic is preserved as `preflight_uv_cache_failure.log`. It produced no
+simulation, no Output write, and does not count as a candidate run.
+
+The run checkpoint confirmed the participant/runtime hash
+`7e9794843eae071186cfdff4d835fb5d3e645bbd3d09008c86ac7977af1a17ee`, the
+candidate ATT in the active Round 2 Output, and no restricted material in Git.
+The final verification below is rerun after this report is committed.
 
 ## Fixed control and run contract
 

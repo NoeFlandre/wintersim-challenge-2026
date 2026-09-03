@@ -1,8 +1,9 @@
 # Round 2 readiness
 
 **Status:** organizer archive downloaded, checksum-verified, bootstrapped,
-synchronized, and smoke-tested. The first Round 2 experiment is complete and
-accepted; Round 1 remains unchanged.
+synchronized, and smoke-tested. Round 2's accepted incumbent is now the v8
+upper-quartile pure-leg multi-transfer recovery-hold strategy; Round 1 remains
+unchanged.
 
 ## Organizer notice
 
@@ -47,10 +48,13 @@ it in a submission archive.
 - The tracked `submission/response_strategies/` directory remains the sole
   participant submission surface. It now contains the accepted Round 2
   port-closure recovery-hold strategy; Round 1 evidence remains separate.
-- The accepted experiment is documented in
-  [`round2-port-closure-one-transfer-full-headway-v1.md`](experiments/round2-port-closure-one-transfer-full-headway-v1.md).
-- Its cumulative resilience loss is `35.1039547178493`, compared with the
-  fresh v3 control `35.50366097019303` (a `1.125817%` improvement).
+- The original accepted experiment is documented in
+  [`round2-port-closure-one-transfer-full-headway-v1.md`](experiments/round2-port-closure-one-transfer-full-headway-v1.md);
+  its `35.1039547178493` result is now the control for later trials.
+- The current accepted experiment is documented in
+  [`round2-multi-transfer-leg-teu-guard-v8.md`](experiments/round2-multi-transfer-leg-teu-guard-v8.md).
+  Its cumulative resilience loss is `34.62237395179777`, improving the
+  accepted control by `1.3718704058339608%` over all 72 five-day periods.
 
 ## Verified archive structure
 

@@ -1,6 +1,7 @@
 # Round 2: time-aware booking assignment (v9)
 
-**Status: DESIGN — frozen before implementation.**
+**Status: ACCEPTED — complete. The candidate strictly improved the accepted
+control and is now the active strategy.**
 
 ## Why a new architecture
 
@@ -204,3 +205,128 @@ candidate_loss < 35.1039547178493 - 1e-9
 Equality, worsening, invalid output, crash, or a failed final gate is
 rejection. On rejection the candidate code and tests are reverted, the accepted
 control is synchronized, and its pinned ATT is restored and re-scored.
+
+## Control reproduction
+
+Before the candidate ran, the accepted control strategy was run once in this
+environment with the frozen configuration. It reproduced the documented result
+bit for bit, which establishes that the comparison is sound and that this
+container is deterministic:
+
+- control ATT SHA-256: `3d02322b340136474319f3e6cf6bce2120676e2e6ad50eef293e02ed618643e5`
+  (byte-identical to the documented accepted control);
+- control cumulative loss: `35.1039547178493` over 72 periods, equal to the
+  documented value to the last digit;
+- runtime `01:01:13`; evidence under
+  `.challenge/round2/results/control_repro_20260903/`.
+
+## Full-run result and decision
+
+Exactly one authoritative candidate run used the frozen configuration and the
+fixed command, exiting `0` after `00:39:37` with Period 72, Simulation Day 360,
+`Simulation completed.` and the CSV-written marker. The ATT was preserved
+before scoring, and its write is proved fresh: the manifest pinned the stale
+pre-run `Output` ATT at mtime `1788469792234316665` with the control's hash,
+and the scored file has mtime `1788472226137910850`.
+
+- candidate ATT SHA-256: `cbde868e871b9dbe624e2aeeb222b6e4f9638375d6a5178dbf1bf571413e5a88`;
+- raw log SHA-256: `a44e51370c4f709d40ac2312ac85a8d48c01c9d0a3f041aeb736dff1ad4a48e6`;
+- 72 numbered periods; candidate mean ATT `14.79388888888889` days against the
+  control's `15.557500000000001` days;
+- **candidate cumulative resilience loss: `20.248013560766417`**;
+- accepted-control loss: `35.1039547178493`;
+- difference: `-14.855941157082881`;
+- relative improvement: `42.3198505025677%`;
+- periods better/equal/worse: `50 / 0 / 22`.
+
+The immutable acceptance rule was evaluated unchanged:
+
+```text
+20.248013560766417 < 35.1039547178493 - 1e-9
+```
+
+It is true, so the candidate is **ACCEPTED**. No second candidate was run and
+no threshold was altered after launch.
+
+### Independent reproduction
+
+An exploratory full run of the identical strategy in a separate copy of the
+organizer tree, started before the authoritative run, produced ATT SHA-256
+`cbde868e871b9dbe624e2aeeb222b6e4f9638375d6a5178dbf1bf571413e5a88` — byte
+identical to the authoritative run — and therefore the same score. Two
+independent runs of the frozen candidate agree exactly.
+
+## Where the improvement comes from
+
+| window | periods | control loss | candidate loss | delta |
+| --- | --- | --- | --- | --- |
+| Shanghai->Kaohsiung congestion | 13 | `16.7290` | `4.9317` | `-11.7973` |
+| Colombo->New Jersey congestion | 13 | `1.2326` | `-0.0164` | `-1.2490` |
+| Qingdao->Busan congestion | 6 | `1.6728` | `0.5622` | `-1.1107` |
+| no active disruption | 33 | `13.4287` | `12.6009` | `-0.8278` |
+| Tianjin closure | 3 | `1.5063` | `1.2781` | `-0.2283` |
+| Piraeus closure | 4 | `0.5345` | `0.8916` | `+0.3571` |
+
+The result matches the pre-run diagnosis rather than merely beating it. The
+Shanghai-Kaohsiung congestion window alone accounts for `-11.7973` of the
+`-14.8559` total, or 79% of the improvement. That window carries `47.7%` of the
+control's entire loss and was never addressable by the v1-v7 hold family, which
+only ever operated inside the two port closures worth `5.8%` between them.
+
+The mechanism is the one the audit identified. While `Shanghai->Kaohsiung` is
+congested, the organizer's distance-based fallback sends Shanghai->Los Angeles
+cargo - the largest single demand in the matrix at `6,393` annual TEU - along
+`S1 Shanghai->Shenzhen`, `S2 Shenzhen->Kaohsiung`, `S4 Kaohsiung->Los Angeles`:
+three bookings and two transfers, chosen because it is 79 nautical miles shorter
+than the two-booking `S2 Shanghai->Busan`, `S9 Busan->Los Angeles` path. At S4's
+`154`-hour headway the extra transfer costs days. Control ATT peaks at `20.51`
+days in period 39; the candidate holds it to `16.15`.
+
+The `33` periods with no active disruption improve by `-0.8278`, confirming the
+audit's finding that the defect is structural and not disruption-specific.
+
+## Regressions and what they indicate
+
+`22` periods are worse: 1, 6, 18, 19, 42, 52, 54, 55, 56-63, 66-68 and 70-72.
+They are not scattered noise; they cluster in two places.
+
+1. **Periods 56-63 and 70-72** (late run, no active disruption) contribute most
+   of the loss added back. This is the signature of the cost model
+   under-pricing transfers: the companion measurement in
+   [`round2-cost-model-fidelity.md`](round2-cost-model-fidelity.md) shows the
+   estimate is low by about `+45` hours per boarding, roughly half the network's
+   `108`-hour mean headway, so chains with more transfers are chosen more often
+   than they should be and the error accumulates through the run.
+2. **The Piraeus closure window** is the only window that is worse overall
+   (`+0.3571`). Closure handling is the one area where the retired v1 hold was
+   doing useful work, so a closure-specific refinement is a separate candidate.
+
+Both point to concrete, separately testable follow-ups rather than to a flaw in
+the accepted result.
+
+## Post-acceptance verification
+
+The accepted candidate remained synchronized and active. All final gates were
+rerun after the result was recorded:
+
+- `uv lock --check`, locked all-group sync, Ruff format and lint, mypy, and ty:
+  clean;
+- 233 non-integration tests, `92.29%` branch coverage (gate `90%`);
+- 6 real-context integration tests against the organizer's Round 2 scenario;
+- Round 2 sync leaves participant and runtime `user_strategy.py` byte-identical
+  at `bc7989ffec898742e6805c3c99d5fba8b7f72abf38f36275b7831a50450af0a6`;
+- Round 2 smoke: `smoke: OK`;
+- deterministic participant-only package, twice, SHA-256
+  `022c0b3abcd2a5a9e5abbf31fb7ce7af1525772e10ea30b0f6861c8644845955`, members
+  `response_strategies/README.md` and `response_strategies/user_strategy.py`
+  only;
+- restricted-material scan of tracked files: no archive, `Input/`, `Output/`,
+  `main.py`, `default_strategy.py`, or `simulation_model/` path is tracked;
+- clean Git working tree.
+
+One bookkeeping correction: the `package_sha256` pinned in the pre-run manifest
+(`b0eb25ab...`) was computed before the participant README was rewritten for
+this policy, so it is stale. The manifest has been annotated with the final
+package hash. Only `user_strategy.py` affects evaluated behaviour, and its hash
+is identical across the manifest, the participant tree, the synchronized
+runtime, and both completed full runs.

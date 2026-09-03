@@ -18,7 +18,7 @@ authoritative baseline ATT
 | v6 | v1 holds dropped below the third-quartile annual-TEU threshold | 285 to 168 holds | `35.84344929789106` | `+0.7395` (`+2.107%`) | 10/59/3 | rejected |
 | v7 | v1 plus upper-quartile-TEU half-headway holds | +39 holds (324) | `35.41374495066942` | `+0.3098` (`+0.882%`) | — | rejected |
 | v8 | delegate lower-quartile pure-leg multi-transfer holds | — | design only | — | — | never run |
-| v9 | **architecture change:** build the booking chain from estimated transport time instead of delegating to the organizer's distance-based shortest path | 66,070 chains where the incumbent delegated; 285 former holds now booked | pending | pending | pending | pending |
+| v9 | **architecture change:** build the booking chain from estimated transport time instead of delegating to the organizer's distance-based shortest path | 66,070 chains where the incumbent delegated; 285 former holds now booked | `20.248013560766417` | `-14.8559` (`-42.320%`) | 50/0/22 | **accepted** |
 
 ## Lessons carried forward
 
@@ -36,8 +36,27 @@ authoritative baseline ATT
    shipment's age at each period end, so a hold that does not pay off is
    charged in every period it spans. That is the mechanism behind v2/v3/v7:
    marginal-margin holds accumulate age faster than they save transit time.
-5. **Capacity is not a constraint.** Service-route utilisation runs `0.88%` to
+5. **The loss was never where the experiments were looking.** Per-period
+   attribution of the control run puts `47.7%` of the loss in the
+   Shanghai-Kaohsiung congestion window and `38.3%` in periods with no active
+   disruption. The two port closures, which are the only place the v1-v7 family
+   could act, hold `5.8%` between them. Attribute the objective before
+   choosing where to intervene.
+6. **Capacity is not a constraint.** Service-route utilisation runs `0.88%` to
    `6.12%`. Transport time is dominated by sailing time plus waiting for the
    next departure, so re-routing cargo between services has no meaningful
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
+
+## After v9
+
+v9 replaced the architecture, so the incumbent is now
+`20.248013560766417` and the open questions have changed:
+
+- the cost model under-prices each boarding by about `+45` hours, which is
+  measured, mechanism-explained, and the likely cause of the v9 regression
+  cluster in periods 56-63 and 70-72;
+- the Piraeus closure window is the one window v9 makes worse (`+0.3571`),
+  which is where the retired v1 hold had been earning its keep;
+- `adjust_bookings_before_cargo_handling` is still fully delegated, so cargo
+  already in transit is still replanned by distance.

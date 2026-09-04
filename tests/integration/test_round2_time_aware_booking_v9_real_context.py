@@ -95,7 +95,11 @@ def _new_shipment(context: Any, demand: Any) -> Any:
 
 
 def _chain_hours(module: Any, context: Any, shipment: Any) -> float:
-    """Estimated hours of an assigned chain, using the strategy's own model."""
+    """Estimated hours of an assigned chain, using the strategy's own model.
+
+    Mirrors the strategy: the first service boarded is charged the live wait
+    carried on its edge, later services their headway expectation.
+    """
     port_indexes = module._port_indexes(context)
     network = module._network(context, port_indexes)
     assert network is not None
@@ -110,7 +114,9 @@ def _chain_hours(module: Any, context: Any, shipment: Any) -> float:
             and edge.departure_segment_index == booking.departure_segment_index
             and edge.arrival_segment_index == booking.arrival_segment_index
         )
-        if previous != route_index:
+        if previous is None:
+            total += edge.first_wait_hours
+        elif previous != route_index:
             total += network.boarding_hours[route_index]
         total += edge.hours
         previous = route_index

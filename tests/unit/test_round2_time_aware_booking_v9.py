@@ -34,12 +34,24 @@ def _route(
     *,
     vessels: int = 1,
     speed: float = 20.0,
+    speeds: list[float] | None = None,
     multipliers: list[float] | None = None,
+    positions: list[int] | None = None,
+    alongside: bool = False,
+    stranded: bool = False,
 ) -> SimpleNamespace:
     """Build a cyclic route visiting ``ports`` in order and returning to start.
 
     ``ports`` lists the departure port of each leg; the cycle closes back onto
     ``ports[0]``. ``distances`` has one entry per leg.
+
+    Each deployed vessel is given a position on the rotation, because the
+    strategy reads live vessel positions to price the first boarding. By
+    default the vessels are spread evenly around the cycle, which is what a
+    settled service looks like. ``positions`` places them explicitly,
+    ``alongside`` puts them at a berth rather than at sea, and ``stranded``
+    points them at a segment of another route so they cannot be located, which
+    is the case that falls back to the headway expectation.
     """
     route = SimpleNamespace(
         id=route_id,
@@ -47,10 +59,6 @@ def _route(
         source_service_route=None,
         disruption_key=None,
         associated_bookings=[],
-        deployed_vessels=[
-            SimpleNamespace(vessel_class=SimpleNamespace(sailing_speed=speed))
-            for _ in range(vessels)
-        ],
         segments=[],
     )
     if multipliers is None:
@@ -71,6 +79,21 @@ def _route(
                 associated_service_route=route,
             )
         )
+    count = len(route.segments)
+    if positions is None:
+        positions = [(index * count) // vessels for index in range(vessels)]
+    vessel_speeds = speeds if speeds is not None else [speed] * vessels
+    foreign = SimpleNamespace(sequence_index=1, associated_leg=None)
+    route.deployed_vessels = [
+        SimpleNamespace(
+            index=index,
+            vessel_class=SimpleNamespace(sailing_speed=vessel_speeds[index]),
+            current_segment=(foreign if stranded else route.segments[positions[index] % count]),
+            current_berth=SimpleNamespace() if alongside else None,
+            carried_shipments=[],
+        )
+        for index in range(vessels)
+    ]
     return route
 
 
@@ -273,28 +296,37 @@ def test_route_without_deployed_vessels_is_never_booked() -> None:
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is None
 
 
-def test_headway_uses_the_live_deployed_vessel_count() -> None:
-    """The same network flips its decision purely on deployed vessel counts.
-
-    direct (1 vessel)  = 0.5 * (1000/20)/1 + 500/20 = 50.0 h
-    direct (5 vessels) = 0.5 * (1000/20)/5 + 500/20 = 30.0 h
-    transfer           = 2 * (0.5 * (600/20)/2 + 300/20) = 45.0 h
-    """
+def _vessel_count_fixture(*, direct_vessels: int) -> tuple[Any, Any]:
     origin = _port("Origin")
     destination = _port("Destination")
     hub = _port("Hub")
-    direct = _route("DIRECT", [origin, destination], [500.0, 500.0], vessels=1)
+    direct = _route("DIRECT", [origin, destination], [500.0, 500.0], vessels=direct_vessels)
     feeder = _route("FEEDER", [origin, hub], [300.0, 300.0], vessels=2)
     trunk = _route("TRUNK", [hub, destination], [300.0, 300.0], vessels=2)
     context = _context([origin, hub, destination], [direct, feeder, trunk])
+    return context, _shipment(origin, destination)
 
-    infrequent = _shipment(origin, destination)
-    assert UserStrategy.assign_associated_bookings(context, NOW, infrequent) is True
+
+def test_more_vessels_around_the_rotation_shorten_the_wait_and_flip_the_choice() -> None:
+    """Deploying a second vessel on the direct service must change the plan.
+
+    One vessel on DIRECT has just left the origin, so the next sailing is a
+    whole cycle away and the two-leg path wins:
+
+      direct   = (0.5 * 25 + 3 + 25 + 3) + 25                    = 68.5 h
+      transfer = (0.5 * 15 + 3) + 15  + (600/20)/2 + 15          = 55.5 h
+
+    A second DIRECT vessel on the return leg is about to arrive, which is what
+    a higher-frequency service actually means:
+
+      direct   = (0.5 * 25 + 3) + 25                             = 40.5 h
+    """
+    infrequent_context, infrequent = _vessel_count_fixture(direct_vessels=1)
+    assert UserStrategy.assign_associated_bookings(infrequent_context, NOW, infrequent) is True
     assert _chain(infrequent) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
 
-    direct.deployed_vessels = direct.deployed_vessels * 5
-    frequent = _shipment(origin, destination)
-    assert UserStrategy.assign_associated_bookings(context, NOW, frequent) is True
+    frequent_context, frequent = _vessel_count_fixture(direct_vessels=2)
+    assert UserStrategy.assign_associated_bookings(frequent_context, NOW, frequent) is True
     assert _chain(frequent) == [("DIRECT", 1, 1)]
 
 
@@ -561,32 +593,151 @@ def test_a_long_way_round_edge_is_costed_with_intermediate_berthing() -> None:
 
 
 def _headway_coefficient_fixture() -> tuple[Any, Any]:
-    """A network whose cheapest chain depends on the price of one boarding.
+    """Two chains that share their first boarding, so only a transfer differs.
 
-    ``direct`` is a high-frequency 800 nm service; ``feeder`` + ``trunk`` reach
-    the destination in 200 + 200 nm but each runs a single vessel, so each
-    boarding is expensive:
+    Both options start on ``MAIN`` at the same segment, so the live
+    first-boarding wait is identical and cancels out. What is left is whether
+    staying on ``MAIN`` to the destination beats hopping onto the
+    single-vessel ``BRANCH``:
 
-      direct   = (1600/20)/8 + 800/20                     = 10 + 40 = 50.0 h
-      transfer = (400/20)/1 + 200/20  (feeder)
-               + (400/20)/1 + 200/20  (trunk)             = 30 + 30 = 60.0 h
+      stay    = 100/20 + 900/20 + 3 (one intermediate call)      = 53.0 h
+      hop     = 100/20 + BRANCH boarding + 400/20
+                with a full headway  = 5 + 40 + 20               = 65.0 h
+                with half a headway  = 5 + 20 + 20               = 45.0 h
 
-    Charging only half a headway per boarding would instead make the transfer
-    look cheaper (40.0 h against 45.0 h) and would pick it, so this fixture
-    discriminates between the two costings.
+    So a full headway keeps the cargo on MAIN and half a headway would move it
+    onto BRANCH.
     """
     origin = _port("Origin")
-    destination = _port("Destination")
     hub = _port("Hub")
-    direct = _route("DIRECT", [origin, destination], [800.0, 800.0], vessels=8)
-    feeder = _route("FEEDER", [origin, hub], [200.0, 200.0], vessels=1)
-    trunk = _route("TRUNK", [hub, destination], [200.0, 200.0], vessels=1)
-    context = _context([origin, hub, destination], [direct, feeder, trunk])
+    destination = _port("Destination")
+    main = _route("MAIN", [origin, hub, destination], [100.0, 900.0, 100.0], vessels=1)
+    branch = _route("BRANCH", [hub, destination], [400.0, 400.0], vessels=1)
+    context = _context([origin, hub, destination], [main, branch])
     return context, _shipment(origin, destination)
 
 
-def test_a_boarding_costs_a_full_headway_not_half() -> None:
+def test_a_transfer_boarding_costs_a_full_headway_not_half() -> None:
     context, shipment = _headway_coefficient_fixture()
 
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
-    assert _chain(shipment) == [("DIRECT", 1, 1)]
+    assert _chain(shipment) == [("MAIN", 1, 2)]
+
+
+# ---------------------------------------------------------------------------
+# The first boarding is read from live vessel positions.
+# ---------------------------------------------------------------------------
+
+
+def _live_phase_fixture(*, imminent: str) -> tuple[Any, Any]:
+    """Two interchangeable services; only their vessel positions differ.
+
+    ``EARLY`` and ``LATE`` are the same shape, so under a headway-only costing
+    they tie and the tie-break is arbitrary. Placing one route's vessel just
+    short of the origin and the other's just past it must decide the choice.
+    """
+    origin = _port("Origin")
+    destination = _port("Destination")
+    early = _route(
+        "EARLY",
+        [origin, destination],
+        [400.0, 400.0],
+        vessels=1,
+        positions=[1] if imminent == "EARLY" else [0],
+    )
+    late = _route(
+        "LATE",
+        [origin, destination],
+        [400.0, 400.0],
+        vessels=1,
+        positions=[1] if imminent == "LATE" else [0],
+    )
+    context = _context([origin, destination], [early, late])
+    return context, _shipment(origin, destination)
+
+
+def test_prefers_the_service_whose_vessel_departs_sooner() -> None:
+    # A vessel sailing the return leg (position 1) is about to reach the origin;
+    # one that has just left it (position 0) is a whole cycle away.
+    context, shipment = _live_phase_fixture(imminent="LATE")
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("LATE", 1, 1)]
+
+
+def test_the_same_network_flips_when_the_imminent_vessel_changes() -> None:
+    context, shipment = _live_phase_fixture(imminent="EARLY")
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("EARLY", 1, 1)]
+
+
+def test_a_vessel_alongside_a_berth_is_treated_as_about_to_depart() -> None:
+    origin = _port("Origin")
+    destination = _port("Destination")
+    # Both vessels sit at position 0; only ALONGSIDE has finished sailing.
+    sailing = _route("SAILING", [origin, destination], [400.0, 400.0], positions=[0])
+    berthed = _route(
+        "ALONGSIDE", [origin, destination], [400.0, 400.0], positions=[1], alongside=True
+    )
+    context = _context([origin, destination], [sailing, berthed])
+    shipment = _shipment(origin, destination)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("ALONGSIDE", 1, 1)]
+
+
+def test_unlocatable_vessels_fall_back_to_the_headway_expectation() -> None:
+    """A route whose vessels cannot be placed must still be usable.
+
+    ``STRANDED`` carries a foreign current segment, so no live phase can be
+    read. It must not be dropped: with a far shorter cycle than ``SLOW`` its
+    headway expectation still wins.
+    """
+    origin = _port("Origin")
+    destination = _port("Destination")
+    stranded = _route("STRANDED", [origin, destination], [100.0, 100.0], vessels=1, stranded=True)
+    slow = _route("SLOW", [origin, destination], [4000.0, 4000.0], vessels=1, positions=[1])
+    context = _context([origin, destination], [stranded, slow])
+    shipment = _shipment(origin, destination)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("STRANDED", 1, 1)]
+
+
+def test_equal_speeds_give_exactly_the_cycle_over_vessel_count_headway() -> None:
+    """The mixed-speed headway must be an identity when speeds match.
+
+    The reciprocal-of-rates form generalises to vessels of differing speed;
+    for the usual equal-speed deployment it must reproduce the plain
+    cycle / vessel-count headway bit for bit, so it cannot perturb a settled
+    result.
+    """
+    import response_strategies.user_strategy as strategy
+
+    origin = _port("Origin")
+    hub = _port("Hub")
+    destination = _port("Destination")
+    route = _route("R", [origin, hub, destination], [100.0, 200.0, 300.0], vessels=3)
+    context = _context([origin, hub, destination], [route])
+    network = strategy._network(context, strategy._port_indexes(context))
+
+    assert network is not None
+    cycle_hours = (100.0 + 200.0 + 300.0) / 20.0
+    assert network.boarding_hours[0] == cycle_hours / 3
+
+
+def test_mixed_speeds_board_faster_than_the_slowest_vessel_alone() -> None:
+    import response_strategies.user_strategy as strategy
+
+    origin = _port("Origin")
+    destination = _port("Destination")
+    mixed = _route("MIXED", [origin, destination], [400.0, 400.0], vessels=2, speeds=[10.0, 40.0])
+    context = _context([origin, destination], [mixed])
+    network = strategy._network(context, strategy._port_indexes(context))
+
+    assert network is not None
+    slow_cycle = 800.0 / 10.0
+    fast_cycle = 800.0 / 40.0
+    assert network.boarding_hours[0] == 1.0 / (1.0 / slow_cycle + 1.0 / fast_cycle)
+    assert network.boarding_hours[0] < fast_cycle

@@ -13,7 +13,14 @@ Every quantity is read from the supplied runtime objects. The strategy is
 deterministic, standard-library-only, performs no I/O, keeps no state between
 calls, and delegates to the organizer fallback whenever the runtime data is
 malformed, ambiguous, or would force cargo across a congested leg that no
-alternative path avoids. The other three decision points stay delegated.
+alternative path avoids.
+
+It also owns one veto. When a disruption appears after cargo is already at sea,
+the organizer replans the rest of its journey by sailing distance and by
+refusing the disrupted ports and legs outright, which can be much slower than
+simply staying aboard and waiting the disruption out. Where the same cost model
+says the booked chain already beats the best alternative, the strategy keeps it.
+The remaining two decision points stay delegated.
 """
 
 from __future__ import annotations
@@ -288,19 +295,25 @@ def _route_edges(
     return tuple(edges), boarding_hours
 
 
-def _network(
-    context: Any, port_indexes: dict[int, int], reopen_hours: dict[int, float]
-) -> _Network | None:
-    """Build the bookable network from the live nominal service routes."""
-    ports = tuple(context.ports)
-    closed_indexes: set[int] = set()
-    for index, port in enumerate(ports):
+def _closed_port_indexes(context: Any) -> frozenset[int] | None:
+    """Positions in ``context.ports`` of every port with no berth available."""
+    closed: set[int] = set()
+    for index, port in enumerate(tuple(context.ports)):
         state = _port_is_closed(port)
         if state is None:
             return None
         if state:
-            closed_indexes.add(index)
-    closed = frozenset(closed_indexes)
+            closed.add(index)
+    return frozenset(closed)
+
+
+def _network(
+    context: Any, port_indexes: dict[int, int], reopen_hours: dict[int, float]
+) -> _Network | None:
+    """Build the bookable network from the live nominal service routes."""
+    closed = _closed_port_indexes(context)
+    if closed is None:
+        return None
 
     raw_routes = _sequence(getattr(context, "service_routes", None))
     if raw_routes is None:
@@ -424,6 +437,157 @@ def _fastest_path(
     return tuple(path)
 
 
+def _ordered_segments(route: Any) -> tuple[Any, ...] | None:
+    """The route's segments in rotation order, or ``None`` if malformed."""
+    segments = _sequence(getattr(route, "segments", None))
+    if not segments:
+        return None
+    ordered: list[tuple[int, Any]] = []
+    seen: set[int] = set()
+    for segment in segments:
+        index = getattr(segment, "sequence_index", None)
+        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+            return None
+        if index in seen:
+            return None
+        seen.add(index)
+        ordered.append((index, segment))
+    ordered.sort(key=lambda item: item[0])
+    return tuple(segment for _index, segment in ordered)
+
+
+def _position_of(segments: tuple[Any, ...], sequence_index: Any) -> int:
+    return next(
+        (
+            position
+            for position, segment in enumerate(segments)
+            if segment.sequence_index == sequence_index
+        ),
+        -1,
+    )
+
+
+def _ride_segments(
+    segments: tuple[Any, ...], departure_index: Any, arrival_index: Any
+) -> tuple[Any, ...] | None:
+    """Segments sailed from ``departure_index`` to ``arrival_index`` inclusive."""
+    start = _position_of(segments, departure_index)
+    end = _position_of(segments, arrival_index)
+    if start < 0 or end < 0:
+        return None
+    ridden: list[Any] = []
+    cursor = start
+    while True:
+        ridden.append(segments[cursor])
+        if cursor == end:
+            return tuple(ridden)
+        cursor = (cursor + 1) % len(segments)
+        if len(ridden) > len(segments):
+            return None
+
+
+def _remaining_rides(
+    shipment: Any, current_booking: Any, current_segment: Any
+) -> tuple[tuple[Any, Any, Any], ...] | None:
+    """The rides still to be sailed, as (route, departure index, arrival index).
+
+    Mirrors how the organizer splits a chain at the vessel's current port: the
+    part of the current booking already sailed is dropped, and a current
+    booking that ends here contributes nothing.
+    """
+    bookings = _sequence(getattr(shipment, "associated_bookings", None))
+    if not bookings:
+        return None
+    for booking in bookings:
+        index = getattr(booking, "sequence_index", None)
+        if isinstance(index, bool) or not isinstance(index, int):
+            return None
+    rides: list[tuple[Any, Any, Any]] = []
+    for booking in sorted(bookings, key=lambda item: item.sequence_index):
+        if booking.sequence_index < current_booking.sequence_index:
+            continue
+        route = getattr(booking, "service_route", None)
+        segments = None if route is None else _ordered_segments(route)
+        if segments is None:
+            return None
+        if booking is current_booking:
+            here = _position_of(segments, current_segment.sequence_index)
+            end = _position_of(segments, booking.arrival_segment_index)
+            if here >= 0 and here == end:
+                continue
+            if here < 0:
+                departure = booking.departure_segment_index
+            else:
+                departure = segments[(here + 1) % len(segments)].sequence_index
+        else:
+            departure = booking.departure_segment_index
+        rides.append((route, departure, booking.arrival_segment_index))
+    return tuple(rides)
+
+
+def _ride_is_disrupted(
+    route: Any,
+    departure_index: Any,
+    arrival_index: Any,
+    closed: frozenset[int],
+    port_indexes: dict[int, int],
+) -> bool | None:
+    """Whether this ride calls at a shut port or crosses a congested leg."""
+    segments = _ordered_segments(route)
+    if segments is None:
+        return None
+    ridden = _ride_segments(segments, departure_index, arrival_index)
+    if ridden is None:
+        return None
+    for segment in ridden:
+        leg = getattr(segment, "associated_leg", None)
+        if leg is None:
+            return None
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if multiplier is None:
+            return None
+        if multiplier > 1.0:
+            return True
+        position = port_indexes.get(id(getattr(leg, "arrival_port", None)))
+        if position is None:
+            return None
+        if position in closed:
+            return True
+    return False
+
+
+def _find_edge(network: _Network, route: Any, departure_index: Any, arrival_index: Any):
+    for position, candidate in enumerate(network.routes):
+        if candidate is not route:
+            continue
+        for edge in network.edges:
+            if (
+                edge.route_index == position
+                and edge.departure_segment_index == departure_index
+                and edge.arrival_segment_index == arrival_index
+            ):
+                return edge
+        return None
+    return None
+
+
+def _rides_hours(network: _Network, rides: tuple[tuple[Any, Any, Any], ...]) -> float | None:
+    """Estimated hours to sail ``rides``, already aboard the first one."""
+    elapsed = 0.0
+    previous: Any = None
+    for position, (route, departure_index, arrival_index) in enumerate(rides):
+        edge = _find_edge(network, route, departure_index, arrival_index)
+        if edge is None:
+            return None
+        if position and previous is not route:
+            elapsed += network.boarding_hours[edge.route_index]
+        elapsed = _edge_arrival(edge, elapsed)
+        if not math.isfinite(elapsed):
+            return None
+        previous = route
+    return elapsed
+
+
 def _plan(context: Any, now: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | None:
     """Choose the booking chain for one newly generated shipment."""
     bookings = getattr(shipment, "associated_bookings", None)
@@ -497,6 +661,136 @@ def _assign(context: Any, now: Any, shipment: Any) -> bool | None:
     return True
 
 
+def _reopen_positions(context: Any, now: Any, port_indexes: dict[int, int]) -> dict[int, float]:
+    recovery = _closure_recovery(context, now) or {}
+    return {
+        position: hours
+        for identity, hours in recovery.items()
+        if (position := port_indexes.get(identity)) is not None
+    }
+
+
+def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
+    """Keep in-transit chains when they already beat every alternative.
+
+    The organizer replans a carried shipment whenever the unfinished part of
+    its chain meets an active disruption, rebuilding by sailing distance and
+    refusing the disrupted ports and legs outright. Staying aboard and waiting
+    is often faster. This returns ``True`` — a decision to change nothing —
+    only when the booked chain is at least as fast as the best alternative from
+    here, judged by the same cost model that chose the chain in the first place.
+
+    The alternative is costed optimistically, with no wait to board its first
+    service, so a chain is kept only when it beats even the most favourable
+    rebuild. Anything uncertain delegates, which restores the organizer's
+    behaviour exactly.
+    """
+    current_segment = getattr(vessel, "current_segment", None)
+    leg = getattr(current_segment, "associated_leg", None)
+    current_port = getattr(leg, "arrival_port", None)
+    if current_port is None:
+        return None
+    carried = _sequence(getattr(vessel, "carried_shipments", None))
+    if not carried:
+        return None
+
+    port_indexes = _port_indexes(context)
+    if port_indexes is None:
+        return None
+    current_index = port_indexes.get(id(current_port))
+    if current_index is None:
+        return None
+    closed = _closed_port_indexes(context)
+    if closed is None:
+        return None
+
+    reopen_hours = _reopen_positions(context, now, port_indexes)
+    network: _Network | None = None
+    decided = 0
+
+    for shipment in carried:
+        bookings = _sequence(getattr(shipment, "associated_bookings", None))
+        if not bookings:
+            continue
+        current_booking = next(
+            (
+                booking
+                for booking in bookings
+                if getattr(booking, "sequence_index", None)
+                == getattr(shipment, "current_booking_index", None)
+            ),
+            None,
+        )
+        if current_booking is None:
+            continue
+        rides = _remaining_rides(shipment, current_booking, current_segment)
+        if rides is None:
+            return None
+        if not rides:
+            continue
+
+        disrupted = False
+        for route, departure_index, arrival_index in rides:
+            state = _ride_is_disrupted(route, departure_index, arrival_index, closed, port_indexes)
+            if state is None:
+                return None
+            disrupted = disrupted or state
+        if not disrupted:
+            # The organizer would leave this shipment alone too.
+            continue
+
+        final_route, _departure, final_arrival = rides[-1]
+        final_segments = _ordered_segments(final_route)
+        if final_segments is None:
+            return None
+        final_position = _position_of(final_segments, final_arrival)
+        if final_position < 0:
+            return None
+        final_port = getattr(
+            getattr(final_segments[final_position], "associated_leg", None),
+            "arrival_port",
+            None,
+        )
+        destination_index = port_indexes.get(id(final_port))
+        if destination_index is None:
+            return None
+        if destination_index == current_index:
+            continue
+
+        if network is None:
+            network = _network(context, port_indexes, reopen_hours)
+            if network is None:
+                return None
+
+        keep_hours = _rides_hours(network, rides)
+        if keep_hours is None:
+            return None
+        clean = _fastest_path(network, current_index, destination_index, allow_congestion=False)
+        if clean is None:
+            return None
+        best = _fastest_path(network, current_index, destination_index, allow_congestion=True)
+        if not best:
+            return None
+        alternative = _rides_hours(
+            network,
+            tuple(
+                (
+                    network.routes[edge.route_index],
+                    edge.departure_segment_index,
+                    edge.arrival_segment_index,
+                )
+                for edge in best
+            ),
+        )
+        if alternative is None:
+            return None
+        if keep_hours > alternative:
+            return None
+        decided += 1
+
+    return True if decided else None
+
+
 class UserStrategy:
     """Deterministic participant strategy with one time-aware booking policy."""
 
@@ -527,5 +821,8 @@ class UserStrategy:
 
     @staticmethod
     def adjust_bookings_before_cargo_handling(context: Any, now: Any, vessel: Any) -> Any:
-        """Delegate in-transit booking changes to the organizer fallback."""
-        return None
+        """Keep an in-transit chain that already beats every alternative."""
+        try:
+            return _keep_booked_chains(context, now, vessel)
+        except _DATA_ERRORS:
+            return None

@@ -741,3 +741,279 @@ def test_congested_leg_plans_do_not_produce_reopening_times() -> None:
     # reopening time still applies and the short ride is still chosen.
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
     assert _chain(shipment) == [("VIA", 1, 2)]
+
+
+# ---------------------------------------------------------------------------
+# In-transit chains are kept when they already beat every alternative.
+# ---------------------------------------------------------------------------
+
+
+def _booking(
+    sequence_index: int, shipment: Any, route: Any, departure: int, arrival: int
+) -> SimpleNamespace:
+    booking = SimpleNamespace(
+        sequence_index=sequence_index,
+        shipment=shipment,
+        service_route=route,
+        departure_segment_index=departure,
+        arrival_segment_index=arrival,
+    )
+    route.associated_bookings.append(booking)
+    return booking
+
+
+def _in_transit_fixture(reopen_hours: float, *, closed: bool = True) -> tuple[Any, Any, Any]:
+    """A vessel at ``Mid`` carrying cargo booked onward through a shut port.
+
+    ``MAIN`` runs Origin -> Mid -> Shut -> Dest -> Origin on 100 nm legs with one
+    vessel, so a boarding costs its 20 h cycle. ``BYPASS`` runs Mid -> Dest on
+    1000 nm legs with one vessel, so boarding it costs 100 h.
+
+      keep      = ride Mid->Dest on MAIN: 10 h sailing + 3 h call, with the shut
+                  call 5 h in held until it reopens
+      bypass    = 50 h of sailing, costed with no wait to board
+    """
+    origin = _port("Origin")
+    mid = _port("Mid")
+    shut = _port("Shut", closed=closed)
+    dest = _port("Dest")
+    main = _route("MAIN", [origin, mid, shut, dest], [100.0, 100.0, 100.0, 100.0], vessels=1)
+    bypass = _route("BYPASS", [mid, dest], [1000.0, 1000.0], vessels=1)
+    context = _context([origin, mid, shut, dest], [main, bypass])
+    context.disruption_plans = [_closure_plan(shut, reopen_hours)] if closed else []
+
+    shipment = SimpleNamespace(
+        teu_size=10.0,
+        demand=SimpleNamespace(origin_port=origin, destination_port=dest),
+        associated_bookings=[],
+        current_booking_index=1,
+    )
+    shipment.associated_bookings.append(_booking(1, shipment, main, 1, 3))
+    vessel = SimpleNamespace(
+        index=0,
+        vessel_class=SimpleNamespace(sailing_speed=20.0),
+        assigned_service_route=main,
+        current_segment=main.segments[0],
+        current_berth=None,
+        carried_shipments=[shipment],
+    )
+    return context, vessel, shipment
+
+
+def _freeze_chain(shipment: Any) -> list[tuple[str, int, int, int]]:
+    return [
+        (
+            b.service_route.id,
+            b.sequence_index,
+            b.departure_segment_index,
+            b.arrival_segment_index,
+        )
+        for b in shipment.associated_bookings
+    ]
+
+
+def test_a_booked_chain_that_beats_every_alternative_is_kept() -> None:
+    # The shut port reopens in 8 h, well before the cargo could reach the
+    # destination any other way, so staying aboard wins.
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    before = _freeze_chain(shipment)
+    index_before = shipment.current_booking_index
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
+    assert _freeze_chain(shipment) == before
+    assert shipment.current_booking_index == index_before
+
+
+def test_a_long_closure_delegates_so_the_organizer_can_replan() -> None:
+    # Reopening in 500 h makes staying aboard far worse than the bypass, so the
+    # organizer keeps control of the replan.
+    context, vessel, shipment = _in_transit_fixture(500.0)
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_an_undisrupted_remaining_chain_delegates() -> None:
+    # Nothing on the rest of the journey is disrupted, so the organizer would
+    # not replan either and there is no decision to take.
+    context, vessel, shipment = _in_transit_fixture(8.0, closed=False)
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_vessel_carrying_nothing_delegates() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    vessel.carried_shipments = []
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_vessel_with_no_current_segment_delegates() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    vessel.current_segment = None
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_shipment_whose_current_booking_ends_here_delegates() -> None:
+    # The booking finishes at Mid, so there is nothing left to compare.
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    shipment.associated_bookings[0].arrival_segment_index = 1
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_shipment_with_an_unknown_current_booking_index_delegates() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    shipment.current_booking_index = 99
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_malformed_booking_sequence_delegates() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    shipment.associated_bookings[0].sequence_index = "first"
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_booking_on_an_unknown_route_delegates() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    shipment.associated_bookings[0].service_route = None
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_the_veto_never_mutates_the_context() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    routes_before = [list(route.associated_bookings) for route in context.service_routes]
+    carried_before = list(vessel.carried_shipments)
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
+    assert [list(route.associated_bookings) for route in context.service_routes] == routes_before
+    assert vessel.carried_shipments == carried_before
+
+
+def test_a_multi_booking_chain_is_walked_from_the_current_port() -> None:
+    """A later booking on another service must be costed too, not ignored."""
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    main, bypass = context.service_routes
+    # Re-book as MAIN Origin->Shut then BYPASS is not connected from Shut, so
+    # use MAIN Origin->Mid->Shut then MAIN Shut->Dest as a second booking.
+    shipment.associated_bookings.clear()
+    main.associated_bookings.clear()
+    shipment.associated_bookings.append(_booking(1, shipment, main, 1, 2))
+    shipment.associated_bookings.append(_booking(2, shipment, main, 3, 3))
+    shipment.current_booking_index = 1
+
+    result = UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel)
+    assert result in (True, None)
+    # Whatever it decides, it must not have touched the chain.
+    assert [b.sequence_index for b in shipment.associated_bookings] == [1, 2]
+
+
+def test_a_vessel_whose_current_leg_has_no_arrival_port_delegates() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    vessel.current_segment.associated_leg.arrival_port = None
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_needs_the_current_port_in_the_context() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.ports = [port for port in context.ports if port.name != "Mid"]
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_on_a_malformed_port_collection() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.ports = None
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_on_a_non_boolean_berth_state() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.ports[1].berths[0].is_available = "yes"
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_shipment_without_bookings_is_skipped_by_the_veto() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    bare = SimpleNamespace(
+        teu_size=1.0,
+        demand=shipment.demand,
+        associated_bookings=[],
+        current_booking_index=None,
+    )
+    vessel.carried_shipments = [bare, shipment]
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
+
+
+def test_a_veto_delegates_when_a_booked_route_is_malformed() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.service_routes[0].segments[1].sequence_index = 1
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_when_a_booked_leg_is_malformed() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.service_routes[0].segments[1].associated_leg.sailing_time_multiplier = None
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_when_a_booked_leg_leaves_the_context() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.service_routes[0].segments[1].associated_leg.arrival_port = _port("Ghost")
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_when_the_arrival_segment_is_unknown() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    shipment.associated_bookings[0].arrival_segment_index = 99
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_when_the_destination_is_unreachable_without_congestion() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    # Congest the only bypass so no congestion-free alternative exists.
+    for segment in context.service_routes[1].segments:
+        segment.associated_leg.sailing_time_multiplier = 5.0
+    for segment in context.service_routes[0].segments:
+        segment.associated_leg.sailing_time_multiplier = 5.0
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_veto_delegates_when_the_network_cannot_be_built() -> None:
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.service_routes[1].deployed_vessels[0].vessel_class.sailing_speed = -1.0
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_a_chain_ending_at_the_current_port_is_skipped() -> None:
+    context, vessel, shipment = _in_transit_fixture(8.0)
+    main = context.service_routes[0]
+    shipment.associated_bookings.clear()
+    main.associated_bookings.clear()
+    # Booked Origin -> Shut -> Dest -> Origin -> back to Mid: ends where we are.
+    shipment.associated_bookings.append(_booking(1, shipment, main, 1, 1))
+    shipment.associated_bookings.append(_booking(2, shipment, main, 2, 1))
+    shipment.current_booking_index = 2
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+
+
+def test_the_booking_hook_still_fails_closed_on_junk() -> None:
+    assert UserStrategy.assign_associated_bookings(object(), NOW, object()) is None
+
+
+def test_the_veto_hook_fails_closed_on_junk() -> None:
+    assert UserStrategy.adjust_bookings_before_cargo_handling(object(), NOW, object()) is None

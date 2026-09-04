@@ -5,9 +5,11 @@ team **OrtolanForever** for Round 2 of the WSC 2026 Simulation Challenge.
 
 ## Strategy
 
-The strategy owns exactly one decision: the initial booking chain for newly
-generated cargo (`assign_associated_bookings`). The other three decision points
-are delegated to the organizer's default implementation.
+The strategy owns two decisions: the initial booking chain for newly generated
+cargo (`assign_associated_bookings`), and whether to leave an in-transit chain
+alone when a disruption appears after the cargo has sailed
+(`adjust_bookings_before_cargo_handling`). The other two decision points are
+delegated to the organizer's default implementation.
 
 The organizer's fallback selects a booking chain by minimising **sailing
 distance**. Distance ignores how often each service actually departs, so the
@@ -74,3 +76,22 @@ behind.
 The organizer's framework supplies the remaining simulation components at
 evaluation time. This archive intentionally contains only the participant
 strategy and this explanation.
+
+## Keeping an in-transit chain
+
+When a disruption appears after cargo is already at sea, the organizer replans
+the rest of its journey by sailing distance, refusing the disrupted ports and
+legs outright, and discharges the cargo at its current port whenever the
+rebuild does not continue on the service it is already riding. Staying aboard
+and waiting the disruption out is often faster.
+
+This strategy therefore returns a decision to change nothing whenever every
+affected shipment on the arriving vessel is at least as well off keeping its
+booked chain, judged by the same cost model — the remaining chain walked from
+the current port with closure waits and congestion priced, against the fastest
+path the model can find from there. The alternative is costed with no wait to
+board its first service, so a chain is kept only when it beats even the most
+favourable rebuild.
+
+The hook never mutates a booking, route, vessel, or berth. Anything uncertain
+returns `None`, which restores the organizer's own replanning exactly.

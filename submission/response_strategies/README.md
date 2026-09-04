@@ -124,9 +124,16 @@ comparing their multiplier-stretched distances is exactly comparing their cycle
 hours, and a service that moves keeps its full vessel count: its headway
 improves as well as its sailing time.
 
-Three safety rules bound the change:
+Four safety rules bound the change:
 
-- **A shut port is never routed around.** A closure is a wait, not a reason to
+- **A detour is never built through a port that will be shut while it is
+  needed.** A rotation is only worth changing to if it can be sailed for as
+  long as it is needed, so the legs available to a detour exclude any port that
+  is shut now or that a close-berth disruption plan shuts at any point inside
+  the slowdown's remaining life. If no detour survives that, the service stays
+  where it is. A detour that somehow still ends up calling a closed port stops
+  being the rotation to run, and the fleet goes home and waits the closure out.
+- **A shut port on the service's own rotation is never routed around.** A closure is a wait, not a reason to
   stop calling somewhere; dropping the call would abandon the cargo booked
   there. A rotation with a closed port anywhere on it is left alone entirely.
 - **Only an empty vessel moves, and only where it stands.** A vessel joins

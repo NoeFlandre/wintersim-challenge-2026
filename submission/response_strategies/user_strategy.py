@@ -386,6 +386,7 @@ def _closed_port_indexes(context: Any) -> frozenset[int] | None:
 
 def _network(
     context: Any,
+    now: Any,
     port_indexes: dict[int, int],
     reopen_hours: dict[int, float],
     clears_hours: dict[int, float] | None = None,
@@ -404,7 +405,7 @@ def _network(
     bookable = {
         id(route)
         for route in _service_targets(
-            context, closed, port_indexes, clears_hours or {}, build=False
+            context, now, closed, port_indexes, clears_hours or {}, build=False
         ).values()
     }
     edges: list[_Edge] = []
@@ -708,7 +709,7 @@ def _plan(context: Any, now: Any, shipment: Any) -> tuple[_Network, tuple[_Edge,
     # the earlier behaviour: shut ports impassable, slowdowns assumed permanent.
     reopen_hours = _reopen_positions(context, now, port_indexes)
     clears_hours = _congestion_recovery(context, now) or {}
-    network = _network(context, port_indexes, reopen_hours, clears_hours)
+    network = _network(context, now, port_indexes, reopen_hours, clears_hours)
     if network is None:
         return None
 
@@ -852,7 +853,7 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
             continue
 
         if network is None:
-            network = _network(context, port_indexes, reopen_hours, clears_hours)
+            network = _network(context, now, port_indexes, reopen_hours, clears_hours)
             if network is None:
                 return None
 
@@ -1004,6 +1005,51 @@ def _outlasts_a_changeover(
     return remaining > turn / speed
 
 
+def _closures_within(
+    context: Any, now: Any, horizon_hours: float, port_indexes: dict[int, int]
+) -> frozenset[int] | None:
+    """Positions of ports shut at any point between now and ``now + horizon``.
+
+    A rotation is only worth changing to if it can be sailed for as long as it
+    is needed, and a port that will be shut part-way through cannot be. The
+    disruption plans are the same published set that v12 reads to time a
+    reopening, and the same epoch guard applies: if the plan arithmetic cannot
+    be trusted, no port is claimed to be safe and no detour is built.
+    """
+    if not isinstance(now, dt.datetime) or not math.isfinite(horizon_hours):
+        return None
+    plans = getattr(context, "disruption_plans", None)
+    if not isinstance(plans, (list, tuple)):
+        return None
+    try:
+        limit = now + dt.timedelta(hours=min(horizon_hours, 3650.0 * 24.0))
+    except (OverflowError, OSError):
+        return None
+    shut: set[int] = set()
+    for plan in plans:
+        closes = getattr(plan, "close_berth", None)
+        if not isinstance(closes, bool):
+            return None
+        if not closes:
+            continue
+        port = getattr(getattr(plan, "target_berth", None), "port", None)
+        position = port_indexes.get(id(port))
+        if position is None:
+            return None
+        start_days = _finite_real(getattr(plan, "start_offset_days", None))
+        duration_days = _positive_real(getattr(plan, "duration_days", None))
+        if start_days is None or duration_days is None:
+            return None
+        try:
+            start = dt.datetime.min + dt.timedelta(days=start_days)
+            end = start + dt.timedelta(days=duration_days)
+        except (OverflowError, OSError):
+            return None
+        if start < limit and end > now:
+            shut.add(position)
+    return frozenset(shut)
+
+
 def _undisrupted_leg_path(
     context: Any,
     origin: Any,
@@ -1101,11 +1147,30 @@ def _detour_legs(
     return tuple(replaced)
 
 
-def _rotation_beats(rotation: Any, legs: tuple[Any, ...]) -> bool:
-    """Whether a built rotation is strictly faster than the nominal one now."""
+def _rotation_beats(
+    rotation: Any,
+    legs: tuple[Any, ...],
+    closed: frozenset[int],
+    port_indexes: dict[int, int],
+) -> bool:
+    """Whether a built rotation is the better one to be running right now.
+
+    A detour inserts ports the nominal rotation does not call, and one of those
+    can be shut later. The same rule that keeps a service on a rotation whose
+    own port is shut applies here in reverse: a detour that would sail into a
+    closed port is not a detour worth being on, so the service goes home and
+    waits the closure out on its own rotation.
+    """
     resolved = _ordered_legs(rotation)
     if resolved is None:
         return False
+    for leg in resolved[0]:
+        for port in (
+            getattr(leg, "departure_port", None),
+            getattr(leg, "arrival_port", None),
+        ):
+            if port_indexes.get(id(port)) in closed:
+                return False
     detoured = _cycle_distance(resolved[0])
     current = _cycle_distance(legs)
     return detoured is not None and current is not None and detoured < current
@@ -1141,6 +1206,7 @@ def _build_rotation(context: Any, source: Any, legs: tuple[Any, ...], key: Any) 
 
 def _service_targets(
     context: Any,
+    now: Any,
     closed: frozenset[int],
     port_indexes: dict[int, int],
     clears: dict[int, float],
@@ -1185,7 +1251,18 @@ def _service_targets(
         if rotation is None:
             if not build:
                 continue
-            detour = _detour_legs(context, legs, closed, port_indexes)
+            # The detour has to be sailable for as long as it is needed, so a
+            # port that will be shut inside that window is not available to it.
+            horizon = math.inf
+            for leg in slowed:
+                horizon = min(horizon, clears.get(id(leg), math.inf))
+            unavailable = closed
+            if math.isfinite(horizon):
+                shut = _closures_within(context, now, horizon, port_indexes)
+                if shut is None:
+                    continue
+                unavailable = closed | shut
+            detour = _detour_legs(context, legs, unavailable, port_indexes)
             if detour is None or _cycle_distance(detour) is None:
                 continue
             if (_cycle_distance(detour) or math.inf) >= (_cycle_distance(legs) or 0.0):
@@ -1199,7 +1276,7 @@ def _service_targets(
             built = _ordered_legs(rotation)
             if built is None or not _outlasts_a_changeover(source, built[0], slowed, clears):
                 continue
-        if _rotation_beats(rotation, legs):
+        if _rotation_beats(rotation, legs, closed, port_indexes):
             targets[id(source)] = rotation
     return targets
 
@@ -1209,7 +1286,9 @@ def _has_live_bookings(route: Any) -> bool:
     bookings = getattr(route, "associated_bookings", None)
     if not isinstance(bookings, list):
         return True
-    for booking in bookings:
+    # Newest first: a rotation still in use answers on its first entry, so the
+    # only full scan is the one that finds it finally drained.
+    for booking in reversed(bookings):
         shipment = getattr(booking, "shipment", None)
         if shipment is None or getattr(shipment, "completion_time", None) is None:
             return True
@@ -1280,7 +1359,7 @@ def _run_fleet(context: Any, now: Any, vessel: Any) -> None:
         return
 
     clears = _congestion_recovery(context, now) or {}
-    targets = _service_targets(context, closed, port_indexes, clears, build=True)
+    targets = _service_targets(context, now, closed, port_indexes, clears, build=True)
     staffing: dict[int, int] = {}
     for candidate in vessels:
         assigned = getattr(candidate, "assigned_service_route", None)

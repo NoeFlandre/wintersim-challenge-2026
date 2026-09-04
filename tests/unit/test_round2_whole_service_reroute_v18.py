@@ -103,6 +103,7 @@ def _targets(fixture: Any, *, build: bool) -> dict[int, Any]:
     context = fixture.context
     return strategy._service_targets(
         context,
+        NOW,
         strategy._closed_port_indexes(context),
         strategy._port_indexes(context),
         {},
@@ -155,6 +156,7 @@ def test_a_slowdown_that_lifts_before_the_fleet_could_move_is_refused() -> None:
     fixture.context.disruption_plans = []
     targets = strategy._service_targets(
         fixture.context,
+        NOW,
         strategy._closed_port_indexes(fixture.context),
         strategy._port_indexes(fixture.context),
         {id(slowed): 100.0},
@@ -165,6 +167,7 @@ def test_a_slowdown_that_lifts_before_the_fleet_could_move_is_refused() -> None:
 
     targets = strategy._service_targets(
         fixture.context,
+        NOW,
         strategy._closed_port_indexes(fixture.context),
         strategy._port_indexes(fixture.context),
         {id(slowed): 200.0},
@@ -186,6 +189,7 @@ def test_a_changeover_already_under_way_is_not_reversed_early() -> None:
 
     targets = strategy._service_targets(
         fixture.context,
+        NOW,
         strategy._closed_port_indexes(fixture.context),
         strategy._port_indexes(fixture.context),
         {id(slowed): 1.0},
@@ -207,6 +211,80 @@ def test_a_closed_port_on_the_rotation_is_never_routed_around() -> None:
     assert UserStrategy.create_alternative_service_routes(fixture.context, NOW) is True
     assert all(r.source_service_route is None for r in fixture.context.service_routes)
     assert all(v.pending_assigned_service_route is None for v in fixture.context.vessels)
+
+
+def _plan(port: Any, start_days: float, duration_days: float) -> SimpleNamespace:
+    return SimpleNamespace(
+        close_berth=True,
+        target_berth=SimpleNamespace(port=port),
+        target_leg=None,
+        start_offset_days=start_days,
+        duration_days=duration_days,
+        multiplier=1.0,
+    )
+
+
+def test_a_detour_is_never_built_through_a_port_that_will_shut() -> None:
+    """A rotation must be sailable for as long as it is needed.
+
+    ``D`` is on the detour only. A closure scheduled inside the window the
+    detour would be in use makes that detour unavailable, and with no other way
+    round the slowdown the fleet stays where it is.
+    """
+    fixture = _fixture()
+    slowed = fixture.context.legs[0]
+    # The slowdown has 40 days left; D shuts on day 210 for 20, i.e. inside it.
+    fixture.context.disruption_plans = [_plan(fixture.ports["D"], 210.0, 20.0)]
+    targets = strategy._service_targets(
+        fixture.context,
+        dt.datetime.min + dt.timedelta(days=200),
+        strategy._closed_port_indexes(fixture.context),
+        strategy._port_indexes(fixture.context),
+        {id(slowed): 40.0 * 24.0},
+        build=True,
+    )
+    assert targets[id(fixture.route)] is fixture.route
+    assert all(r.source_service_route is None for r in fixture.context.service_routes)
+
+
+def test_a_closure_after_the_slowdown_ends_does_not_block_the_detour() -> None:
+    """Only a closure inside the window the detour is needed for counts."""
+    fixture = _fixture()
+    slowed = fixture.context.legs[0]
+    # The slowdown has 5 days left when D shuts on day 210, so the fleet will
+    # have come home before it matters.
+    fixture.context.disruption_plans = [_plan(fixture.ports["D"], 210.0, 20.0)]
+    targets = strategy._service_targets(
+        fixture.context,
+        dt.datetime.min + dt.timedelta(days=200),
+        strategy._closed_port_indexes(fixture.context),
+        strategy._port_indexes(fixture.context),
+        {id(slowed): 9.0 * 24.0},
+        build=True,
+    )
+    assert targets[id(fixture.route)].source_service_route is fixture.route
+
+
+def test_a_detour_into_a_port_that_shuts_is_abandoned() -> None:
+    """A closure can land on a port only the detour calls; go home and wait."""
+    fixture = _fixture()
+    UserStrategy.create_alternative_service_routes(fixture.context, NOW)
+    detour = fixture.context.service_routes[-1]
+    for vessel in fixture.context.vessels:
+        vessel.current_segment = fixture.route.segments[2]
+        UserStrategy.create_alternative_service_routes(fixture.context, NOW, vessel)
+    assert len(detour.deployed_vessels) == 3
+
+    # D is on the detour only; the nominal rotation never calls there.
+    assert "D" not in {s.associated_leg.departure_port.name for s in fixture.route.segments}
+    fixture.ports["D"].berths[0].is_available = False
+    assert _targets(fixture, build=True)[id(fixture.route)] is fixture.route
+
+    for vessel in fixture.context.vessels:
+        vessel.current_segment = detour.segments[3]
+        UserStrategy.create_alternative_service_routes(fixture.context, NOW, vessel)
+    assert len(fixture.route.deployed_vessels) == 3
+    assert detour.deployed_vessels == []
 
 
 def test_a_calm_rotation_is_left_alone() -> None:
@@ -332,7 +410,9 @@ def test_a_rotation_being_drained_takes_no_new_cargo() -> None:
     vessel.current_segment = fixture.route.segments[2]
     UserStrategy.create_alternative_service_routes(fixture.context, NOW, vessel)
 
-    network = strategy._network(fixture.context, strategy._port_indexes(fixture.context), {}, {})
+    network = strategy._network(
+        fixture.context, NOW, strategy._port_indexes(fixture.context), {}, {}
+    )
     assert network is not None
     assert [route.id for route in network.routes] == [detour.id]
 

@@ -28,9 +28,28 @@ authoritative baseline ATT
 | v16 | keep every vessel on its rotation instead of letting the organizer reserve one per affected service onto a single-vessel avoiding route | no alternative routes exist; S4 regains 25% of its frequency | `9.762649496857325` | `-0.5845` (`-5.649%`) | 34/22/16 | **accepted** (held-out tie and `-0.09%`, no cargo stranded) |
 | v17 | move a whole service onto a detour around a slowdown whenever the detour still calls every port and its cycle is shorter at the live multipliers | one detour built for `S4`, whole fleet reserved | not run | — | — | rejected on held-out (`shifted` `-1.0385`, `mild` `+2.0175`) |
 | v18 | v17 plus the changeover cost: start a rotation change only when the slowdown's remaining life exceeds one turn of the detour, and never reverse one already under way | two detours built (`S4-UALT-1`, `S5-UALT-1`); both 60-day windows change, the 25-day one does not | `4.912139391692661` | `-4.8505` (`-49.684%`) | 28/12/32 | **accepted** (held-out `-2.43%` and an exact tie, no cargo stranded) |
+| v19 | bring a rerouted fleet home when a port on its detour shuts | Round 2 bit-identical; `inserted` `22.2326` against a do-nothing `16.7550` | not accepted | — | — | rejected on held-out `inserted` (`+32.69%`) |
+| v20 | never build a detour through a port that a disruption plan will shut inside the window the detour is needed for | Round 2 bit-identical; `inserted` `16.1746`, now `-3.46%` against doing nothing | `4.912139391692661` | `0.0000` (tie, by design) | 28/12/32 | **accepted** (7 held-out scenarios: 4 wins, 3 ties, 0 losses) |
 
-Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18),
-a `-86.0%` reduction.
+Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
+unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
+
+## Held-out scorecard for the accepted policy
+
+Every scenario carries a **do-nothing arm** (v16, which never moves a vessel),
+so each row answers "does owning the fleet decision pay here?" rather than only
+"is the new version better than the old one".
+
+| scenario | do nothing | accepted (v20) | delta | unbooked |
+| --- | --- | --- | --- | --- |
+| Round 2 (scored) | `9.7626` | `4.912139391692661` | `-49.68%` | `0` |
+| `twin` | `42.1737` | `40.12987734887265` | `-4.85%` | `0` |
+| `inserted` | `16.7550` | `16.17458575774183` | `-3.46%` | `0` |
+| `shifted` | `42.6642` | `41.62569844636167` | `-2.43%` | `0` |
+| `long` | `79.2269` | `77.65274459580378` | `-1.99%` | `0` |
+| `mild` | `5.3634` | `5.363436801272705` | tie | `0` |
+| `brief` | `6.7675` | `6.767487342693513` | exact tie | `0` |
+| `undisrupted` | `-5.0308` | `-5.030822520503106` | exact tie | `0` |
 
 ## Lessons carried forward
 
@@ -205,3 +224,23 @@ The protocol has already changed two decisions:
     v18's whole price is paid in the ten weeks *after* the slowdown it fixes,
     in periods where nothing is disrupted. Attributing loss by window is what
     made that visible; the scalar alone would have hidden it.
+28. **A held-out set that a policy has been developed against is not held
+    out.** `shifted` and `mild` shaped every candidate from v13 to v18, and
+    both said v18 was fine. One genuinely new scenario said it was `51%` worse
+    than doing nothing. Retire held-out scenarios as they are used, and keep
+    adding adversarial ones.
+29. **Carry a do-nothing arm on every new scenario.** Comparing v19 only
+    against v18 would have shown a `3.12` improvement and hidden a `5.48`
+    regression against delegating the decision entirely.
+30. **Fixing the symptom you predicted is not the same as fixing the defect.**
+    v19 addressed exactly the failure mode named in its own design doc, and
+    that failure mode was half the problem.
+31. **Feasibility before optimality.** v18 and v19 argued about whether and
+    when to change rotation; neither asked whether the rotation could be sailed
+    for as long as it was needed. That question made both earlier arguments
+    moot.
+32. **A rule whose predicted effect is "nothing changes anywhere except one
+    scenario" is worth more than a rule that improves the score.** v20's
+    prediction was checked in six places and held in all six, to the last digit.
+33. **Future disruption plans are readable, and using them is not an exploit.**
+    v12 already timed a reopening from the same published plan set.

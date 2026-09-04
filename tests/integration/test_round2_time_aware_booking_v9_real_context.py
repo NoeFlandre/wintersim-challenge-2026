@@ -94,10 +94,10 @@ def _new_shipment(context: Any, demand: Any) -> Any:
     )
 
 
-def _chain_hours(module: Any, context: Any, shipment: Any) -> float:
+def _chain_hours(module: Any, context: Any, shipment: Any, now: Any) -> float:
     """Estimated hours of an assigned chain, using the strategy's own model."""
     port_indexes = module._port_indexes(context)
-    network = module._network(context, port_indexes, {})
+    network = module._network(context, now, port_indexes, {})
     assert network is not None
     total = 0.0
     previous = None
@@ -225,12 +225,12 @@ def test_assigned_chain_is_never_slower_than_the_organizer_choice(
                 )
             )
         try:
-            organizer_hours = _chain_hours(module, context, reference)
+            organizer_hours = _chain_hours(module, context, reference, now)
         except StopIteration:
             # The organizer chose an alternative route, which the policy
             # deliberately never books; nothing to compare.
             continue
-        chosen_hours = _chain_hours(module, context, shipment)
+        chosen_hours = _chain_hours(module, context, shipment, now)
         compared += 1
         assert chosen_hours <= organizer_hours + 1e-6, (
             f"{demand.origin_port.name}->{demand.destination_port.name}: "
@@ -294,7 +294,7 @@ def test_closed_port_window_prices_the_wait_for_reopening(
 
     port_indexes = module._port_indexes(context)
     piraeus_index = port_indexes[id(piraeus)]
-    network = module._network(context, port_indexes, {piraeus_index: reopen_hours})
+    network = module._network(context, now, port_indexes, {piraeus_index: reopen_hours})
     assert network is not None
 
     inbound = [
@@ -355,7 +355,7 @@ def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) 
     _apply_runtime_disruption_state(context, now)
 
     port_indexes = module._port_indexes(context)
-    network = module._network(context, port_indexes, {})
+    network = module._network(context, now, port_indexes, {})
     assert network is not None
     assert network.edges
     for edge in network.edges:
@@ -513,10 +513,10 @@ def test_a_staffed_detour_replaces_its_nominal_rotation_in_the_network(
     assert detour.deployed_vessels, "at least one vessel must have switched"
     port_indexes = module._port_indexes(context)
     closed = module._closed_port_indexes(context)
-    network = module._network(context, port_indexes, {}, {})
+    network = module._network(context, now, port_indexes, {}, {})
     booked = {route.id for route in network.routes}
     assert detour.id in booked
     if source.deployed_vessels:
         assert source.id not in booked, "a rotation being drained takes no new cargo"
-    targets = module._service_targets(context, closed, port_indexes, {}, build=False)
+    targets = module._service_targets(context, now, closed, port_indexes, {}, build=False)
     assert targets[id(source)] is detour

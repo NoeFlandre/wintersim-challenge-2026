@@ -136,7 +136,15 @@ The three accepted architecture changes since:
   `79%` of all remaining loss, drops from `7.7506` to `0.0129`. Score
   `4.912139391692661` (a further `-49.684%`).
 
-Two architecture changes were tried and rejected:
+- [v20 closure-safe detours](docs/experiments/round2-closure-safe-detours-v20.md)
+  refuses to build a detour through a port that a disruption plan will shut
+  while that detour is needed. Round 2 is bit-for-bit unchanged by it, because
+  no Round 2 detour has a closure inside its window — but an adversarial
+  held-out scenario that does had the accepted policy `51%` *worse* than never
+  moving a vessel, and this returns it to `3.46%` better. Score
+  `4.912139391692661` (unchanged, by design).
+
+Three architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
@@ -147,9 +155,13 @@ moved a fleet onto a faster detour without pricing the changeover, and was
 rejected on a held-out scenario (`+2.0175`) before its authoritative run. Its
 two held-out verdicts disagreed, and the ratio that separated them — the
 slowdown's duration against the rotation's cycle — became v18.
+[v19 hidden-round hardening](docs/experiments/round2-hidden-round-hardening-v19.md)
+brought a rerouted fleet home when a port on its detour shut, and was rejected
+for trading twenty days of sailing into a closed port for four rotation changes
+in one window. It found the defect that v20 fixes.
 
-The active Round 2 strategy scores `4.912139391692661`, which is `86.0%`
-below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
+The active Round 2 strategy scores `4.912139391692661`, which is `86.01%`
+below the `35.1039547178493` that opened the round - `7.15x` lower. Its ATT SHA-256 is
 `d6eb1590f3317d9f8a918efc8d3a188529dd99c6bcc82b04295deef001e00f22`.
 
 ### Guarding against overfitting

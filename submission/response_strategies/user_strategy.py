@@ -18,6 +18,7 @@ alternative path avoids. The other three decision points stay delegated.
 
 from __future__ import annotations
 
+import datetime as dt
 import heapq
 import math
 import numbers
@@ -41,6 +42,10 @@ class _Edge(NamedTuple):
     arrival_segment_index: int
     hours: float
     crosses_congestion: bool
+    # Calls at ports that are shut right now, as (hours into this ride when the
+    # call happens, hours from now until that port reopens). Empty unless a
+    # closure is active, which keeps the common case identical.
+    closed_calls: tuple[tuple[float, float], ...]
 
 
 class _Network(NamedTuple):
@@ -107,6 +112,51 @@ def _port_is_closed(port: Any) -> bool | None:
     return bool(berths) and available == 0
 
 
+def _closure_recovery(context: Any, now: Any) -> dict[int, float] | None:
+    """Hours from ``now`` until each port whose closure is active reopens.
+
+    A closure is temporary, so a port that is shut today is perfectly usable by
+    cargo that will not reach it until after it reopens. The reopening time is
+    only taken when the plan arithmetic agrees with the live berth state: the
+    plan offsets are relative to the start of the simulation, which is taken to
+    be ``datetime.min``, and requiring the two to agree means a different epoch
+    degrades to treating the port as unusable rather than mis-timing it.
+    """
+    if not isinstance(now, dt.datetime):
+        return None
+    plans = getattr(context, "disruption_plans", None)
+    if not isinstance(plans, (list, tuple)):
+        return None
+    recovery: dict[int, float] = {}
+    for plan in plans:
+        closes = getattr(plan, "close_berth", None)
+        if not isinstance(closes, bool):
+            return None
+        if not closes:
+            continue
+        port = getattr(getattr(plan, "target_berth", None), "port", None)
+        if port is None:
+            return None
+        start_days = _finite_real(getattr(plan, "start_offset_days", None))
+        duration_days = _positive_real(getattr(plan, "duration_days", None))
+        if start_days is None or duration_days is None:
+            return None
+        try:
+            start = dt.datetime.min + dt.timedelta(days=start_days)
+            end = start + dt.timedelta(days=duration_days)
+        except (OverflowError, OSError):
+            return None
+        if not start <= now < end:
+            continue
+        hours = (end - now).total_seconds() / 3600.0
+        if not math.isfinite(hours) or hours <= 0.0:
+            return None
+        identity = id(port)
+        if hours > recovery.get(identity, 0.0):
+            recovery[identity] = hours
+    return recovery
+
+
 def _mean_speed(route: Any) -> float | None:
     vessels = _sequence(getattr(route, "deployed_vessels", None))
     if not vessels:
@@ -155,6 +205,7 @@ def _route_edges(
     route_index: int,
     port_indexes: dict[int, int],
     closed: frozenset[int],
+    reopen_hours: dict[int, float],
 ) -> tuple[tuple[_Edge, ...], float] | None:
     """Build every bookable edge of one route and its expected boarding wait."""
     resolved = _ordered_legs(route)
@@ -197,6 +248,7 @@ def _route_edges(
         sailing = 0.0
         congested = False
         blocked = False
+        closed_calls: list[tuple[float, float]] = []
         for step in range(1, count):
             position = (start + step - 1) % count
             leg = legs[position]
@@ -207,15 +259,20 @@ def _route_edges(
             arrival_index = port_indexes[id(arrival)]
             if blocked:
                 break
-            if arrival_index in closed:
-                # Any later edge from this start would call here on the way.
-                blocked = True
-                continue
-            if arrival is departure:
-                continue
             hours = sailing + _BERTHING_HOURS * (step - 1)
             if not math.isfinite(hours) or hours <= 0.0:
                 return None
+            if arrival_index in closed:
+                reopen = reopen_hours.get(arrival_index)
+                if reopen is None:
+                    # A closure with no readable reopening time is treated as
+                    # impassable, as is every longer ride from this start that
+                    # would have to call here on the way.
+                    blocked = True
+                    continue
+                closed_calls.append((hours, reopen))
+            if arrival is departure:
+                continue
             edges.append(
                 _Edge(
                     departure_index,
@@ -225,12 +282,15 @@ def _route_edges(
                     sequence_indexes[position],
                     hours,
                     congested,
+                    tuple(closed_calls),
                 )
             )
     return tuple(edges), boarding_hours
 
 
-def _network(context: Any, port_indexes: dict[int, int]) -> _Network | None:
+def _network(
+    context: Any, port_indexes: dict[int, int], reopen_hours: dict[int, float]
+) -> _Network | None:
     """Build the bookable network from the live nominal service routes."""
     ports = tuple(context.ports)
     closed_indexes: set[int] = set()
@@ -257,7 +317,7 @@ def _network(context: Any, port_indexes: dict[int, int]) -> _Network | None:
             continue
         if not isinstance(getattr(route, "associated_bookings", None), list):
             return None
-        built = _route_edges(route, len(routes), port_indexes, closed)
+        built = _route_edges(route, len(routes), port_indexes, closed, reopen_hours)
         if built is None:
             return None
         route_edges, boarding_hours = built
@@ -267,6 +327,22 @@ def _network(context: Any, port_indexes: dict[int, int]) -> _Network | None:
     if not routes:
         return None
     return _Network(tuple(edges), tuple(routes), tuple(boarding))
+
+
+def _edge_arrival(edge: _Edge, depart_hours: float) -> float:
+    """Hours from now at which this ride ends, given when it starts.
+
+    A call at a shut port cannot be served before the port reopens, so the ride
+    waits there and everything after it shifts by the same amount. With no shut
+    calls this is simply ``depart_hours + edge.hours``, so an undisrupted
+    network is costed exactly as before.
+    """
+    start = depart_hours
+    for offset, reopen in edge.closed_calls:
+        arrive = start + offset
+        if arrive < reopen:
+            start += reopen - arrive
+    return start + edge.hours
 
 
 def _fastest_path(
@@ -316,7 +392,8 @@ def _fastest_path(
         )
 
     for edge in outgoing.get(origin_index, []):
-        offer(edge, network.boarding_hours[edge.route_index] + edge.hours, None)
+        depart = network.boarding_hours[edge.route_index]
+        offer(edge, _edge_arrival(edge, depart), None)
 
     goal: tuple[int, int] | None = None
     while heap:
@@ -330,8 +407,8 @@ def _fastest_path(
         for edge in outgoing.get(port_index, []):
             if edge.route_index == route_index:
                 continue
-            step = network.boarding_hours[edge.route_index] + edge.hours
-            offer(edge, cost + step, state)
+            depart = cost + network.boarding_hours[edge.route_index]
+            offer(edge, _edge_arrival(edge, depart), state)
     if goal is None:
         return None
 
@@ -347,7 +424,7 @@ def _fastest_path(
     return tuple(path)
 
 
-def _plan(context: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | None:
+def _plan(context: Any, now: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | None:
     """Choose the booking chain for one newly generated shipment."""
     bookings = getattr(shipment, "associated_bookings", None)
     if not isinstance(bookings, list) or bookings:
@@ -368,7 +445,16 @@ def _plan(context: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | N
     if origin_index is None or destination_index is None:
         return None
 
-    network = _network(context, port_indexes)
+    # A missing or unreadable closure plan set leaves the recovery map empty,
+    # which reproduces the earlier behaviour of treating shut ports as
+    # impassable rather than mis-timing them.
+    recovery = _closure_recovery(context, now) or {}
+    reopen_hours = {
+        position: hours
+        for identity, hours in recovery.items()
+        if (position := port_indexes.get(identity)) is not None
+    }
+    network = _network(context, port_indexes, reopen_hours)
     if network is None:
         return None
 
@@ -381,9 +467,9 @@ def _plan(context: Any, shipment: Any) -> tuple[_Network, tuple[_Edge, ...]] | N
     return None if path is None else (network, path)
 
 
-def _assign(context: Any, shipment: Any) -> bool | None:
+def _assign(context: Any, now: Any, shipment: Any) -> bool | None:
     """Build and register the chosen chain, or return ``None`` to delegate."""
-    planned = _plan(context, shipment)
+    planned = _plan(context, now, shipment)
     if planned is None:
         return None
     network, path = planned
@@ -435,7 +521,7 @@ class UserStrategy:
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:
         """Assign the fastest booking chain available to new cargo."""
         try:
-            return _assign(context, shipment)
+            return _assign(context, now, shipment)
         except _DATA_ERRORS:
             return None
 

@@ -97,7 +97,7 @@ def _new_shipment(context: Any, demand: Any) -> Any:
 def _chain_hours(module: Any, context: Any, shipment: Any) -> float:
     """Estimated hours of an assigned chain, using the strategy's own model."""
     port_indexes = module._port_indexes(context)
-    network = module._network(context, port_indexes)
+    network = module._network(context, port_indexes, {})
     assert network is not None
     total = 0.0
     previous = None
@@ -268,9 +268,16 @@ def test_policy_does_not_advance_the_model_or_write_output(
     assert after == before
 
 
-def test_closed_port_window_delegates_for_that_destination(
+def test_closed_port_window_prices_the_wait_for_reopening(
     real_context_environment: Any,
 ) -> None:
+    """During a closure, cargo may be routed through the port at its true cost.
+
+    A closure is temporary, so the policy books cargo bound for or transiting a
+    shut port instead of holding it at the origin. Arriving before the
+    reopening is allowed — waiting there can genuinely be the best plan — but
+    the estimate must charge that wait rather than pretend the call is free.
+    """
     module, scenario_builders = real_context_environment
     context = scenario_builders.create_with_disruption()
     # Day 400.5 falls inside the Piraeus closure window.
@@ -280,46 +287,65 @@ def test_closed_port_window_delegates_for_that_destination(
     piraeus = next(port for port in context.ports if port.name == "Piraeus")
     assert all(not berth.is_available for berth in piraeus.berths)
 
+    recovery = module._closure_recovery(context, now)
+    assert recovery is not None
+    reopen_hours = recovery.get(id(piraeus))
+    assert reopen_hours is not None and reopen_hours > 0.0
+
+    port_indexes = module._port_indexes(context)
+    piraeus_index = port_indexes[id(piraeus)]
+    network = module._network(context, port_indexes, {piraeus_index: reopen_hours})
+    assert network is not None
+
     inbound = [
         demand
         for demand in context.demands
         if demand.destination_port is piraeus and demand.origin_port is not piraeus
     ]
     assert inbound
+    booked = 0
     for demand in inbound:
         shipment = _new_shipment(context, demand)
-        assert module.UserStrategy.assign_associated_bookings(context, now, shipment) is None
-        assert shipment.associated_bookings == []
+        if module.UserStrategy.assign_associated_bookings(context, now, shipment) is True:
+            booked += 1
+    assert booked > 0, "a closure with a known reopening must not force a hold"
 
-    # Cargo that merely used to transit Piraeus must still be routed.
-    routed = 0
+    # Every planned call at the shut port must be charged the wait it implies.
+    checked = 0
     for demand in context.demands:
-        if demand.destination_port is piraeus or demand.origin_port is demand.destination_port:
+        if demand.origin_port is demand.destination_port:
             continue
         shipment = _new_shipment(context, demand)
-        if module.UserStrategy.assign_associated_bookings(context, now, shipment) is True:
-            routed += 1
-            for booking in shipment.associated_bookings:
-                route = booking.service_route
-                segments = sorted(route.segments, key=lambda s: s.sequence_index)
-                count = len(segments)
-                start = next(
-                    index
-                    for index, segment in enumerate(segments)
-                    if segment.sequence_index == booking.departure_segment_index
+        if module.UserStrategy.assign_associated_bookings(context, now, shipment) is not True:
+            continue
+        elapsed = 0.0
+        previous = None
+        for booking in sorted(shipment.associated_bookings, key=lambda b: b.sequence_index):
+            route_index = network.routes.index(booking.service_route)
+            edge = next(
+                candidate
+                for candidate in network.edges
+                if candidate.route_index == route_index
+                and candidate.departure_segment_index == booking.departure_segment_index
+                and candidate.arrival_segment_index == booking.arrival_segment_index
+            )
+            if previous is None or previous != route_index:
+                elapsed += network.boarding_hours[route_index]
+            arrival = module._edge_arrival(edge, elapsed)
+            for offset, reopen in edge.closed_calls:
+                checked += 1
+                if elapsed + offset >= reopen:
+                    continue
+                # The ride cannot end before it clears the shut port and then
+                # sails whatever is left of its leg chain.
+                assert arrival >= reopen + (edge.hours - offset) - 1e-6, (
+                    f"{demand.origin_port.name}->{demand.destination_port.name} reaches "
+                    f"a shut port at hour {elapsed + offset:.2f}, reopening at "
+                    f"{reopen:.2f}, but the ride is costed to end at {arrival:.2f}"
                 )
-                end = next(
-                    index
-                    for index, segment in enumerate(segments)
-                    if segment.sequence_index == booking.arrival_segment_index
-                )
-                index = start
-                while True:
-                    assert segments[index].associated_leg.arrival_port is not piraeus
-                    if index == end:
-                        break
-                    index = (index + 1) % count
-    assert routed > 0
+            elapsed = arrival
+            previous = route_index
+    assert checked > 0, "the closure window must produce at least one timed call"
 
 
 def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) -> None:
@@ -329,7 +355,7 @@ def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) 
     _apply_runtime_disruption_state(context, now)
 
     port_indexes = module._port_indexes(context)
-    network = module._network(context, port_indexes)
+    network = module._network(context, port_indexes, {})
     assert network is not None
     assert network.edges
     for edge in network.edges:

@@ -37,9 +37,14 @@ consecutive bookings never use the same service route.
 The strategy declines and lets the organizer decide whenever:
 
 - the shipment is not newly generated cargo, or origin and destination match;
-- a port has berths and none of them is available — it is not booked as an
-  arrival or an intermediate call, and a closed destination is delegated so the
-  organizer's wait-and-retry keeps control;
+- a port whose berths are all unavailable has **no readable reopening time**.
+  A closure is temporary, so when its end can be established from the active
+  disruption plans the port stays usable and the estimate charges the wait
+  until it reopens, delaying the rest of that ride by the same amount; cargo
+  bound for it is booked rather than held. The reopening time is trusted only
+  when the plan arithmetic and the live berth state agree, so an unexpected
+  simulation epoch, a malformed plan, or a missing plan all fall back to
+  treating the port as impassable;
 - the only available path would cross a congested leg. Congested legs are
   used when a congestion-free path also exists and the congested one is still
   faster, but never as the sole option;

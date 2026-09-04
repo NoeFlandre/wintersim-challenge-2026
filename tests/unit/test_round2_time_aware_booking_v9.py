@@ -207,7 +207,7 @@ def test_delegates_when_every_path_must_cross_a_congested_leg() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_closed_transshipment_port_is_not_booked() -> None:
+def test_closed_transshipment_port_without_a_reopening_time_is_not_booked() -> None:
     origin = _port("Origin")
     destination = _port("Destination")
     hub = _port("Hub", closed=True)
@@ -221,7 +221,7 @@ def test_closed_transshipment_port_is_not_booked() -> None:
     assert _chain(shipment) == [("DIRECT", 1, 1)]
 
 
-def test_delegates_when_the_destination_port_is_closed() -> None:
+def test_delegates_when_a_closed_destination_has_no_reopening_time() -> None:
     origin = _port("Origin")
     destination = _port("Destination", closed=True)
     direct = _route("DIRECT", [origin, destination], [1000.0, 1000.0])
@@ -232,7 +232,7 @@ def test_delegates_when_the_destination_port_is_closed() -> None:
     assert shipment.associated_bookings == []
 
 
-def test_intermediate_call_at_a_closed_port_is_not_booked_through() -> None:
+def test_intermediate_closed_call_without_a_reopening_time_is_not_booked_through() -> None:
     origin = _port("Origin")
     middle = _port("Middle", closed=True)
     destination = _port("Destination")
@@ -590,3 +590,154 @@ def test_a_boarding_costs_a_full_headway_not_half() -> None:
 
     assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
     assert _chain(shipment) == [("DIRECT", 1, 1)]
+
+
+# ---------------------------------------------------------------------------
+# A closure is temporary: cargo arriving after it lifts may pass through.
+# ---------------------------------------------------------------------------
+
+NOW_DAYS = 200.0
+
+
+def _closure_plan(port: Any, reopen_hours: float, duration_days: float = 5.0) -> Any:
+    """A close-berth plan for ``port`` that lifts ``reopen_hours`` from ``NOW``."""
+    return SimpleNamespace(
+        target_leg=None,
+        target_berth=SimpleNamespace(port=port),
+        start_offset_days=NOW_DAYS + reopen_hours / 24.0 - duration_days,
+        duration_days=duration_days,
+        multiplier=1.0,
+        close_berth=True,
+    )
+
+
+def _timed_closure_fixture(reopen_hours: float) -> tuple[Any, Any]:
+    """A short ride through a shut hub against a long ride that avoids it.
+
+    ``VIA`` reaches the destination in two 100 nm legs but calls at the shut
+    ``Hub`` five hours in; ``LONG`` sails 400 nm straight there. Boarding costs
+    a full headway on each: 15 h for VIA, 40 h for LONG.
+
+      VIA  = max(15 + 5, reopen) - 5 + 13   (13 h of sailing plus one call)
+      LONG = 40 + 20                                              = 60.0 h
+
+    So VIA costs 28 h once the hub has reopened by the time cargo gets there,
+    and reopen + 8 h while it has not.
+    """
+    origin = _port("Origin")
+    hub = _port("Hub", closed=True)
+    destination = _port("Destination")
+    via = _route("VIA", [origin, hub, destination], [100.0, 100.0, 100.0], vessels=1)
+    long_way = _route("LONG", [origin, destination], [400.0, 400.0], vessels=1)
+    context = _context([origin, hub, destination], [via, long_way])
+    context.disruption_plans = [_closure_plan(hub, reopen_hours)]
+    return context, _shipment(origin, destination)
+
+
+def test_shut_hub_is_used_when_cargo_arrives_after_it_reopens() -> None:
+    # Reopens in 20 h; the ride reaches the hub at 20 h, so nothing is lost.
+    context, shipment = _timed_closure_fixture(20.0)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("VIA", 1, 2)]
+
+
+def test_shut_hub_is_avoided_when_it_reopens_too_late() -> None:
+    # Reopens in 100 h, so VIA would cost 108 h against LONG's 60 h.
+    context, shipment = _timed_closure_fixture(100.0)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("LONG", 1, 1)]
+
+
+def test_a_closed_destination_is_booked_rather_than_held_when_it_reopens() -> None:
+    """Cargo bound for a shut port should travel and arrive as it reopens.
+
+    Holding it at the origin and only then sailing can never be faster than
+    sailing now and waiting at the far end, so a readable reopening time turns
+    this from a delegation into a booking.
+    """
+    origin = _port("Origin")
+    destination = _port("Destination", closed=True)
+    direct = _route("DIRECT", [origin, destination], [400.0, 400.0], vessels=1)
+    context = _context([origin, destination], [direct])
+    context.disruption_plans = [_closure_plan(destination, 100.0)]
+    shipment = _shipment(origin, destination)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("DIRECT", 1, 1)]
+
+
+def test_a_closure_wait_delays_the_rest_of_the_ride() -> None:
+    import response_strategies.user_strategy as strategy
+
+    edge = strategy._Edge(
+        departure_index=0,
+        arrival_index=1,
+        route_index=0,
+        departure_segment_index=1,
+        arrival_segment_index=2,
+        hours=50.0,
+        crosses_congestion=False,
+        closed_calls=((10.0, 100.0),),
+    )
+    # Setting off now, the call at 10 h waits until hour 100, so the remaining
+    # 40 h of the ride finish at 140 rather than 50.
+    assert strategy._edge_arrival(edge, 0.0) == 140.0
+    # Setting off late enough that the port is already open costs nothing extra.
+    assert strategy._edge_arrival(edge, 95.0) == 145.0
+
+
+def test_an_inactive_closure_plan_leaves_the_port_impassable() -> None:
+    # The plan has already lifted, so the live berth state and the plan
+    # disagree; the port is treated as impassable rather than mis-timed.
+    context, shipment = _timed_closure_fixture(20.0)
+    context.disruption_plans = [
+        SimpleNamespace(
+            target_leg=None,
+            target_berth=SimpleNamespace(port=context.ports[1]),
+            start_offset_days=1.0,
+            duration_days=2.0,
+            multiplier=1.0,
+            close_berth=True,
+        )
+    ]
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("LONG", 1, 1)]
+
+
+def test_a_malformed_closure_plan_leaves_the_port_impassable() -> None:
+    context, shipment = _timed_closure_fixture(20.0)
+    context.disruption_plans = [_closure_plan(context.ports[1], 20.0)]
+    context.disruption_plans[0].duration_days = None
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("LONG", 1, 1)]
+
+
+def test_a_non_datetime_now_leaves_closures_impassable() -> None:
+    context, shipment = _timed_closure_fixture(20.0)
+
+    assert UserStrategy.assign_associated_bookings(context, 12345, shipment) is True
+    assert _chain(shipment) == [("LONG", 1, 1)]
+
+
+def test_congested_leg_plans_do_not_produce_reopening_times() -> None:
+    context, shipment = _timed_closure_fixture(20.0)
+    leg = context.service_routes[0].segments[0].associated_leg
+    context.disruption_plans.append(
+        SimpleNamespace(
+            target_leg=leg,
+            target_berth=None,
+            start_offset_days=NOW_DAYS - 1.0,
+            duration_days=5.0,
+            multiplier=2.0,
+            close_berth=False,
+        )
+    )
+
+    # The congested-leg plan is ignored by the closure map, so the hub's own
+    # reopening time still applies and the short ride is still chosen.
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("VIA", 1, 2)]

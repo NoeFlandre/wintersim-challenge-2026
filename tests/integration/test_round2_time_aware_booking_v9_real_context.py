@@ -362,3 +362,53 @@ def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) 
         assert math.isfinite(edge.hours) and edge.hours > 0.0
     for hours in network.boarding_hours:
         assert math.isfinite(hours) and hours > 0.0
+
+
+def test_the_fleet_decision_creates_no_alternative_routes(
+    real_context_environment: Any,
+) -> None:
+    """The organizer would divert a vessel here; the strategy must not let it.
+
+    Checks against the organizer's own validator, which runs after every call
+    to this hook, and contrasts the outcome with what the fallback does to the
+    same context.
+    """
+    module, scenario_builders = real_context_environment
+    import simulation_model  # noqa: F401, PLC0415
+    from response_strategies import default_strategy as organizer  # noqa: PLC0415
+    from response_strategies.strategy_validation import (  # noqa: PLC0415
+        capture_alternative_route_strategy_state,
+        validate_alternative_route_strategy_result,
+    )
+
+    # Mid-way through the Shanghai->Kaohsiung congestion window.
+    now = SIM_START + dt.timedelta(days=310.5)
+
+    context = scenario_builders.create_with_disruption()
+    _apply_runtime_disruption_state(context, now)
+    routes_before = len(context.service_routes)
+    vessels_before = len(context.vessels)
+    deployed_before = {id(r): len(r.deployed_vessels) for r in context.service_routes}
+
+    snapshot = capture_alternative_route_strategy_state(context)
+    decision = module.UserStrategy.create_alternative_service_routes(context, now)
+    # The organizer validates every call, decision or not.
+    validate_alternative_route_strategy_result(context, snapshot)
+
+    assert decision is not None, "the hook must own this decision"
+    assert len(context.service_routes) == routes_before
+    assert len(context.vessels) == vessels_before
+    assert {id(r): len(r.deployed_vessels) for r in context.service_routes} == deployed_before
+    assert all(v.pending_assigned_service_route is None for v in context.vessels)
+    assert all(r.source_service_route is None for r in context.service_routes)
+
+    # The fallback, on an identical context, does divert a vessel.
+    fallback_context = scenario_builders.create_with_disruption()
+    _apply_runtime_disruption_state(fallback_context, now)
+    organizer.DefaultStrategy.create_alternative_service_routes(fallback_context, now)
+    assert len(fallback_context.service_routes) > routes_before, (
+        "the fallback is expected to build avoiding routes here"
+    )
+    assert any(v.pending_assigned_service_route is not None for v in fallback_context.vessels), (
+        "the fallback is expected to reserve a vessel away from its service"
+    )

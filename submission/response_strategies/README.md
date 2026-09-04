@@ -5,11 +5,13 @@ team **OrtolanForever** for Round 2 of the WSC 2026 Simulation Challenge.
 
 ## Strategy
 
-The strategy owns two decisions: the initial booking chain for newly generated
-cargo (`assign_associated_bookings`), and whether to leave an in-transit chain
-alone when a disruption appears after the cargo has sailed
-(`adjust_bookings_before_cargo_handling`). The other two decision points are
-delegated to the organizer's default implementation.
+The strategy owns three decisions: the initial booking chain for newly
+generated cargo (`assign_associated_bookings`), whether to leave an in-transit
+chain alone when a disruption appears after the cargo has sailed
+(`adjust_bookings_before_cargo_handling`), and whether to move vessels between
+services in response to a disruption
+(`create_alternative_service_routes`). Berth selection is delegated to the
+organizer's default implementation.
 
 The organizer's fallback selects a booking chain by minimising **sailing
 distance**. Distance ignores how often each service actually departs, so the
@@ -97,3 +99,17 @@ favourable rebuild.
 
 The hook never mutates a booking, route, vessel, or berth. Anything uncertain
 returns `None`, which restores the organizer's own replanning exactly.
+
+## Keeping the fleet on its rotations
+
+The organizer's fallback answers a disruption by building an avoiding route
+from existing legs and reserving one vessel from each affected service onto it.
+This strategy declines that trade. A service with `n` vessels has a headway of
+`cycle / n`, so giving up a vessel costs it a proportionate share of its
+departures, while the new route runs a single vessel around a longer loop and
+so offers a headway of its entire cycle — which is why this strategy never
+books such a route in the first place.
+
+The decision creates, moves, and modifies nothing: the fleet simply stays as
+deployed. Because it is taken from the first call onward, no vessel is ever
+switched away and none ever needs restoring at recovery.

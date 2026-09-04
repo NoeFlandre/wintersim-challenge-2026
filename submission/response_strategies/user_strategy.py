@@ -20,7 +20,12 @@ the organizer replans the rest of its journey by sailing distance and by
 refusing the disrupted ports and legs outright, which can be much slower than
 simply staying aboard and waiting the disruption out. Where the same cost model
 says the booked chain already beats the best alternative, the strategy keeps it.
-The remaining two decision points stay delegated.
+
+Finally it owns the fleet decision, and keeps every vessel on its scheduled
+rotation. The organizer's own response to a disruption reserves one vessel from
+each affected service onto a newly built avoiding route, which costs the
+affected service a share of its frequency while the new route runs a single
+vessel on a longer loop. Berth selection stays delegated.
 """
 
 from __future__ import annotations
@@ -893,8 +898,23 @@ class UserStrategy:
 
     @staticmethod
     def create_alternative_service_routes(context: Any, now: Any, vessel: Any = None) -> Any:
-        """Delegate alternative-route creation to the organizer fallback."""
-        return None
+        """Keep every vessel on its scheduled rotation.
+
+        The organizer's fallback answers a disruption by building an avoiding
+        route and reserving one vessel from each affected service onto it. That
+        trade is a poor one for cargo routed by transport time: the affected
+        service loses a share of its departures, while the new route runs a
+        single vessel around a longer loop and so offers a headway of its own
+        cycle. This strategy never books such a route, precisely because one
+        vessel cannot carry a useful service, so reserving vessels onto them
+        only thins out the rotations the cargo does use.
+
+        Returning a decision here suppresses that reservation. Nothing is
+        created, moved, or modified: the fleet simply stays as deployed, which
+        also keeps every headway estimate equal to the service actually on
+        offer.
+        """
+        return True
 
     @staticmethod
     def assign_associated_bookings(context: Any, now: Any, shipment: Any) -> Any:

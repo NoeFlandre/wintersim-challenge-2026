@@ -403,10 +403,25 @@ def test_repeated_calls_are_deterministic() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_other_hooks_remain_delegated() -> None:
+def test_berth_selection_remains_delegated() -> None:
     assert UserStrategy.select_vessel_for_berth(object(), object(), [], [], NOW) is None
-    assert UserStrategy.create_alternative_service_routes(object(), NOW) is None
-    assert UserStrategy.adjust_bookings_before_cargo_handling(object(), NOW, object()) is None
+
+
+def test_the_fleet_decision_is_owned_and_creates_nothing() -> None:
+    """Every vessel stays on its rotation, whatever the context looks like."""
+    routes = [object(), object()]
+    vessels = [object()]
+    context = SimpleNamespace(service_routes=routes, vessels=vessels, disruption_plans=[])
+
+    assert UserStrategy.create_alternative_service_routes(context, NOW) is not None
+    assert UserStrategy.create_alternative_service_routes(context, NOW, vessels[0]) is not None
+    assert context.service_routes == routes
+    assert context.vessels == vessels
+
+
+def test_the_fleet_decision_holds_even_for_a_malformed_context() -> None:
+    assert UserStrategy.create_alternative_service_routes(object(), NOW) is not None
+    assert UserStrategy.create_alternative_service_routes(None, None, None) is not None
 
 
 # ---------------------------------------------------------------------------

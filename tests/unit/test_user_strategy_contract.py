@@ -76,12 +76,17 @@ def test_select_vessel_for_berth_returns_none_and_does_not_mutate() -> None:
     assert berths == ["berth_1"], "must not mutate available_berths"
 
 
-def test_create_alternative_service_routes_returns_none_and_leaves_context_unchanged() -> None:
+def test_create_alternative_service_routes_decides_and_leaves_context_unchanged() -> None:
+    """The strategy owns this decision, and its decision creates nothing.
+
+    The organizer validates this hook after every call, including one that
+    returns a decision, so the context must be untouched either way.
+    """
     context = {"routes": [1, 2, 3], "vessels": ["x"]}
     snapshot = {"routes": list(context["routes"]), "vessels": list(context["vessels"])}
     result = UserStrategy.create_alternative_service_routes(context, now=5, vessel="x")
-    assert result is None
-    assert context == snapshot, "None result must leave context unchanged"
+    assert result is not None, "the fleet decision is owned, not delegated"
+    assert context == snapshot, "the decision must leave the context unchanged"
 
 
 def test_assign_associated_bookings_delegates_malformed_context() -> None:

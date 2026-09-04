@@ -50,6 +50,8 @@ it in a submission archive.
 - Every Round 2 experiment is tabulated in the
   [experiment ledger](experiments/round2-ledger.md).
 - The active strategy is the accepted
+  [v18 changeover cost](experiments/round2-changeover-cost-v18.md),
+  built on the accepted
   [v16 fleet stability](experiments/round2-fleet-stability-v16.md),
   built on the accepted
   [v15 timed congestion](experiments/round2-timed-congestion-v15.md),
@@ -62,8 +64,8 @@ it in a submission archive.
   built on the accepted
   [v10 full-headway boarding cost](experiments/round2-full-headway-boarding-v10.md)
   and [v9 time-aware booking assignment](experiments/round2-time-aware-booking-v9.md).
-- Its cumulative resilience loss is `9.762649496857325` over 72 periods,
-  `72.19%` below the `35.1039547178493` reached by the earlier hold-based v1
+- Its cumulative resilience loss is `4.912139391692661` over 72 periods,
+  `86.0%` below the `35.1039547178493` reached by the earlier hold-based v1
   policy. The v1 control was reproduced bit for bit in the current environment
   before the comparison.
 - Candidates are additionally required to hold up on held-out scenarios they
@@ -71,6 +73,10 @@ it in a submission archive.
   `10.32%`; the in-transit intervention improves the gentler `mild` scenario by
   `0.74%`; and timed congestion improves `mild` by `15.79%`, against only
   `0.034%` on Round 2, whose congestion windows are too long for it to bite.
+  v18's whole-service detour improves `shifted` by `2.43%` and leaves `mild`
+  bit-for-bit unchanged, the gate having made it inert where the disruption is
+  shorter than a rotation change; the version without that gate made `mild`
+  `37.62%` worse and was rejected on that evidence alone.
 
 ## Verified archive structure
 

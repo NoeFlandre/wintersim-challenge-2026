@@ -21,22 +21,27 @@ refusing the disrupted ports and legs outright, which can be much slower than
 simply staying aboard and waiting the disruption out. Where the same cost model
 says the booked chain already beats the best alternative, the strategy keeps it.
 
-Finally it owns the fleet decision, and keeps every vessel on its scheduled
-rotation. The organizer's own response to a disruption reserves one vessel from
-each affected service onto a newly built avoiding route, which costs the
-affected service a share of its frequency while the new route runs a single
-vessel on a longer loop. Berth selection stays delegated.
+Finally it owns the fleet decision. When a slowdown lands on a service's
+rotation, the strategy moves the *whole* service onto a detour around it built
+from existing legs - but only when that detour still calls every port the
+rotation calls and its cycle is strictly shorter at the speeds now in force.
+The organizer's own response reserves a single vessel onto such a route, which
+leaves the original rotation both slow and thinned; moving the service keeps
+its frequency and drops the slowdown. A shut port is never routed around, and
+a rotation is never left without vessels while cargo is still booked on it.
+Berth selection stays delegated.
 """
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import heapq
 import math
 import numbers
 from typing import Any, NamedTuple
 
-from maritime_data_context import Booking
+from maritime_data_context import Booking, Segment, ServiceRoute
 
 # The organizer's BerthBerthing activity has a fixed three-hour duration. It is
 # charged once for every intermediate port call inside a single booking, so a
@@ -385,7 +390,7 @@ def _network(
     reopen_hours: dict[int, float],
     clears_hours: dict[int, float] | None = None,
 ) -> _Network | None:
-    """Build the bookable network from the live nominal service routes."""
+    """Build the bookable network from the rotations the fleet is running."""
     closed = _closed_port_indexes(context)
     if closed is None:
         return None
@@ -393,13 +398,20 @@ def _network(
     raw_routes = _sequence(getattr(context, "service_routes", None))
     if raw_routes is None:
         return None
+    # New cargo is booked only on the rotation each service is actually running
+    # now. A rotation a service has moved off is left to the cargo already on
+    # it, which is how it drains before its last vessel is allowed to leave.
+    bookable = {
+        id(route)
+        for route in _service_targets(
+            context, closed, port_indexes, clears_hours or {}, build=False
+        ).values()
+    }
     edges: list[_Edge] = []
     routes: list[Any] = []
     boarding: list[float] = []
     for route in raw_routes:
-        # Alternative routes carry a single reserved vessel and are withdrawn
-        # when the disruption ends, which would orphan a booking made on them.
-        if getattr(route, "source_service_route", None) is not None:
+        if id(route) not in bookable:
             continue
         if not _sequence(getattr(route, "deployed_vessels", None)):
             continue
@@ -881,6 +893,427 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
     return True if decided else None
 
 
+# ---------------------------------------------------------------------------
+# The fleet decision: run every service on the fastest rotation that still
+# calls all of its ports.
+# ---------------------------------------------------------------------------
+
+# Marks the rotations this strategy builds, so they are never confused with the
+# ones the organizer fallback builds.
+_ROUTE_MARK = "UALT"
+
+
+def _leg_endpoints(leg: Any) -> tuple[str, str] | None:
+    departure = getattr(getattr(leg, "departure_port", None), "name", None)
+    arrival = getattr(getattr(leg, "arrival_port", None), "name", None)
+    if not isinstance(departure, str) or not isinstance(arrival, str):
+        return None
+    return departure.casefold(), arrival.casefold()
+
+
+def _cycle_distance(legs: tuple[Any, ...]) -> float | None:
+    """Distance once round a rotation, stretched by the multipliers in force.
+
+    Ranking two rotations of the same service by this quantity is the same
+    comparison as by cycle hours: the vessels' speed divides both sides out.
+    """
+    total = 0.0
+    for leg in legs:
+        distance = _positive_real(getattr(leg, "sailing_distance", None))
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if distance is None or multiplier is None:
+            return None
+        total += distance * multiplier
+    return total if math.isfinite(total) and total > 0.0 else None
+
+
+def _slowdown_present(context: Any) -> bool | None:
+    legs = _sequence(getattr(context, "legs", None))
+    if legs is None:
+        return None
+    for leg in legs:
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if multiplier is None:
+            return None
+        if multiplier > 1.0:
+            return True
+    return False
+
+
+def _slowdown_of(
+    legs: tuple[Any, ...], closed: frozenset[int], port_indexes: dict[int, int]
+) -> tuple[tuple[tuple[str, str], ...], tuple[Any, ...]] | None:
+    """The slowed legs of a rotation, or ``None`` if it must be left alone."""
+    keys: list[tuple[str, str]] = []
+    slowed: list[Any] = []
+    for leg in legs:
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if multiplier is None:
+            return None
+        for port in (
+            getattr(leg, "departure_port", None),
+            getattr(leg, "arrival_port", None),
+        ):
+            # A shut port is a wait, not a reason to stop calling there.
+            if port_indexes.get(id(port)) in closed:
+                return None
+        if multiplier > 1.0:
+            key = _leg_endpoints(leg)
+            if key is None:
+                return None
+            keys.append(key)
+            slowed.append(leg)
+    if not slowed:
+        return None
+    return tuple(sorted(keys)), tuple(slowed)
+
+
+def _nominal_distance(legs: tuple[Any, ...]) -> float | None:
+    """Distance once round a rotation at normal speed."""
+    total = 0.0
+    for leg in legs:
+        distance = _positive_real(getattr(leg, "sailing_distance", None))
+        if distance is None:
+            return None
+        total += distance
+    return total if math.isfinite(total) and total > 0.0 else None
+
+
+def _outlasts_a_changeover(
+    source: Any,
+    rotation_legs: tuple[Any, ...],
+    slowed: tuple[Any, ...],
+    clears: dict[int, float],
+) -> bool:
+    """Whether the slowdown will still be in force after the fleet has moved.
+
+    Changing rotation is not free. Vessels move one at a time, only when empty,
+    so the changeover takes about one turn of the new rotation - and it is paid
+    again on the way back. The quantity that says whether it is worth paying is
+    the slowdown's own remaining life against that turn, and both are read from
+    the runtime state. An end that cannot be established counts as permanent,
+    exactly as the booking cost model treats it.
+    """
+    speed = _mean_speed(source)
+    turn = _nominal_distance(rotation_legs)
+    if speed is None or turn is None:
+        return False
+    remaining = math.inf
+    for leg in slowed:
+        remaining = min(remaining, clears.get(id(leg), math.inf))
+    return remaining > turn / speed
+
+
+def _undisrupted_leg_path(
+    context: Any,
+    origin: Any,
+    destination: Any,
+    closed: frozenset[int],
+    port_indexes: dict[int, int],
+) -> tuple[Any, ...] | None:
+    """Shortest path between two ports over legs no disruption touches."""
+    legs = _sequence(getattr(context, "legs", None))
+    if legs is None:
+        return None
+    start = port_indexes.get(id(origin))
+    goal = port_indexes.get(id(destination))
+    if start is None or goal is None or start == goal or start in closed:
+        return None
+
+    outgoing: dict[int, list[tuple[float, int, Any]]] = {}
+    for leg in legs:
+        distance = _positive_real(getattr(leg, "sailing_distance", None))
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if distance is None or multiplier is None:
+            return None
+        if multiplier > 1.0:
+            continue
+        departure = port_indexes.get(id(getattr(leg, "departure_port", None)))
+        arrival = port_indexes.get(id(getattr(leg, "arrival_port", None)))
+        if departure is None or arrival is None:
+            return None
+        if departure in closed or arrival in closed:
+            continue
+        outgoing.setdefault(departure, []).append((distance, arrival, leg))
+
+    best: dict[int, float] = {start: 0.0}
+    previous: dict[int, tuple[int, Any]] = {}
+    # Heap entries are ordered by numbers alone, so nothing depends on hashing.
+    heap: list[tuple[float, int]] = [(0.0, start)]
+    while heap:
+        cost, port = heapq.heappop(heap)
+        if best.get(port, math.inf) < cost - 1e-12:
+            continue
+        if port == goal:
+            break
+        for distance, arrival, leg in outgoing.get(port, []):
+            candidate = cost + distance
+            if candidate < best.get(arrival, math.inf) - 1e-12:
+                best[arrival] = candidate
+                previous[arrival] = (port, leg)
+                heapq.heappush(heap, (candidate, arrival))
+
+    if goal not in previous:
+        return None
+    path: list[Any] = []
+    cursor = goal
+    while cursor != start:
+        step = previous.get(cursor)
+        if step is None:
+            return None
+        cursor, leg = step
+        path.append(leg)
+        if len(path) > len(legs):
+            return None
+    path.reverse()
+    return tuple(path)
+
+
+def _detour_legs(
+    context: Any,
+    legs: tuple[Any, ...],
+    closed: frozenset[int],
+    port_indexes: dict[int, int],
+) -> tuple[Any, ...] | None:
+    """Replace every slowed leg of a rotation by the fastest way round it.
+
+    Only insertions are made, so the detour calls every port the rotation
+    calls, in the same order, and stays a connected cycle.
+    """
+    replaced: list[Any] = []
+    for leg in legs:
+        multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if multiplier is None:
+            return None
+        if multiplier <= 1.0:
+            replaced.append(leg)
+            continue
+        detour = _undisrupted_leg_path(
+            context,
+            getattr(leg, "departure_port", None),
+            getattr(leg, "arrival_port", None),
+            closed,
+            port_indexes,
+        )
+        if detour is None:
+            return None
+        replaced.extend(detour)
+    return tuple(replaced)
+
+
+def _rotation_beats(rotation: Any, legs: tuple[Any, ...]) -> bool:
+    """Whether a built rotation is strictly faster than the nominal one now."""
+    resolved = _ordered_legs(rotation)
+    if resolved is None:
+        return False
+    detoured = _cycle_distance(resolved[0])
+    current = _cycle_distance(legs)
+    return detoured is not None and current is not None and detoured < current
+
+
+def _build_rotation(context: Any, source: Any, legs: tuple[Any, ...], key: Any) -> Any | None:
+    """Register a new service route over existing legs. No leg is created."""
+    routes = _sequence(getattr(context, "service_routes", None))
+    register = getattr(context, "partial_service_routes", None)
+    if routes is None or not isinstance(register, list) or not legs:
+        return None
+    taken = {getattr(route, "id", None) for route in routes}
+    index = 1
+    while f"{getattr(source, 'id', '')}-{_ROUTE_MARK}-{index}" in taken:
+        index += 1
+    rotation = ServiceRoute(
+        id=f"{getattr(source, 'id', '')}-{_ROUTE_MARK}-{index}",
+        name=f"{getattr(source, 'name', '')} Slowdown Detour",
+        start_day_of_week=getattr(source, "start_day_of_week", 0.0),
+    )
+    rotation.source_service_route = source
+    rotation.disruption_key = (_ROUTE_MARK, key)
+    for sequence_index, leg in enumerate(legs, start=1):
+        segment = Segment(sequence_index, leg, rotation)
+        rotation.segments.append(segment)
+        leg_segments = getattr(leg, "segments", None)
+        if isinstance(leg_segments, list):
+            leg_segments.append(segment)
+        register.append(segment)
+    context.service_routes.append(rotation)
+    return rotation
+
+
+def _service_targets(
+    context: Any,
+    closed: frozenset[int],
+    port_indexes: dict[int, int],
+    clears: dict[int, float],
+    *,
+    build: bool,
+) -> dict[int, Any]:
+    """The rotation each service should be running, keyed by its nominal route.
+
+    With ``build`` false this is read-only: a detour that has not been built
+    yet simply leaves the service on its nominal rotation.
+
+    A service that has not started its changeover has to clear the
+    changeover-cost test; one already part-way through does not, since that
+    cost has been paid and reversing early would only pay it twice.
+    """
+    routes = _sequence(getattr(context, "service_routes", None)) or ()
+    nominal = tuple(
+        route for route in routes if getattr(route, "source_service_route", None) is None
+    )
+    targets = {id(route): route for route in nominal}
+    if _slowdown_present(context) is not True:
+        return targets
+
+    for source in nominal:
+        resolved = _ordered_legs(source)
+        if resolved is None:
+            continue
+        legs = resolved[0]
+        found = _slowdown_of(legs, closed, port_indexes)
+        if found is None:
+            continue
+        key, slowed = found
+        rotation = None
+        for candidate in routes:
+            if (
+                getattr(candidate, "source_service_route", None) is source
+                and getattr(candidate, "disruption_key", None) == (_ROUTE_MARK, key)
+                and _sequence(getattr(candidate, "segments", None))
+            ):
+                rotation = candidate
+                break
+        if rotation is None:
+            if not build:
+                continue
+            detour = _detour_legs(context, legs, closed, port_indexes)
+            if detour is None or _cycle_distance(detour) is None:
+                continue
+            if (_cycle_distance(detour) or math.inf) >= (_cycle_distance(legs) or 0.0):
+                continue
+            if not _outlasts_a_changeover(source, detour, slowed, clears):
+                continue
+            rotation = _build_rotation(context, source, detour, key)
+            if rotation is None:
+                continue
+        elif not _sequence(getattr(rotation, "deployed_vessels", None)):
+            built = _ordered_legs(rotation)
+            if built is None or not _outlasts_a_changeover(source, built[0], slowed, clears):
+                continue
+        if _rotation_beats(rotation, legs):
+            targets[id(source)] = rotation
+    return targets
+
+
+def _has_live_bookings(route: Any) -> bool:
+    """Whether any unfinished shipment is still counting on this rotation."""
+    bookings = getattr(route, "associated_bookings", None)
+    if not isinstance(bookings, list):
+        return True
+    for booking in bookings:
+        shipment = getattr(booking, "shipment", None)
+        if shipment is None or getattr(shipment, "completion_time", None) is None:
+            return True
+    return False
+
+
+def _vessel_port(vessel: Any) -> Any:
+    segment = getattr(vessel, "current_segment", None)
+    leg = getattr(segment, "associated_leg", None)
+    if leg is not None:
+        return getattr(leg, "arrival_port", None)
+    berth = getattr(vessel, "current_berth", None)
+    return getattr(berth, "port", None) if berth is not None else None
+
+
+def _reentry_segment(route: Any, port: Any) -> Any:
+    if port is None:
+        return None
+    for segment in _ordered_segments(route) or ():
+        leg = getattr(segment, "associated_leg", None)
+        if leg is not None and getattr(leg, "arrival_port", None) is port:
+            return segment
+    return None
+
+
+def _place_vessel(vessel: Any, route: Any) -> bool:
+    """Move an empty vessel to another rotation at the port it is standing at.
+
+    The safety conditions are the organizer's own: the vessel carries nothing,
+    and the rotation it joins calls the port it is at, so it resumes from
+    there. Nothing is loaded, discharged, or completed here.
+    """
+    if getattr(vessel, "carried_shipments", None):
+        return False
+    deployed = getattr(route, "deployed_vessels", None)
+    if not isinstance(deployed, list):
+        return False
+    segment = _reentry_segment(route, _vessel_port(vessel))
+    if segment is None:
+        return False
+    current = getattr(vessel, "current_segment", None)
+    occupants = getattr(current, "current_vessels", None)
+    if isinstance(occupants, list):
+        while vessel in occupants:
+            occupants.remove(vessel)
+    previous = getattr(vessel, "assigned_service_route", None)
+    leaving = getattr(previous, "deployed_vessels", None)
+    if isinstance(leaving, list):
+        while vessel in leaving:
+            leaving.remove(vessel)
+    if vessel not in deployed:
+        deployed.append(vessel)
+    vessel.assigned_service_route = route
+    vessel.pending_assigned_service_route = None
+    vessel.current_segment = segment
+    occupants = getattr(segment, "current_vessels", None)
+    if isinstance(occupants, list) and vessel not in occupants:
+        occupants.append(vessel)
+    return True
+
+
+def _run_fleet(context: Any, now: Any, vessel: Any) -> None:
+    """Point every service at its target rotation, and move one vessel there."""
+    port_indexes = _port_indexes(context)
+    closed = _closed_port_indexes(context)
+    vessels = _sequence(getattr(context, "vessels", None))
+    if port_indexes is None or closed is None or vessels is None:
+        return
+
+    clears = _congestion_recovery(context, now) or {}
+    targets = _service_targets(context, closed, port_indexes, clears, build=True)
+    staffing: dict[int, int] = {}
+    for candidate in vessels:
+        assigned = getattr(candidate, "assigned_service_route", None)
+        if assigned is not None:
+            staffing[id(assigned)] = staffing.get(id(assigned), 0) + 1
+
+    live: dict[int, bool] = {}
+    for candidate in vessels:
+        assigned = getattr(candidate, "assigned_service_route", None)
+        if assigned is None:
+            continue
+        source = getattr(assigned, "source_service_route", None) or assigned
+        target = targets.get(id(source))
+        keep = target is None or target is assigned
+        # Never take the last vessel off a rotation cargo is still booked on:
+        # that cargo would have nothing left to sail on.
+        if not keep and staffing.get(id(assigned), 0) <= 1:
+            if id(assigned) not in live:
+                live[id(assigned)] = _has_live_bookings(assigned)
+            keep = live[id(assigned)]
+        if keep:
+            if getattr(candidate, "pending_assigned_service_route", None) is not None:
+                candidate.pending_assigned_service_route = None
+            continue
+        candidate.pending_assigned_service_route = target
+
+    if vessel is None:
+        return
+    pending = getattr(vessel, "pending_assigned_service_route", None)
+    if pending is not None and pending is not getattr(vessel, "assigned_service_route", None):
+        _place_vessel(vessel, pending)
+
+
 class UserStrategy:
     """Deterministic participant strategy with one time-aware booking policy."""
 
@@ -898,22 +1331,27 @@ class UserStrategy:
 
     @staticmethod
     def create_alternative_service_routes(context: Any, now: Any, vessel: Any = None) -> Any:
-        """Keep every vessel on its scheduled rotation.
+        """Run every service on the fastest rotation that still calls its ports.
 
-        The organizer's fallback answers a disruption by building an avoiding
-        route and reserving one vessel from each affected service onto it. That
-        trade is a poor one for cargo routed by transport time: the affected
-        service loses a share of its departures, while the new route runs a
-        single vessel around a longer loop and so offers a headway of its own
-        cycle. This strategy never books such a route, precisely because one
-        vessel cannot carry a useful service, so reserving vessels onto them
-        only thins out the rotations the cargo does use.
+        The organizer's fallback answers a slowdown by building a rotation that
+        avoids it and reserving *one* vessel from the affected service onto it.
+        That is the worst of both worlds: the original rotation still crawls
+        through the slowdown and has lost a share of its frequency, while the
+        new one runs a single vessel around its whole cycle. Nothing in the
+        validation rules limits a new rotation to one vessel, so this strategy
+        moves the whole service instead, and only when the detour is strictly
+        faster than sailing the slowdown and still calls every port.
 
-        Returning a decision here suppresses that reservation. Nothing is
-        created, moved, or modified: the fleet simply stays as deployed, which
-        also keeps every headway estimate equal to the service actually on
-        offer.
+        A shut port is never routed around: v12 established that a closure is
+        a wait, and dropping the call would abandon the cargo booked there.
+
+        Vessels move one at a time and only when empty at a port the new
+        rotation calls, and a rotation is never left without vessels while
+        cargo is still booked on it. No cargo is moved, loaded, or completed
+        here.
         """
+        with contextlib.suppress(*_DATA_ERRORS):
+            _run_fleet(context, now, vessel)
         return True
 
     @staticmethod

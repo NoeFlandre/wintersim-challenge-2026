@@ -26,6 +26,11 @@ authoritative baseline ATT
 | v14 | charge the alternative the wait to board it, and drop the congestion-free requirement that has no meaning for cargo already at sea | repairs v13's closure regressions; 5 of 6 windows improve | `10.350669070475163` | `-1.5652` (`-13.136%`) | 28/33/11 | **accepted** (held-out `-0.74%` for the intervention) |
 | v15 | time a congestion slowdown as v12 timed a closure: a leg sailed after it clears is costed at normal speed | both 60-day windows unchanged; the 25-day window improves | `10.347110679813037` | `-0.0036` (`-0.034%`) | 17/45/10 | **accepted** (held-out `-15.79%` on short windows) |
 | v16 | keep every vessel on its rotation instead of letting the organizer reserve one per affected service onto a single-vessel avoiding route | no alternative routes exist; S4 regains 25% of its frequency | `9.762649496857325` | `-0.5845` (`-5.649%`) | 34/22/16 | **accepted** (held-out tie and `-0.09%`, no cargo stranded) |
+| v17 | move a whole service onto a detour around a slowdown whenever the detour still calls every port and its cycle is shorter at the live multipliers | one detour built for `S4`, whole fleet reserved | not run | — | — | rejected on held-out (`shifted` `-1.0385`, `mild` `+2.0175`) |
+| v18 | v17 plus the changeover cost: start a rotation change only when the slowdown's remaining life exceeds one turn of the detour, and never reverse one already under way | two detours built (`S4-UALT-1`, `S5-UALT-1`); both 60-day windows change, the 25-day one does not | `4.912139391692661` | `-4.8505` (`-49.684%`) | 28/12/32 | **accepted** (held-out `-2.43%` and an exact tie, no cargo stranded) |
+
+Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18),
+a `-86.0%` reduction.
 
 ## Lessons carried forward
 
@@ -170,3 +175,33 @@ The protocol has already changed two decisions:
     `unbooked == 0` was made an explicit acceptance condition and the held-out
     scenario chosen for having a hub closure. It came back `0`, which is a
     result rather than an assumption.
+22. **The berth hook has nothing to sell.** A probe that wrapped
+    `select_vessel_for_berth` and ran the real scenario recorded `0` calls in
+    145 days: the organizer consults it only when waiting vessels reach three
+    times the idle berths, and the run's own statistics put average vessels
+    waiting at `0.19` of `41`. v5 had already measured a tie there. Two
+    independent measurements agree that berth priority is not a lever in this
+    network, so no further experiment should spend a run on it.
+23. **Changing a fleet's rotation costs about one turn of it, twice.** v17
+    moved whole services onto faster detours and was rejected because the cost
+    of the changeover — vessels move one at a time and only when empty, and
+    then have to come home — exceeded the benefit whenever the slowdown was
+    shorter than a rotation. Any decision that reassigns vessels has to price
+    the transient, not just compare the two steady states.
+24. **Two held-out scenarios that disagree are worth more than two that
+    agree.** `shifted` liked v17 and `mild` hated it, and the ratio that
+    separates them (slowdown duration against rotation cycle) was exactly the
+    term the rule was missing. Design the held-out set to differ along axes the
+    candidate might be sensitive to, not to be uniformly hard.
+25. **Price the transient, then the steady state.** The same whole-service
+    detour rule that was rejected at `+2.02` on a held-out scenario is worth
+    `-49.68%` once it also asks whether the disruption will outlast the
+    changeover. The difference is one ratio of runtime quantities, no constant.
+26. **A held-out scenario that returns to a bit-for-bit tie is a strong
+    result.** `mild` matching its control to the last digit proves the gate
+    made the mechanism inert there rather than merely smaller, which is what
+    distinguishes a corrected rule from a damped one.
+27. **The cost of a policy can land entirely outside the window it acts in.**
+    v18's whole price is paid in the ten weeks *after* the slowdown it fixes,
+    in periods where nothing is disrupted. Attributing loss by window is what
+    made that visible; the scalar alone would have hidden it.

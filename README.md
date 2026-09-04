@@ -128,16 +128,29 @@ The three accepted architecture changes since:
   no cargo ever reaches the slowed leg after it clears — but worth `-15.79%`
   on a held-out scenario whose windows are 25 to 30 days.
 
-One architecture change was tried and rejected:
+- [v18 changeover cost](docs/experiments/round2-changeover-cost-v18.md)
+  moves a *whole* service onto a detour around a slowdown — built from existing
+  legs, still calling every port — but only when the slowdown will outlast the
+  changeover itself, which takes about one turn of the rotation and is paid
+  again on the way home. The 60-day `5x` Shanghai-Kaohsiung window, which held
+  `79%` of all remaining loss, drops from `7.7506` to `0.0129`. Score
+  `4.912139391692661` (a further `-49.684%`).
+
+Two architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
 unobservable-progress estimate is optimistically biased, so the busiest trunk
 services looked most imminent.
+[v17 whole-service reroute](docs/experiments/round2-whole-service-reroute-v17.md)
+moved a fleet onto a faster detour without pricing the changeover, and was
+rejected on a held-out scenario (`+2.0175`) before its authoritative run. Its
+two held-out verdicts disagreed, and the ratio that separated them — the
+slowdown's duration against the rotation's cycle — became v18.
 
-The active Round 2 strategy scores `9.762649496857325`, which is `72.19%`
+The active Round 2 strategy scores `4.912139391692661`, which is `86.0%`
 below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
-`beace437a6c0d55bce87d35b38bfcfe25c897aa7749e17fc3425a2fa7e1de885`.
+`d6eb1590f3317d9f8a918efc8d3a188529dd99c6bcc82b04295deef001e00f22`.
 
 ### Guarding against overfitting
 

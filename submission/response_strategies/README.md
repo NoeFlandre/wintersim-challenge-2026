@@ -54,9 +54,9 @@ The strategy declines and lets the organizer decide whenever:
 - the only available path would cross a congested leg. Congested legs are
   used when a congestion-free path also exists and the congested one is still
   faster, but never as the sole option;
-- a service route is an organizer-created disruption alternative, or currently
-  has no deployed vessels — booking either could be orphaned when the
-  organizer restores vessels at recovery;
+- a service route is not the rotation its service is currently running, or
+  has no deployed vessels — booking either could be orphaned when the fleet
+  moves;
 - any runtime value is missing, malformed, non-finite, ambiguous, or the
   destination is unreachable.
 
@@ -69,11 +69,12 @@ behind.
 - Compatible with Python 3.11 and newer.
 - Deterministic: no randomness, no wall clock, no iteration order that depends
   on object identity or hashing, and integer-only tie-breaks.
-- Uses only the Python standard library plus `Booking` from the organizer's
-  `maritime_data_context`, which the organizer's own interface documentation
-  directs a custom strategy to create.
-- Read-only apart from the booking chain the interface requires it to create:
-  it changes no route, vessel, berth, disruption, or simulation state.
+- Uses only the Python standard library plus `Booking`, `Segment` and
+  `ServiceRoute` from the organizer's `maritime_data_context`, which the
+  organizer's own interface documentation directs a custom strategy to create.
+- Changes no berth, disruption, demand, shipment, or clock state. The only
+  state it writes is the booking chain and the fleet's rotation assignment,
+  both of which the interface exists to set.
 - Performs no network, subprocess, filesystem, environment, or wall-clock
   access, and keeps no state between calls.
 
@@ -100,16 +101,44 @@ favourable rebuild.
 The hook never mutates a booking, route, vessel, or berth. Anything uncertain
 returns `None`, which restores the organizer's own replanning exactly.
 
-## Keeping the fleet on its rotations
+## Running each service on its fastest rotation
 
 The organizer's fallback answers a disruption by building an avoiding route
-from existing legs and reserving one vessel from each affected service onto it.
-This strategy declines that trade. A service with `n` vessels has a headway of
-`cycle / n`, so giving up a vessel costs it a proportionate share of its
-departures, while the new route runs a single vessel around a longer loop and
-so offers a headway of its entire cycle — which is why this strategy never
-books such a route in the first place.
+from existing legs and reserving **one** vessel from each affected service onto
+it. That is the worst of both worlds: the original rotation still crawls
+through the slowdown and has lost a share of its departures, while the new
+route runs a single vessel around its whole cycle.
 
-The decision creates, moves, and modifies nothing: the fleet simply stays as
-deployed. Because it is taken from the first call onward, no vessel is ever
-switched away and none ever needs restoring at recovery.
+Nothing in the organizer's validation limits a new rotation to one vessel, so
+this strategy moves the **whole service** instead, under one rule:
+
+> Move an entire service onto a detour around a slowdown when the detour still
+> calls every port the rotation calls and its cycle is strictly shorter than
+> the rotation's cycle at the multipliers now in force.
+
+The detour is built by replacing each slowed leg `A -> B` with the fastest path
+`A -> ... -> B` over existing legs that no disruption touches. Only insertions
+are made, so every port is still called, in the same order, and the rotation
+stays a connected cycle. Because both cycles are measured at the same speed,
+comparing their multiplier-stretched distances is exactly comparing their cycle
+hours, and a service that moves keeps its full vessel count: its headway
+improves as well as its sailing time.
+
+Three safety rules bound the change:
+
+- **A shut port is never routed around.** A closure is a wait, not a reason to
+  stop calling somewhere; dropping the call would abandon the cargo booked
+  there. A rotation with a closed port anywhere on it is left alone entirely.
+- **Only an empty vessel moves, and only where it stands.** A vessel joins
+  another rotation only when it is carrying nothing and the rotation calls the
+  port it is at, so it resumes from there. No cargo is loaded, discharged,
+  moved, or completed by this hook.
+- **A rotation is never left without vessels while cargo is still booked on
+  it.** The last vessel stays until no unfinished shipment holds a booking on
+  that rotation. New cargo is offered only the rotation each service is
+  actually running, which is what lets the one being left behind drain.
+
+When the slowdown lifts, the same rule points the service back at its nominal
+rotation and the fleet returns the same way, one empty vessel at a time. With
+no slowdown in force, or with no detour worth taking, nothing is created and
+the fleet stays exactly as deployed.

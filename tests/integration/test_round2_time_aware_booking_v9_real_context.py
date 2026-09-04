@@ -364,14 +364,14 @@ def test_estimated_hours_are_finite_and_positive(real_context_environment: Any) 
         assert math.isfinite(hours) and hours > 0.0
 
 
-def test_the_fleet_decision_creates_no_alternative_routes(
+def test_the_fleet_decision_moves_a_whole_service_around_a_slowdown(
     real_context_environment: Any,
 ) -> None:
-    """The organizer would divert a vessel here; the strategy must not let it.
+    """The strategy must build one detour for S4 and reserve its whole fleet.
 
-    Checks against the organizer's own validator, which runs after every call
-    to this hook, and contrasts the outcome with what the fallback does to the
-    same context.
+    Checked against the organizer's own validator, which runs after every call
+    to this hook, and contrasted with what the fallback does to the same
+    context: it builds the same kind of route but reserves a single vessel.
     """
     module, scenario_builders = real_context_environment
     import simulation_model  # noqa: F401, PLC0415
@@ -388,27 +388,135 @@ def test_the_fleet_decision_creates_no_alternative_routes(
     _apply_runtime_disruption_state(context, now)
     routes_before = len(context.service_routes)
     vessels_before = len(context.vessels)
-    deployed_before = {id(r): len(r.deployed_vessels) for r in context.service_routes}
+    legs_before = list(context.legs)
+    source = next(route for route in context.service_routes if route.id == "S4")
+    fleet = [v for v in context.vessels if v.assigned_service_route is source]
+    assert len(fleet) > 1
 
     snapshot = capture_alternative_route_strategy_state(context)
     decision = module.UserStrategy.create_alternative_service_routes(context, now)
-    # The organizer validates every call, decision or not.
     validate_alternative_route_strategy_result(context, snapshot)
 
     assert decision is not None, "the hook must own this decision"
-    assert len(context.service_routes) == routes_before
     assert len(context.vessels) == vessels_before
-    assert {id(r): len(r.deployed_vessels) for r in context.service_routes} == deployed_before
-    assert all(v.pending_assigned_service_route is None for v in context.vessels)
-    assert all(r.source_service_route is None for r in context.service_routes)
+    assert list(context.legs) == legs_before, "no leg may be created"
+    built = [r for r in context.service_routes if r.source_service_route is not None]
+    assert len(built) == 1, "exactly one detour, for the one slowed service"
+    detour = built[0]
+    assert detour.source_service_route is source
+    assert len(context.service_routes) == routes_before + 1
 
-    # The fallback, on an identical context, does divert a vessel.
+    # It calls every port the rotation calls, and is strictly faster now.
+    def ports(route: Any) -> set[str]:
+        return {s.associated_leg.departure_port.name for s in route.segments}
+
+    def stretched(route: Any) -> float:
+        return sum(
+            s.associated_leg.sailing_distance * s.associated_leg.sailing_time_multiplier
+            for s in route.segments
+        )
+
+    assert ports(source) <= ports(detour)
+    assert stretched(detour) < stretched(source)
+    assert [s.sequence_index for s in sorted(detour.segments, key=lambda x: x.sequence_index)] == (
+        list(range(1, len(detour.segments) + 1))
+    )
+
+    # The whole fleet is reserved: this is the difference from the fallback.
+    reserved = [v for v in fleet if v.pending_assigned_service_route is detour]
+    assert len(reserved) == len(fleet)
+
     fallback_context = scenario_builders.create_with_disruption()
     _apply_runtime_disruption_state(fallback_context, now)
     organizer.DefaultStrategy.create_alternative_service_routes(fallback_context, now)
-    assert len(fallback_context.service_routes) > routes_before, (
-        "the fallback is expected to build avoiding routes here"
+    fallback_reserved = [
+        v for v in fallback_context.vessels if v.pending_assigned_service_route is not None
+    ]
+    assert len(fallback_reserved) == 1, (
+        "the fallback is expected to reserve exactly one vessel; moving the "
+        "whole service is what this strategy adds"
     )
-    assert any(v.pending_assigned_service_route is not None for v in fallback_context.vessels), (
-        "the fallback is expected to reserve a vessel away from its service"
+
+
+def test_the_fleet_decision_leaves_a_closed_port_alone(
+    real_context_environment: Any,
+) -> None:
+    """A shut port is a wait. Nothing is built and no vessel is reserved."""
+    module, scenario_builders = real_context_environment
+    import simulation_model  # noqa: F401, PLC0415
+    from response_strategies.strategy_validation import (  # noqa: PLC0415
+        capture_alternative_route_strategy_state,
+        validate_alternative_route_strategy_result,
     )
+
+    # Mid-way through the Piraeus closure, with no slowdown anywhere.
+    now = SIM_START + dt.timedelta(days=405.0)
+
+    context = scenario_builders.create_with_disruption()
+    _apply_runtime_disruption_state(context, now)
+    assert any(not berth.is_available for port in context.ports for berth in port.berths)
+    assert all(leg.sailing_time_multiplier == 1.0 for leg in context.legs)
+    routes_before = len(context.service_routes)
+
+    snapshot = capture_alternative_route_strategy_state(context)
+    decision = module.UserStrategy.create_alternative_service_routes(context, now)
+    validate_alternative_route_strategy_result(context, snapshot)
+
+    assert decision is not None
+    assert len(context.service_routes) == routes_before
+    assert all(v.pending_assigned_service_route is None for v in context.vessels)
+
+
+def test_the_fleet_decision_builds_nothing_on_a_calm_network(
+    real_context_environment: Any,
+) -> None:
+    """With no disruption in force the fleet is left exactly as deployed."""
+    module, scenario_builders = real_context_environment
+    import simulation_model  # noqa: F401, PLC0415
+
+    # Between the Colombo->New Jersey and Shanghai->Kaohsiung windows.
+    now = SIM_START + dt.timedelta(days=260.0)
+    context = scenario_builders.create_with_disruption()
+    _apply_runtime_disruption_state(context, now)
+    assert all(leg.sailing_time_multiplier == 1.0 for leg in context.legs)
+    assert all(berth.is_available for port in context.ports for berth in port.berths)
+    deployed_before = {id(r): list(r.deployed_vessels) for r in context.service_routes}
+    routes_before = len(context.service_routes)
+
+    assert module.UserStrategy.create_alternative_service_routes(context, now) is not None
+    assert len(context.service_routes) == routes_before
+    assert {id(r): list(r.deployed_vessels) for r in context.service_routes} == deployed_before
+    assert all(v.pending_assigned_service_route is None for v in context.vessels)
+
+
+def test_a_staffed_detour_replaces_its_nominal_rotation_in_the_network(
+    real_context_environment: Any,
+) -> None:
+    """New cargo is offered the rotation the service is actually running."""
+    module, scenario_builders = real_context_environment
+    import simulation_model  # noqa: F401, PLC0415
+
+    now = SIM_START + dt.timedelta(days=310.5)
+    context = scenario_builders.create_with_disruption()
+    _apply_runtime_disruption_state(context, now)
+    module.UserStrategy.create_alternative_service_routes(context, now)
+    detour = next(r for r in context.service_routes if r.source_service_route is not None)
+    source = detour.source_service_route
+
+    # Staff the detour as the simulation would, one empty vessel at a time.
+    for vessel in list(context.vessels):
+        if vessel.pending_assigned_service_route is detour:
+            vessel.carried_shipments.clear()
+            vessel.current_segment = sorted(source.segments, key=lambda s: s.sequence_index)[0]
+            module.UserStrategy.create_alternative_service_routes(context, now, vessel)
+
+    assert detour.deployed_vessels, "at least one vessel must have switched"
+    port_indexes = module._port_indexes(context)
+    closed = module._closed_port_indexes(context)
+    network = module._network(context, port_indexes, {}, {})
+    booked = {route.id for route in network.routes}
+    assert detour.id in booked
+    if source.deployed_vessels:
+        assert source.id not in booked, "a rotation being drained takes no new cargo"
+    targets = module._service_targets(context, closed, port_indexes, {}, build=False)
+    assert targets[id(source)] is detour

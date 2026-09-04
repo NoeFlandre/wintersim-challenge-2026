@@ -77,10 +77,10 @@ def test_select_vessel_for_berth_returns_none_and_does_not_mutate() -> None:
 
 
 def test_create_alternative_service_routes_decides_and_leaves_context_unchanged() -> None:
-    """The strategy owns this decision, and its decision creates nothing.
+    """The strategy owns this decision and creates nothing it cannot read.
 
     The organizer validates this hook after every call, including one that
-    returns a decision, so the context must be untouched either way.
+    returns a decision, so an unreadable context must be left untouched.
     """
     context = {"routes": [1, 2, 3], "vessels": ["x"]}
     snapshot = {"routes": list(context["routes"]), "vessels": list(context["vessels"])}

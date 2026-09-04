@@ -30,6 +30,8 @@ authoritative baseline ATT
 | v18 | v17 plus the changeover cost: start a rotation change only when the slowdown's remaining life exceeds one turn of the detour, and never reverse one already under way | two detours built (`S4-UALT-1`, `S5-UALT-1`); both 60-day windows change, the 25-day one does not | `4.912139391692661` | `-4.8505` (`-49.684%`) | 28/12/32 | **accepted** (held-out `-2.43%` and an exact tie, no cargo stranded) |
 | v19 | bring a rerouted fleet home when a port on its detour shuts | Round 2 bit-identical; `inserted` `22.2326` against a do-nothing `16.7550` | not accepted | — | — | rejected on held-out `inserted` (`+32.69%`) |
 | v20 | never build a detour through a port that a disruption plan will shut inside the window the detour is needed for | Round 2 bit-identical; `inserted` `16.1746`, now `-3.46%` against doing nothing | `4.912139391692661` | `0.0000` (tie, by design) | 28/12/32 | **accepted** (7 held-out scenarios: 4 wins, 3 ties, 0 losses) |
+| v21 | refuse a ride on a temporary rotation that would end after the rotation is withdrawn, so it drains before the fleet comes home | tapers the detour's intake near a window's end | `6.5457552167823945` | `+1.6336` (`+33.26%`) | 18/16/38 | rejected (cost `1.68` inside the window; the tail it targeted got `0.68` worse) |
+| v22 | a fleet moves to escape a live disruption and never merely to come home: keep the incumbent rotation unless the disruptions hurt it more | fleets stay on their detours | `13.632583218221225` | `+8.7204` (`+177.53%`) | 15/24/33 | rejected (target window improved to `-0.4034`, but `33` undisrupted periods cost `+6.53` for a permanently split fleet) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -244,3 +246,17 @@ The protocol has already changed two decisions:
     prediction was checked in six places and held in all six, to the last digit.
 33. **Future disruption plans are readable, and using them is not an exploit.**
     v12 already timed a reopening from the same published plan set.
+34. **A negative result that relocates the cost is more informative than one
+    that merely fails.** v21 was supposed to shrink periods `41-56` and made
+    them worse, which ruled out the leftover pile as the cause.
+35. **The detour's value inside its window is large and fragile.** Any rule
+    that reduces how much cargo can use it gives back the `7.74` that building
+    it won.
+36. **A split fleet is much worse than either rotation.** v22 cost `+6.53`
+    across `33` undisrupted periods for running two half-services. Judge a
+    vessel-reassignment policy on whether the fleet ends up whole.
+37. **Read the route statistics, not just the ATT.** `Avg Capacity TEU` split
+    across a route and its detour identified both v22's failure and the
+    residual defect in the accepted policy: about two of 41 vessels sit parked
+    on withdrawn rotations for most of the run, worth the `1.2764` that periods
+    `41-56` carry.

@@ -144,7 +144,7 @@ The three accepted architecture changes since:
   moving a vessel, and this returns it to `3.46%` better. Score
   `4.912139391692661` (unchanged, by design).
 
-Three architecture changes were tried and rejected:
+Five architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
@@ -159,6 +159,17 @@ slowdown's duration against the rotation's cycle — became v18.
 brought a rerouted fleet home when a port on its detour shut, and was rejected
 for trading twenty days of sailing into a closed port for four rotation changes
 in one window. It found the defect that v20 fixes.
+[v21 rotation deadline](docs/experiments/round2-rotation-deadline-v21.md)
+refused rides that would outlive the rotation carrying them, scored
+`6.5457552167823945`, and disproved its own premise: the ten-week tail it
+targeted got `0.68` *worse*.
+[v22 incumbent rotation](docs/experiments/round2-incumbent-rotation-v22.md)
+stopped bringing fleets home at all, scored `13.632583218221225`, and although
+it improved the window it aimed at to `-0.4034`, it cost `+6.53` across the
+`33` undisrupted periods by leaving both affected services permanently split
+between two half-fleets. Its route statistics identified the residual defect in
+the accepted policy: about two of the `41` vessels sit parked on withdrawn
+rotations for most of the run.
 
 The active Round 2 strategy scores `4.912139391692661`, which is `86.01%`
 below the `35.1039547178493` that opened the round - `7.15x` lower. Its ATT SHA-256 is

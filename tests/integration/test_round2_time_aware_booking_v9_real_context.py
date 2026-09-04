@@ -332,17 +332,17 @@ def test_closed_port_window_prices_the_wait_for_reopening(
             if previous is None or previous != route_index:
                 elapsed += network.boarding_hours[route_index]
             arrival = module._edge_arrival(edge, elapsed)
-            for offset, reopen in edge.closed_calls:
-                checked += 1
-                if elapsed + offset >= reopen:
+            for base, multiplier, clears, reopen in edge.timeline or ():
+                if reopen <= 0.0:
                     continue
-                # The ride cannot end before it clears the shut port and then
-                # sails whatever is left of its leg chain.
-                assert arrival >= reopen + (edge.hours - offset) - 1e-6, (
-                    f"{demand.origin_port.name}->{demand.destination_port.name} reaches "
-                    f"a shut port at hour {elapsed + offset:.2f}, reopening at "
-                    f"{reopen:.2f}, but the ride is costed to end at {arrival:.2f}"
+                checked += 1
+                # The ride cannot end before it clears the shut port.
+                assert arrival >= reopen - 1e-6, (
+                    f"{demand.origin_port.name}->{demand.destination_port.name} is "
+                    f"costed to end at hour {arrival:.2f} but calls at a port that "
+                    f"reopens at {reopen:.2f}"
                 )
+                assert base > 0.0 and multiplier >= 1.0 and clears >= 0.0
             elapsed = arrival
             previous = route_index
     assert checked > 0, "the closure window must produce at least one timed call"

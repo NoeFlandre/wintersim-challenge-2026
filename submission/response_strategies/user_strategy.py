@@ -49,10 +49,13 @@ class _Edge(NamedTuple):
     arrival_segment_index: int
     hours: float
     crosses_congestion: bool
-    # Calls at ports that are shut right now, as (hours into this ride when the
-    # call happens, hours from now until that port reopens). Empty unless a
-    # closure is active, which keeps the common case identical.
-    closed_calls: tuple[tuple[float, float], ...]
+    # Per-leg schedule, present only when this ride meets a live disruption.
+    # Each entry is (hours at normal speed, the multiplier in force now, hours
+    # until that multiplier lifts, hours until the arrival port reopens), with
+    # ``inf`` for a multiplier whose end cannot be established and ``0.0`` for
+    # an arrival that is open. ``None`` means nothing on this ride is disrupted,
+    # which keeps the common case a single addition.
+    timeline: tuple[tuple[float, float, float, float], ...] | None
 
 
 class _Network(NamedTuple):
@@ -164,6 +167,54 @@ def _closure_recovery(context: Any, now: Any) -> dict[int, float] | None:
     return recovery
 
 
+def _congestion_recovery(context: Any, now: Any) -> dict[int, float] | None:
+    """Hours from ``now`` until each leg whose congestion is active clears.
+
+    A congestion multiplier is as temporary as a closure, so cargo that will
+    not reach a slowed leg until after it clears should not be charged for it.
+    As with closures the plan arithmetic is only trusted where it agrees with
+    live state - here that the leg's multiplier really is raised - so a
+    different simulation epoch degrades to assuming the slowdown persists.
+    """
+    if not isinstance(now, dt.datetime):
+        return None
+    plans = getattr(context, "disruption_plans", None)
+    if not isinstance(plans, (list, tuple)):
+        return None
+    recovery: dict[int, float] = {}
+    for plan in plans:
+        closes = getattr(plan, "close_berth", None)
+        if not isinstance(closes, bool):
+            return None
+        leg = getattr(plan, "target_leg", None)
+        if closes or leg is None:
+            continue
+        multiplier = _positive_real(getattr(plan, "multiplier", None))
+        live = _positive_real(getattr(leg, "sailing_time_multiplier", None))
+        if multiplier is None or live is None:
+            return None
+        if multiplier <= 1.0 or live <= 1.0:
+            continue
+        start_days = _finite_real(getattr(plan, "start_offset_days", None))
+        duration_days = _positive_real(getattr(plan, "duration_days", None))
+        if start_days is None or duration_days is None:
+            return None
+        try:
+            start = dt.datetime.min + dt.timedelta(days=start_days)
+            end = start + dt.timedelta(days=duration_days)
+        except (OverflowError, OSError):
+            return None
+        if not start <= now < end:
+            continue
+        hours = (end - now).total_seconds() / 3600.0
+        if not math.isfinite(hours) or hours <= 0.0:
+            return None
+        identity = id(leg)
+        if hours > recovery.get(identity, 0.0):
+            recovery[identity] = hours
+    return recovery
+
+
 def _mean_speed(route: Any) -> float | None:
     vessels = _sequence(getattr(route, "deployed_vessels", None))
     if not vessels:
@@ -213,6 +264,7 @@ def _route_edges(
     port_indexes: dict[int, int],
     closed: frozenset[int],
     reopen_hours: dict[int, float],
+    clears_hours: dict[int, float],
 ) -> tuple[tuple[_Edge, ...], float] | None:
     """Build every bookable edge of one route and its expected boarding wait."""
     resolved = _ordered_legs(route)
@@ -222,7 +274,12 @@ def _route_edges(
     legs, sequence_indexes = resolved
     vessel_count = len(tuple(route.deployed_vessels))
 
-    leg_hours: list[float] = []
+    # Per leg: hours at normal speed, the multiplier in force now, and when
+    # that multiplier lifts. A raised multiplier whose end cannot be
+    # established never lifts, which reproduces the earlier behaviour.
+    base_hours: list[float] = []
+    multipliers: list[float] = []
+    clears: list[float] = []
     for leg in legs:
         distance = _positive_real(getattr(leg, "sailing_distance", None))
         multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
@@ -232,9 +289,15 @@ def _route_edges(
         arrival = getattr(leg, "arrival_port", None)
         if id(departure) not in port_indexes or id(arrival) not in port_indexes:
             return None
-        leg_hours.append(distance * multiplier / speed)
+        base_hours.append(distance / speed)
+        multipliers.append(multiplier)
+        clears.append(0.0 if multiplier <= 1.0 else clears_hours.get(id(leg), math.inf))
 
-    cycle_hours = math.fsum(leg_hours)
+    # The rotation runs at the speeds in force now, so the headway reflects the
+    # slowdown the vessels are actually suffering.
+    cycle_hours = math.fsum(
+        base * multiplier for base, multiplier in zip(base_hours, multipliers, strict=True)
+    )
     if not math.isfinite(cycle_hours) or cycle_hours <= 0.0:
         return None
     # Waiting for a departure costs one headway, not half of one. Cargo is
@@ -255,13 +318,15 @@ def _route_edges(
         sailing = 0.0
         congested = False
         blocked = False
-        closed_calls: list[tuple[float, float]] = []
+        disrupted = False
+        steps: list[tuple[float, float, float, float]] = []
         for step in range(1, count):
             position = (start + step - 1) % count
             leg = legs[position]
-            sailing += leg_hours[position]
-            if leg.sailing_time_multiplier > 1.0:
+            sailing += base_hours[position] * multipliers[position]
+            if multipliers[position] > 1.0:
                 congested = True
+                disrupted = True
             arrival = getattr(leg, "arrival_port", None)
             arrival_index = port_indexes[id(arrival)]
             if blocked:
@@ -269,15 +334,17 @@ def _route_edges(
             hours = sailing + _BERTHING_HOURS * (step - 1)
             if not math.isfinite(hours) or hours <= 0.0:
                 return None
+            reopen = 0.0
             if arrival_index in closed:
-                reopen = reopen_hours.get(arrival_index)
-                if reopen is None:
-                    # A closure with no readable reopening time is treated as
-                    # impassable, as is every longer ride from this start that
-                    # would have to call here on the way.
+                known = reopen_hours.get(arrival_index)
+                if known is None:
+                    # A closure with no readable reopening time is impassable,
+                    # as is every longer ride from this start.
                     blocked = True
                     continue
-                closed_calls.append((hours, reopen))
+                reopen = known
+                disrupted = True
+            steps.append((base_hours[position], multipliers[position], clears[position], reopen))
             if arrival is departure:
                 continue
             edges.append(
@@ -289,7 +356,7 @@ def _route_edges(
                     sequence_indexes[position],
                     hours,
                     congested,
-                    tuple(closed_calls),
+                    tuple(steps) if disrupted else None,
                 )
             )
     return tuple(edges), boarding_hours
@@ -308,7 +375,10 @@ def _closed_port_indexes(context: Any) -> frozenset[int] | None:
 
 
 def _network(
-    context: Any, port_indexes: dict[int, int], reopen_hours: dict[int, float]
+    context: Any,
+    port_indexes: dict[int, int],
+    reopen_hours: dict[int, float],
+    clears_hours: dict[int, float] | None = None,
 ) -> _Network | None:
     """Build the bookable network from the live nominal service routes."""
     closed = _closed_port_indexes(context)
@@ -330,7 +400,9 @@ def _network(
             continue
         if not isinstance(getattr(route, "associated_bookings", None), list):
             return None
-        built = _route_edges(route, len(routes), port_indexes, closed, reopen_hours)
+        built = _route_edges(
+            route, len(routes), port_indexes, closed, reopen_hours, clears_hours or {}
+        )
         if built is None:
             return None
         route_edges, boarding_hours = built
@@ -345,17 +417,23 @@ def _network(
 def _edge_arrival(edge: _Edge, depart_hours: float) -> float:
     """Hours from now at which this ride ends, given when it starts.
 
-    A call at a shut port cannot be served before the port reopens, so the ride
-    waits there and everything after it shifts by the same amount. With no shut
-    calls this is simply ``depart_hours + edge.hours``, so an undisrupted
+    Both kinds of disruption are temporary and both are timed. A leg sailed
+    after its slowdown lifts runs at normal speed, and a call at a shut port
+    cannot be served before it reopens, which delays everything after it. With
+    nothing disrupted on the ride this is a single addition, so an undisrupted
     network is costed exactly as before.
     """
-    start = depart_hours
-    for offset, reopen in edge.closed_calls:
-        arrive = start + offset
-        if arrive < reopen:
-            start += reopen - arrive
-    return start + edge.hours
+    if edge.timeline is None:
+        return depart_hours + edge.hours
+    clock = depart_hours
+    last = len(edge.timeline) - 1
+    for position, (base, multiplier, clears, reopen) in enumerate(edge.timeline):
+        clock += base * (multiplier if clock < clears else 1.0)
+        if clock < reopen:
+            clock = reopen
+        if position != last:
+            clock += _BERTHING_HOURS
+    return clock
 
 
 def _fastest_path(
@@ -609,16 +687,11 @@ def _plan(context: Any, now: Any, shipment: Any) -> tuple[_Network, tuple[_Edge,
     if origin_index is None or destination_index is None:
         return None
 
-    # A missing or unreadable closure plan set leaves the recovery map empty,
-    # which reproduces the earlier behaviour of treating shut ports as
-    # impassable rather than mis-timing them.
-    recovery = _closure_recovery(context, now) or {}
-    reopen_hours = {
-        position: hours
-        for identity, hours in recovery.items()
-        if (position := port_indexes.get(identity)) is not None
-    }
-    network = _network(context, port_indexes, reopen_hours)
+    # A missing or unreadable plan set leaves these maps empty, which reproduces
+    # the earlier behaviour: shut ports impassable, slowdowns assumed permanent.
+    reopen_hours = _reopen_positions(context, now, port_indexes)
+    clears_hours = _congestion_recovery(context, now) or {}
+    network = _network(context, port_indexes, reopen_hours, clears_hours)
     if network is None:
         return None
 
@@ -708,6 +781,7 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
         return None
 
     reopen_hours = _reopen_positions(context, now, port_indexes)
+    clears_hours = _congestion_recovery(context, now) or {}
     network: _Network | None = None
     decided = 0
 
@@ -761,7 +835,7 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
             continue
 
         if network is None:
-            network = _network(context, port_indexes, reopen_hours)
+            network = _network(context, port_indexes, reopen_hours, clears_hours)
             if network is None:
                 return None
 

@@ -18,9 +18,11 @@ transshipment — and a transfer costs, on average, half of the next service's
 headway. This strategy instead minimises **estimated transport time**, built
 entirely from the live simulation context:
 
-- sailing time per leg is `sailing_distance * sailing_time_multiplier` divided
-  by the mean speed of the route's currently deployed vessels, so an active
-  congestion multiplier is priced rather than merely avoided;
+- sailing time per leg is `sailing_distance` divided by the mean speed of the
+  route's currently deployed vessels, multiplied by the congestion multiplier
+  **only while that congestion is still in force**. A slowdown is temporary, so
+  a leg the cargo will not reach until after it clears is costed at normal
+  speed; a slowdown whose end cannot be established is assumed permanent;
 - boarding a service costs one full `headway`, where
   `headway = route cycle hours / deployed vessel count`. Cargo loads only onto
   a vessel whose next segment matches the booking's departure segment, so

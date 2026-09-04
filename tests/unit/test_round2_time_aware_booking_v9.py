@@ -671,21 +671,76 @@ def test_a_closed_destination_is_booked_rather_than_held_when_it_reopens() -> No
 def test_a_closure_wait_delays_the_rest_of_the_ride() -> None:
     import response_strategies.user_strategy as strategy
 
+    # Two 20 h legs at normal speed with a 3 h call between them, and the port
+    # reached after the first leg is shut until hour 100.
     edge = strategy._Edge(
         departure_index=0,
         arrival_index=1,
         route_index=0,
         departure_segment_index=1,
         arrival_segment_index=2,
+        hours=43.0,
+        crosses_congestion=False,
+        timeline=((20.0, 1.0, 0.0, 100.0), (20.0, 1.0, 0.0, 0.0)),
+    )
+    # Setting off now, the call at hour 20 waits until 100, then 3 h alongside
+    # and a 20 h leg finish at 123 rather than 43.
+    assert strategy._edge_arrival(edge, 0.0) == 123.0
+    # Setting off late enough that the port is already open costs nothing extra.
+    assert strategy._edge_arrival(edge, 110.0) == 153.0
+
+
+def test_a_ride_with_nothing_disrupted_is_a_single_addition() -> None:
+    import response_strategies.user_strategy as strategy
+
+    edge = strategy._Edge(
+        departure_index=0,
+        arrival_index=1,
+        route_index=0,
+        departure_segment_index=1,
+        arrival_segment_index=1,
         hours=50.0,
         crosses_congestion=False,
-        closed_calls=((10.0, 100.0),),
+        timeline=None,
     )
-    # Setting off now, the call at 10 h waits until hour 100, so the remaining
-    # 40 h of the ride finish at 140 rather than 50.
-    assert strategy._edge_arrival(edge, 0.0) == 140.0
-    # Setting off late enough that the port is already open costs nothing extra.
-    assert strategy._edge_arrival(edge, 95.0) == 145.0
+    assert strategy._edge_arrival(edge, 7.0) == 57.0
+
+
+def test_a_slowdown_that_lifts_before_the_leg_starts_is_not_charged() -> None:
+    import response_strategies.user_strategy as strategy
+
+    # One 20 h leg currently running at 5x, with the slowdown lifting at hour 10.
+    edge = strategy._Edge(
+        departure_index=0,
+        arrival_index=1,
+        route_index=0,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+        hours=100.0,
+        crosses_congestion=True,
+        timeline=((20.0, 5.0, 10.0, 0.0),),
+    )
+    # Sailing now, while the slowdown still applies: 20 * 5.
+    assert strategy._edge_arrival(edge, 0.0) == 100.0
+    # Setting off after it lifts: full speed.
+    assert strategy._edge_arrival(edge, 10.0) == 30.0
+
+
+def test_a_slowdown_with_no_known_end_is_charged_forever() -> None:
+    import response_strategies.user_strategy as strategy
+
+    edge = strategy._Edge(
+        departure_index=0,
+        arrival_index=1,
+        route_index=0,
+        departure_segment_index=1,
+        arrival_segment_index=1,
+        hours=100.0,
+        crosses_congestion=True,
+        timeline=((20.0, 5.0, float("inf"), 0.0),),
+    )
+    assert strategy._edge_arrival(edge, 0.0) == 100.0
+    assert strategy._edge_arrival(edge, 10_000.0) == 10_100.0
 
 
 def test_an_inactive_closure_plan_leaves_the_port_impassable() -> None:
@@ -1075,3 +1130,146 @@ def test_the_booking_hook_still_fails_closed_on_junk() -> None:
 
 def test_the_veto_hook_fails_closed_on_junk() -> None:
     assert UserStrategy.adjust_bookings_before_cargo_handling(object(), NOW, object()) is None
+
+
+# ---------------------------------------------------------------------------
+# A slowdown is temporary too: cargo sailing after it lifts is not charged.
+# ---------------------------------------------------------------------------
+
+
+def _congestion_plan(
+    leg: Any, clears_hours: float, *, duration_days: float = 5.0, multiplier: float = 5.0
+) -> Any:
+    """A congested-leg plan for ``leg`` that lifts ``clears_hours`` from ``NOW``."""
+    return SimpleNamespace(
+        target_leg=leg,
+        target_berth=None,
+        start_offset_days=NOW_DAYS + clears_hours / 24.0 - duration_days,
+        duration_days=duration_days,
+        multiplier=multiplier,
+        close_berth=False,
+    )
+
+
+def _timed_congestion_fixture(clears_hours: float) -> tuple[Any, Any]:
+    """A slowed direct service against a clean two-leg detour.
+
+    ``DIRECT``'s outbound leg is running at 5x right now. Sailing it while
+    slowed costs 50 h; once the slowdown lifts it costs 10 h.
+
+      direct while slowed = (400 * 5 / 20)/4 boarding + 200 * 5 / 20  = 75.0 h
+      direct once clear   = (400 * 5 / 20)/4 boarding + 200 / 20      = 35.0 h
+      detour              = 2 * ((600/20)/4 + 300/20)                 = 45.0 h
+    """
+    origin = _port("Origin")
+    destination = _port("Destination")
+    hub = _port("Hub")
+    direct = _route(
+        "DIRECT", [origin, destination], [200.0, 200.0], vessels=4, multipliers=[5.0, 1.0]
+    )
+    feeder = _route("FEEDER", [origin, hub], [300.0, 300.0], vessels=4)
+    trunk = _route("TRUNK", [hub, destination], [300.0, 300.0], vessels=4)
+    context = _context([origin, hub, destination], [direct, feeder, trunk])
+    context.disruption_plans = [_congestion_plan(direct.segments[0].associated_leg, clears_hours)]
+    return context, _shipment(origin, destination)
+
+
+def test_a_slowed_leg_is_used_when_it_clears_before_the_cargo_sails_it() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("DIRECT", 1, 1)]
+
+
+def test_a_slowed_leg_is_avoided_when_it_is_still_slow_on_arrival() -> None:
+    context, shipment = _timed_congestion_fixture(500.0)
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_a_slowdown_with_no_matching_plan_is_assumed_permanent() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+    context.disruption_plans = []
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_an_expired_congestion_plan_is_assumed_permanent() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+    context.disruption_plans[0].start_offset_days = 1.0
+    context.disruption_plans[0].duration_days = 2.0
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_a_malformed_congestion_plan_assumes_the_slowdown_is_permanent() -> None:
+    """An unreadable plan must not be read optimistically.
+
+    Failing closed here means assuming the slowdown lasts, which is the
+    conservative reading and matches how an unreadable closure is treated. The
+    booking still goes ahead; it just takes the detour.
+    """
+    context, shipment = _timed_congestion_fixture(2.0)
+    context.disruption_plans[0].duration_days = None
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_a_non_boolean_close_flag_assumes_the_slowdown_is_permanent() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+    context.disruption_plans[0].close_berth = 0
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_a_congestion_plan_whose_leg_is_no_longer_slowed_is_ignored() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+    # The plan is active but the live multiplier has already been restored, so
+    # plan and live state disagree and the leg is simply not slowed.
+    for segment in context.service_routes[0].segments:
+        segment.associated_leg.sailing_time_multiplier = 1.0
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("DIRECT", 1, 1)]
+
+
+def test_a_non_positive_planned_multiplier_assumes_the_slowdown_is_permanent() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+    context.disruption_plans[0].multiplier = 0.0
+
+    assert UserStrategy.assign_associated_bookings(context, NOW, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_a_non_datetime_now_assumes_slowdowns_are_permanent() -> None:
+    context, shipment = _timed_congestion_fixture(2.0)
+
+    assert UserStrategy.assign_associated_bookings(context, 12345, shipment) is True
+    assert _chain(shipment) == [("FEEDER", 1, 1), ("TRUNK", 1, 1)]
+
+
+def test_closure_and_slowdown_timings_combine_on_one_ride() -> None:
+    import response_strategies.user_strategy as strategy
+
+    # Leg 1: 20 h at 3x until hour 30, arriving at a port shut until hour 90.
+    # Leg 2: 20 h at 2x until hour 200.
+    edge = strategy._Edge(
+        departure_index=0,
+        arrival_index=2,
+        route_index=0,
+        departure_segment_index=1,
+        arrival_segment_index=2,
+        hours=103.0,
+        crosses_congestion=True,
+        timeline=((20.0, 3.0, 30.0, 90.0), (20.0, 2.0, 200.0, 0.0)),
+    )
+    # From hour 0: leg 1 slowed to 60 h, waits for the port until 90, 3 h
+    # alongside, then leg 2 still slowed at 40 h -> 133.
+    assert strategy._edge_arrival(edge, 0.0) == 133.0
+    # From hour 300 both have lifted and the port is open: 20 + 3 + 20.
+    assert strategy._edge_arrival(edge, 300.0) == 343.0

@@ -50,12 +50,14 @@ it in a submission archive.
 - Every Round 2 experiment is tabulated in the
   [experiment ledger](experiments/round2-ledger.md).
 - The active strategy is the accepted
+  [v13 in-transit keep veto](experiments/round2-in-transit-keep-veto-v13.md),
+  built on the accepted
   [v12 timed port closures](experiments/round2-timed-port-closure-v12.md),
   built on the accepted
   [v10 full-headway boarding cost](experiments/round2-full-headway-boarding-v10.md)
   and [v9 time-aware booking assignment](experiments/round2-time-aware-booking-v9.md).
-- Its cumulative resilience loss is `13.27493539992092` over 72 periods,
-  `62.18%` below the `35.1039547178493` reached by the earlier hold-based v1
+- Its cumulative resilience loss is `11.915883436787134` over 72 periods,
+  `66.05%` below the `35.1039547178493` reached by the earlier hold-based v1
   policy. The v1 control was reproduced bit for bit in the current environment
   before the comparison.
 - Candidates are additionally required to beat the incumbent on a held-out

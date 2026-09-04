@@ -78,7 +78,7 @@ requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
 are documented.
 
-Twelve Round 2 experiments are complete. Every experiment, its behavioural
+Thirteen Round 2 experiments are complete. Every experiment, its behavioural
 delta, activation statistics, score, per-period comparison and decision is
 tabulated in the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
 
@@ -106,6 +106,12 @@ The three accepted architecture changes since:
   treats a closure as temporary: it charges the wait until a shut port reopens
   instead of deleting the port, and books cargo bound for one rather than
   holding it. Score `13.27493539992092` (a further `-10.889%`).
+- [v13 in-transit keep veto](docs/experiments/round2-in-transit-keep-veto-v13.md)
+  declines the organizer's distance-based replan of cargo already at sea when
+  the booked chain already beats every alternative. Score
+  `11.915883436787134` (a further `-10.238%`). Accepted with a documented
+  limitation: it is inert on the held-out scenario, and the diagnostic that
+  explains why also names the two fixes its successor targets.
 
 One architecture change was tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
@@ -114,9 +120,9 @@ read the first boarding wait from live vessel positions and scored
 unobservable-progress estimate is optimistically biased, so the busiest trunk
 services looked most imminent.
 
-The active Round 2 strategy scores `13.27493539992092`, which is `62.18%` below
-the `35.1039547178493` that opened the round. Its ATT SHA-256 is
-`d466899bacfa55c53469bea39879b46a7140e587b981efef1a0b44ad1a983954`.
+The active Round 2 strategy scores `11.915883436787134`, which is `66.05%`
+below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
+`1313f8b970b4dd46db306d0b8501bc1b79ddaecf048b21324f97121b46e655c3`.
 
 ### Guarding against overfitting
 
@@ -125,11 +131,14 @@ scenario** it was never developed against, built from the organizer's own
 baseline builder and disruption helpers with different closed ports, different
 congested legs, and different durations and multipliers. Both arms share the
 scenario and seed, so cumulative loss ranks them directly. The protocol
-rejected v11 on independent evidence, and confirmed v12 with a `-10.32%`
-held-out improvement against its `-10.889%` Round 2 improvement.
+rejected v11 on independent evidence, confirmed v12 with a `-10.32%` held-out
+improvement against its `-10.889%` Round 2 improvement, and exposed that v13 is
+inert outside Round 2 — banked only because that hook provably never mutates
+anything and can only decline a change.
 
-The current `UserStrategy` keeps three decisions delegated to the organizer and
-owns one: the initial booking chain for newly generated cargo. It selects the
+The current `UserStrategy` keeps two decisions delegated to the organizer and
+owns two: the initial booking chain for newly generated cargo, and whether to
+leave an in-transit chain alone when a disruption appears after it has sailed. It selects the
 chain with the least estimated transport time, computed from live runtime state
 (sailing time at current leg multipliers, one full headway per service route
 boarded, the simulation's fixed berthing time per intermediate port call, and

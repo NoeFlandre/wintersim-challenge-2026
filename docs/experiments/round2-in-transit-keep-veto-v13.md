@@ -1,6 +1,8 @@
 # Round 2: keep an in-transit chain that already wins (v13)
 
-**Status: DESIGN — frozen before the authoritative run.**
+**Status: ACCEPTED with a documented limitation. It improves Round 2 and is
+provably harmless elsewhere, but it captures only a small part of the
+opportunity it was built on, for reasons measured below.**
 
 ## Hypothesis
 
@@ -83,3 +85,97 @@ candidate_loss < 13.27493539992092 - 1e-9
 Acceptance additionally requires no regression on the held-out `shifted`
 scenario over 300 measured days, where the accepted control scores `42.6751`.
 Held-out candidates are ranked by cumulative loss, never mean ATT.
+
+## Full-run result
+
+One authoritative run completed all 72 periods in `00:21:01`. The ATT is proved
+fresh against the pinned stale mtime `1788499522215734574`.
+
+- candidate ATT SHA-256: `1313f8b970b4dd46db306d0b8501bc1b79ddaecf048b21324f97121b46e655c3`;
+- **candidate cumulative resilience loss: `11.915883436787134`**;
+- accepted v12 control loss: `13.27493539992092`;
+- difference: `-1.359051963133787` (`-10.23772939145062%`);
+- candidate mean ATT `14.373333333333331` days against `14.455`;
+- periods better/equal/worse: `19 / 32 / 21`.
+
+```text
+11.915883436787134 < 13.27493539992092 - 1e-9
+```
+
+is true, so the Round 2 rule is met.
+
+By window:
+
+| window | periods | better | worse | v12 | v13 | delta |
+| --- | --- | --- | --- | --- | --- | --- |
+| no active disruption | 33 | 12 | 7 | `8.7463` | `6.5286` | `-2.2177` |
+| Colombo->New Jersey congestion | 13 | 0 | 0 | `-0.8973` | `-0.8973` | `0.0000` |
+| Qingdao->Busan congestion | 6 | 3 | 3 | `0.6122` | `0.6684` | `+0.0562` |
+| Shanghai->Kaohsiung congestion | 13 | 4 | 4 | `3.5510` | `3.7000` | `+0.1490` |
+| Tianjin closure | 3 | 0 | 3 | `0.6931` | `0.9766` | `+0.2835` |
+| Piraeus closure | 4 | 0 | 4 | `0.5696` | `0.9395` | `+0.3700` |
+
+The gain is entirely in undisrupted periods and every disrupted window is
+slightly worse. Gains total `-2.8874` against regressions of `+1.5284`.
+
+## Held-out result: an exact tie, and why
+
+The `shifted` scenario over 300 measured days produced an ATT **byte-identical**
+to the v12 control, scoring the same `42.6751`, with `0` of 60 periods changed.
+The setup was verified: the held-out tree carried the v13 strategy hash and the
+`_network` refactor is behaviour-identical, so the inertness is real.
+
+A follow-up diagnostic counted why the veto declines, over 160 measured days of
+each scenario. Evidence:
+`.challenge/round2/results/audit_20260903/veto_why_shifted.json` and
+`veto_why_r2_seed7.json`.
+
+| | `shifted` | `r2_seed7` |
+| --- | --- | --- |
+| affected shipment observations | `11,830` | `1,134` |
+| vessel calls containing any affected shipment | `68` | `41` |
+| prefer keeping | `6,601` | `219` |
+| prefer rebuilding | `87` | `915` |
+| un-costable (no congestion-free path) | `5,142` | `0` |
+
+Two limitations of this implementation are now measured facts rather than
+suspicions.
+
+1. **The per-vessel, all-or-nothing rule throws away most of the
+   opportunity.** Affected shipments cluster at roughly 174 per vessel call, so
+   a single un-costable shipment forces the whole call to delegate. On
+   `shifted` there are `5,142` such shipments across only `68` qualifying
+   calls, so essentially every call contains one and nothing is ever vetoed.
+   That is the entire explanation for the tie.
+2. **The bar is set too conservatively to hit the measured target.** Costing
+   the alternative optimistically, with no wait to board it, flips the balance:
+   against that yardstick rebuilding is preferred `4:1` on Round 2, whereas
+   against what the organizer *actually does* keeping was preferred `5.3:1`.
+   Many of the `2,152` harmful rebuilds the pre-run measurement identified are
+   therefore still being delegated.
+
+## Why it is accepted anyway
+
+The Round 2 improvement is real and reproducible, and the held-out tie is
+direct evidence of harmlessness rather than absence of evidence: this hook
+provably never mutates a booking, route, vessel, or berth, and can only ever
+*decline* a change the organizer was about to make. Where it does not fire the
+behaviour is exactly the incumbent's, which is what the byte-identical held-out
+ATT shows. The downside in an unseen scenario is bounded by construction.
+
+What it does not have is positive evidence of generalisation. The successor
+experiment addresses both measured limitations directly by deciding per
+shipment instead of per vessel and by comparing against a fairly costed
+alternative.
+
+## Post-acceptance verification
+
+- `uv lock --check`, locked sync, Ruff format and lint, mypy, ty: clean;
+- 267 non-integration tests, `91.06%` branch coverage (gate `90%`);
+- 6 real-context integration tests;
+- participant and runtime `user_strategy.py` byte-identical at
+  `f41bcb10b957fb0bc2a5049b8e1853ac0e941a1a68ad4c32380b42c9c0051765`;
+- Round 2 smoke: `smoke: OK`;
+- deterministic participant-only package, twice, SHA-256
+  `8a6b69c48de4ba859b246866b7cf3ad66f745f67d001c681937c72cf723c990d`;
+- restricted-material scan clean; clean Git working tree.

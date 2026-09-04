@@ -22,6 +22,7 @@ authoritative baseline ATT
 | v10 | charge a full headway per boarding instead of half, the correction derived from the measured per-boarding residual | every chain re-costed; transfers priced twice as dearly relative to sailing | `14.897068731156086` | `-5.3509` (`-26.427%`) | 54/2/16 | **accepted** |
 | v11 | read the first boarding wait from live vessel positions instead of the headway statistic | every first boarding re-costed | `18.3386705330832` | `+3.4416` (`+23.103%`) | 30/0/42 | rejected (also failed held-out) |
 | v12 | treat a port closure as temporary: charge the wait until it reopens instead of deleting the port, and book cargo bound for one rather than holding it | 17 of 72 periods change; congestion windows untouched | `13.27493539992092` | `-1.6221` (`-10.889%`) | 15/55/2 | **accepted** (held-out `-10.32%`) |
+| v13 | keep an in-transit chain when it already beats the best alternative, instead of letting the organizer rebuild it by distance | fires on Round 2; inert on the held-out scenario | `11.915883436787134` | `-1.3591` (`-10.238%`) | 19/32/21 | **accepted** (held-out exact tie) |
 
 ## Lessons carried forward
 
@@ -51,9 +52,9 @@ authoritative baseline ATT
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
 
-## After v12
+## After v13
 
-The incumbent is `13.27493539992092`, `62.18%` below the `35.1039547178493`
+The incumbent is `11.915883436787134`, `66.05%` below the `35.1039547178493`
 that started the round.
 
 7. **Measure the model against the simulation, then correct the mechanism.**
@@ -113,3 +114,16 @@ The protocol has already changed two decisions:
     holding it cannot move ATT while the cargo is unfinished, because ATT
     charges its age either way; it moves ATT when the cargo completes. v12's
     Piraeus window shows no change while the four periods after it do.
+
+14. **A one-sided change can be banked on a tie.** v13's held-out ATT was
+    byte-identical to its control. That is not absence of evidence but
+    evidence of harmlessness, because the hook cannot mutate anything and can
+    only decline a change; where it does not fire, behaviour is exactly the
+    incumbent's. A change that could mutate state would not earn the same
+    benefit of the doubt.
+15. **Count why a rule declines, not just how often it fires.** v13's tie was
+    fully explained by counting delegate reasons: affected shipments cluster
+    at roughly 174 per vessel call, so its per-vessel all-or-nothing rule let a
+    single un-costable shipment veto the whole call. The same counters showed
+    its yardstick was wrong: costing the alternative optimistically flips
+    keep-versus-rebuild from `5.3:1` for keeping to `4:1` against it.

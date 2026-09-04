@@ -1,6 +1,7 @@
 # Round 2: read the first departure from live vessel positions (v11)
 
-**Status: DESIGN — frozen before the authoritative run.**
+**Status: REJECTED — control restored. Rejected by both the Round 2 rule and
+the held-out generalisation rule.**
 
 ## Hypothesis
 
@@ -88,3 +89,78 @@ Equality, worsening, invalid output, crash, or a failed final gate is
 rejection. Acceptance additionally requires that the candidate does not lose
 ground on the held-out scenarios; a candidate that wins Round 2 while losing
 elsewhere is overfitting and is rejected on that ground alone.
+
+## Held-out results (measured before the authoritative run finished)
+
+Two held-out scenarios were built from the organizer's own baseline builder and
+disruption helpers, each run for a 140-day warm-up plus 150 measured days with
+both arms sharing the scenario and seed. Evidence:
+`.challenge/round2/results/audit_20260903/holdout_*.json`.
+
+Ranking by mean ATT alone made v11 look marginally better on both
+(`-0.17%` and `-0.08%`). That was misleading. The objective weights a period by
+`b / ATT^2`, so it cares more about a shipment-hour lost in a good period than
+in a bad one, and v11's pattern was to win a lot on a few bad periods and lose
+a little on many good ones. Scored properly against the organizer baseline:
+
+| held-out scenario | v10 loss | v11 loss | delta |
+| --- | --- | --- | --- |
+| `shifted` (different legs and hub closures, seed 2026) | `24.4653` | `25.4562` | `+0.9909` |
+| `r2_seed7` (Round 2 disruptions, seed 7) | `3.6526` | `3.4498` | `-0.2028` |
+
+Both arms completed every shipment they booked and left `0` unbooked.
+
+The `shifted` regression alone triggered the precommitted overfitting rule, so
+v11 was already rejected before its Round 2 score was known.
+
+## Full-run result and decision
+
+The authoritative run completed all 72 periods with `Simulation completed.`
+
+- candidate ATT SHA-256: `fbb6dc14e3f0810424184bbde799f24b0c46b717d0d531cb9a93c245d268aaf1`;
+- raw log SHA-256: `a1653cbb71f9208482bc5d79c275d698f5712305f0339889fd86745e58c5bd8c`;
+- **candidate cumulative resilience loss: `18.3386705330832`**;
+- accepted v10 control loss: `14.897068731156086`;
+- difference: `+3.4416018019271135` (`+23.102543621412345%`, worse);
+- candidate mean ATT `14.694444444444445` days against the control's
+  `14.541944444444445`;
+- periods better/equal/worse: `30 / 0 / 42`.
+
+Both rules fail, so the candidate is **REJECTED** and v10 is restored.
+
+## Why it failed
+
+The idea was sound but the estimator is biased, and the bias has a name.
+
+The live phase for a route is taken as the **minimum** over its deployed
+vessels of an estimate that is itself noisy: the progress of a vessel through
+its current leg is not observable, so the code assumes it is halfway. Taking
+the minimum of several noisy estimates is systematically optimistic — the
+winner's curse. The more vessels a route has, the more draws are taken and the
+more optimistic the minimum becomes. S1 has eight vessels and S5 has nine, so
+exactly the busiest trunk services were made to look most imminent, and cargo
+was pulled onto them regardless of whether the rest of the chain was any good.
+
+The mixed costing made it worse. Charging the first boarding a live, optimistic
+figure while charging every transfer a full headway is internally
+inconsistent: it biases the search toward whichever route happens to look
+imminent from the origin, rather than toward the best chain overall.
+
+## Lessons
+
+1. **A statistic beat live data here because the live data was read
+   pessimistically-cheaply.** Reading state is only an improvement if the
+   estimator built from it is unbiased. `min` over noisy per-vessel estimates
+   is not.
+2. **Mean ATT is not the objective and can disagree in sign.** v11 improved
+   mean ATT on both held-out scenarios while making one of them worse on the
+   actual metric. Rank candidates by the metric, never by a convenient average.
+3. **Short held-out runs truncate the evidence.** The `r2_seed7` comparison ran
+   only 150 measured days, so it barely entered the Shanghai-Kaohsiung window
+   where most of v10's advantage accrues, and it wrongly favoured v11. The
+   `shifted` scenario, whose disruptions all fall inside the measured window,
+   agreed with the authoritative result. Future held-out runs must cover their
+   disruption windows *and* the recovery tail.
+4. **The held-out protocol earned its cost.** It rejected this candidate before
+   the authoritative run finished, on independent evidence, and its verdict
+   matched the authoritative one.

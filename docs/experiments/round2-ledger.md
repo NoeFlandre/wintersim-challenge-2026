@@ -24,6 +24,7 @@ authoritative baseline ATT
 | v12 | treat a port closure as temporary: charge the wait until it reopens instead of deleting the port, and book cargo bound for one rather than holding it | 17 of 72 periods change; congestion windows untouched | `13.27493539992092` | `-1.6221` (`-10.889%`) | 15/55/2 | **accepted** (held-out `-10.32%`) |
 | v13 | keep an in-transit chain when it already beats the best alternative, instead of letting the organizer rebuild it by distance | fires on Round 2; inert on the held-out scenario | `11.915883436787134` | `-1.3591` (`-10.238%`) | 19/32/21 | **accepted** (held-out exact tie) |
 | v14 | charge the alternative the wait to board it, and drop the congestion-free requirement that has no meaning for cargo already at sea | repairs v13's closure regressions; 5 of 6 windows improve | `10.350669070475163` | `-1.5652` (`-13.136%`) | 28/33/11 | **accepted** (held-out `-0.74%` for the intervention) |
+| v15 | time a congestion slowdown as v12 timed a closure: a leg sailed after it clears is costed at normal speed | both 60-day windows unchanged; the 25-day window improves | `10.347110679813037` | `-0.0036` (`-0.034%`) | 17/45/10 | **accepted** (held-out `-15.79%` on short windows) |
 
 ## Lessons carried forward
 
@@ -53,9 +54,9 @@ authoritative baseline ATT
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
 
-## After v14
+## After v15
 
-The incumbent is `10.350669070475163`, `70.51%` below the `35.1039547178493`
+The incumbent is `10.347110679813037`, `70.52%` below the `35.1039547178493`
 that started the round.
 
 7. **Measure the model against the simulation, then correct the mechanism.**
@@ -142,3 +143,17 @@ The protocol has already changed two decisions:
     comparison was v12 against v14 — with and without the intervention at all —
     which showed `-0.74%`. A tie between two variants of the same idea is not
     evidence about the idea.
+
+18. **A tiny gain on the scored scenario is not the same as a tiny change.**
+    v15 moves Round 2 by `0.03%` and a held-out scenario by `15.79%`. Both
+    numbers come from one mechanism whose value scales with how short a
+    slowdown is: inside a 60-day window no cargo ever reaches the slowed leg
+    after it clears, so Round 2's two 60-day windows are literally unchanged,
+    while 25-to-30-day windows pay off heavily. Judging that change by its
+    Round 2 delta alone would have thrown away the largest held-out gain of the
+    round.
+19. **The overfitting signature has a shape, and so does its opposite.** A
+    candidate that gains a lot on the scored scenario and nothing elsewhere is
+    suspect; one that gains almost nothing on the scored scenario and a lot on
+    an unseen one is the reverse, and is worth accepting on the strength of the
+    mechanism.

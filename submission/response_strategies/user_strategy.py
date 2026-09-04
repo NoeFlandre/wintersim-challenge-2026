@@ -5,13 +5,9 @@ cargo. The organizer's fallback chooses that chain by minimising sailing
 distance, which ignores how often each service actually departs; a booking that
 saves a few nautical miles by adding a transshipment can cost days of waiting
 for the next vessel. This strategy instead minimises *estimated transport
-time* - sailing time at the live leg multipliers, the wait for each service
-route boarded, and the organizer's fixed berthing time for each intermediate
-port call. The wait to board the *first* service is read from where that
-route's vessels actually are right now, so a service whose vessel is about to
-sail is preferred over an equally fast one that has just left; later boardings,
-whose phase cannot be predicted across days of sailing variation, are charged
-the route's headway.
+time* - sailing time at the live leg multipliers, one departure wait per
+service route used, and the organizer's fixed berthing time for each
+intermediate port call.
 
 Every quantity is read from the supplied runtime objects. The strategy is
 deterministic, standard-library-only, performs no I/O, keeps no state between
@@ -45,9 +41,6 @@ class _Edge(NamedTuple):
     arrival_segment_index: int
     hours: float
     crosses_congestion: bool
-    # Hours until this route next departs this edge's departure segment, read
-    # from live vessel positions. Charged only for the first service boarded.
-    first_wait_hours: float
 
 
 class _Network(NamedTuple):
@@ -114,8 +107,7 @@ def _port_is_closed(port: Any) -> bool | None:
     return bool(berths) and available == 0
 
 
-def _vessel_speeds(route: Any) -> tuple[float, ...] | None:
-    """Sailing speed of every vessel currently deployed on ``route``."""
+def _mean_speed(route: Any) -> float | None:
     vessels = _sequence(getattr(route, "deployed_vessels", None))
     if not vessels:
         return None
@@ -126,17 +118,16 @@ def _vessel_speeds(route: Any) -> tuple[float, ...] | None:
         if speed is None:
             return None
         speeds.append(speed)
-    return tuple(speeds)
+    mean = math.fsum(speeds) / len(speeds)
+    return mean if math.isfinite(mean) and mean > 0.0 else None
 
 
-def _ordered_legs(
-    route: Any,
-) -> tuple[tuple[Any, ...], tuple[int, ...], tuple[Any, ...]] | None:
-    """Return the route's legs, their sequence indexes, and its segments in order."""
+def _ordered_legs(route: Any) -> tuple[tuple[Any, ...], tuple[int, ...]] | None:
+    """Return the route's legs in rotation order plus their sequence indexes."""
     segments = _sequence(getattr(route, "segments", None))
     if segments is None or len(segments) < 2:
         return None
-    ordered: list[tuple[int, Any, Any]] = []
+    ordered: list[tuple[int, Any]] = []
     seen: set[int] = set()
     for segment in segments:
         index = getattr(segment, "sequence_index", None)
@@ -148,81 +139,15 @@ def _ordered_legs(
         leg = getattr(segment, "associated_leg", None)
         if leg is None:
             return None
-        ordered.append((index, leg, segment))
+        ordered.append((index, leg))
     ordered.sort(key=lambda item: item[0])
-    legs = tuple(item[1] for item in ordered)
-    indexes = tuple(item[0] for item in ordered)
-    route_segments = tuple(item[2] for item in ordered)
+    legs = tuple(leg for _index, leg in ordered)
+    indexes = tuple(index for index, _leg in ordered)
     for position, leg in enumerate(legs):
         following = legs[(position + 1) % len(legs)]
         if getattr(leg, "arrival_port", None) is not getattr(following, "departure_port", None):
             return None
-    return legs, indexes, route_segments
-
-
-def _vessel_position(vessel: Any, segments: tuple[Any, ...]) -> tuple[int, bool] | None:
-    """Locate a vessel on its rotation.
-
-    Returns the position of the segment the vessel most recently entered and
-    whether it is already alongside a berth there. A vessel with no current
-    segment is about to depart the first segment, which is position ``-1``
-    meaning "no sailing or port time left to serve first". ``None`` means the
-    vessel could not be located on this rotation.
-    """
-    current = getattr(vessel, "current_segment", None)
-    if current is None:
-        return -1, False
-    for position, segment in enumerate(segments):
-        if segment is current:
-            return position, getattr(vessel, "current_berth", None) is not None
-    return None
-
-
-def _first_departures(
-    route: Any,
-    segments: tuple[Any, ...],
-    leg_hours_by_vessel: tuple[tuple[float, ...], ...],
-) -> tuple[float, ...] | None:
-    """Hours until the route next departs each segment, from live positions.
-
-    Walks each deployed vessel forward around the rotation and takes, for every
-    segment, the earliest departure any vessel offers. A vessel that cannot be
-    located makes the whole result unusable, because taking the minimum over
-    the remaining vessels would understate the true wait for no reason.
-    """
-    vessels = _sequence(getattr(route, "deployed_vessels", None))
-    if not vessels or len(vessels) != len(leg_hours_by_vessel):
-        return None
-    count = len(segments)
-    earliest = [math.inf] * count
-    for vessel, leg_hours in zip(vessels, leg_hours_by_vessel, strict=True):
-        located = _vessel_position(vessel, segments)
-        if located is None:
-            return None
-        position, alongside = located
-        if position < 0:
-            offset = 0.0
-            next_position = 0
-        elif alongside:
-            # Alongside at the arrival port of ``position``; only the remainder
-            # of this port call stands between it and the next departure.
-            offset = 0.5 * _BERTHING_HOURS
-            next_position = (position + 1) % count
-        else:
-            # Sailing ``position``; the expected remaining share of a leg whose
-            # progress is not observable is half of it, then a port call.
-            offset = 0.5 * leg_hours[position] + _BERTHING_HOURS
-            next_position = (position + 1) % count
-        cursor = next_position
-        for step in range(count):
-            if step:
-                offset += leg_hours[cursor] + _BERTHING_HOURS
-                cursor = (cursor + 1) % count
-            if not math.isfinite(offset) or offset < 0.0:
-                return None
-            if offset < earliest[cursor]:
-                earliest[cursor] = offset
-    return None if any(not math.isfinite(value) for value in earliest) else tuple(earliest)
+    return legs, indexes
 
 
 def _route_edges(
@@ -233,12 +158,13 @@ def _route_edges(
 ) -> tuple[tuple[_Edge, ...], float] | None:
     """Build every bookable edge of one route and its expected boarding wait."""
     resolved = _ordered_legs(route)
-    speeds = _vessel_speeds(route)
-    if resolved is None or speeds is None:
+    speed = _mean_speed(route)
+    if resolved is None or speed is None:
         return None
-    legs, sequence_indexes, segments = resolved
+    legs, sequence_indexes = resolved
+    vessel_count = len(tuple(route.deployed_vessels))
 
-    distances: list[float] = []
+    leg_hours: list[float] = []
     for leg in legs:
         distance = _positive_real(getattr(leg, "sailing_distance", None))
         multiplier = _positive_real(getattr(leg, "sailing_time_multiplier", None))
@@ -248,45 +174,26 @@ def _route_edges(
         arrival = getattr(leg, "arrival_port", None)
         if id(departure) not in port_indexes or id(arrival) not in port_indexes:
             return None
-        distances.append(distance * multiplier)
+        leg_hours.append(distance * multiplier / speed)
 
-    # One rotation per vessel at that vessel's own speed. Departures on a given
-    # segment therefore arrive at the combined rate of the deployed vessels, so
-    # the headway is the reciprocal of that rate. With equal speeds this is
-    # exactly cycle / vessel count; with mixed speeds it stays correct.
-    leg_hours_by_vessel: list[tuple[float, ...]] = []
-    departure_rate = 0.0
-    for speed in speeds:
-        vessel_leg_hours = tuple(distance / speed for distance in distances)
-        cycle_hours = math.fsum(vessel_leg_hours)
-        if not math.isfinite(cycle_hours) or cycle_hours <= 0.0:
-            return None
-        leg_hours_by_vessel.append(vessel_leg_hours)
-        departure_rate += 1.0 / cycle_hours
-    if not math.isfinite(departure_rate) or departure_rate <= 0.0:
+    cycle_hours = math.fsum(leg_hours)
+    if not math.isfinite(cycle_hours) or cycle_hours <= 0.0:
         return None
-    boarding_hours = 1.0 / departure_rate
+    # Waiting for a departure costs one headway, not half of one. Cargo is
+    # loaded only if it is already waiting when a vessel begins its port call,
+    # so cargo that becomes ready during the connecting vessel's handling misses
+    # it and waits a further headway; and because sailing duration varies by
+    # +/-5%, vessels on a route drift out of even spacing, which lifts the mean
+    # wait for a random arrival to E[gap^2] / (2 * E[gap]) above headway / 2.
+    boarding_hours = cycle_hours / vessel_count
     if not math.isfinite(boarding_hours) or boarding_hours <= 0.0:
         return None
-
-    # Sailing time for an edge uses the mean of the deployed speeds, since the
-    # carrier is not known when the chain is planned. With equal speeds, which
-    # is the usual deployment, this is exact.
-    mean_speed = math.fsum(speeds) / len(speeds)
-    if not math.isfinite(mean_speed) or mean_speed <= 0.0:
-        return None
-    leg_hours = [distance / mean_speed for distance in distances]
-
-    # Live phase for the first boarding, with the headway expectation as the
-    # graceful fallback whenever vessel positions cannot be resolved.
-    live = _first_departures(route, segments, tuple(leg_hours_by_vessel))
 
     count = len(legs)
     edges: list[_Edge] = []
     for start in range(count):
         departure = getattr(legs[start], "departure_port", None)
         departure_index = port_indexes[id(departure)]
-        first_wait = boarding_hours if live is None else live[start]
         sailing = 0.0
         congested = False
         blocked = False
@@ -318,7 +225,6 @@ def _route_edges(
                     sequence_indexes[position],
                     hours,
                     congested,
-                    first_wait,
                 )
             )
     return tuple(edges), boarding_hours
@@ -410,7 +316,7 @@ def _fastest_path(
         )
 
     for edge in outgoing.get(origin_index, []):
-        offer(edge, edge.first_wait_hours + edge.hours, None)
+        offer(edge, network.boarding_hours[edge.route_index] + edge.hours, None)
 
     goal: tuple[int, int] | None = None
     while heap:

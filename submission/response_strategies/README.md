@@ -19,23 +19,14 @@ entirely from the live simulation context:
 - sailing time per leg is `sailing_distance * sailing_time_multiplier` divided
   by the mean speed of the route's currently deployed vessels, so an active
   congestion multiplier is priced rather than merely avoided;
-- the wait to board the **first** service is read from where that route's
-  vessels actually are: each deployed vessel is walked forward around the
-  rotation (half of its current leg if at sea, half a berthing time if already
-  alongside, then a leg plus a port call per further segment) and the earliest
-  departure any of them offers is used. A service whose vessel is about to
-  arrive is therefore preferred over an identical one whose vessel has just
-  left. If a route's vessels cannot all be located, that route falls back to
-  the headway expectation rather than being dropped;
-- the wait to board each **later** service costs one full `headway`, the
-  reciprocal of the combined departure rate of the deployed vessels
-  (`1 / sum of 1 / cycle hours per vessel`, which equals
-  `cycle hours / vessel count` whenever the vessels share a speed). Phase
-  information about a connection days ahead has decayed, so a full headway
-  rather than the textbook half is used: cargo loads only if it is already
-  waiting when a vessel begins its port call, and the simulation's ±5% sailing
-  variation makes vessels bunch, which lifts the mean wait for a random arrival
-  above half a headway;
+- boarding a service costs one full `headway`, where
+  `headway = route cycle hours / deployed vessel count`. Cargo loads only onto
+  a vessel whose next segment matches the booking's departure segment, so
+  departures on a given segment are one headway apart. A full headway rather
+  than the textbook half is used because cargo is loaded only if it is already
+  waiting when a vessel begins its port call, and because the simulation's ±5%
+  sailing variation makes vessels bunch, which lifts the mean wait for a random
+  arrival above half a headway;
 - each intermediate port call inside a single booking costs the simulation's
   fixed three-hour berthing time.
 

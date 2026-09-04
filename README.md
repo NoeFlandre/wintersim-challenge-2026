@@ -78,7 +78,7 @@ requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
 are documented.
 
-Thirteen Round 2 experiments are complete. Every experiment, its behavioural
+Fourteen Round 2 experiments are complete. Every experiment, its behavioural
 delta, activation statistics, score, per-period comparison and decision is
 tabulated in the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
 
@@ -109,9 +109,12 @@ The three accepted architecture changes since:
 - [v13 in-transit keep veto](docs/experiments/round2-in-transit-keep-veto-v13.md)
   declines the organizer's distance-based replan of cargo already at sea when
   the booked chain already beats every alternative. Score
-  `11.915883436787134` (a further `-10.238%`). Accepted with a documented
-  limitation: it is inert on the held-out scenario, and the diagnostic that
-  explains why also names the two fixes its successor targets.
+  `11.915883436787134` (a further `-10.238%`).
+- [v14 fair in-transit cost](docs/experiments/round2-in-transit-fair-cost-v14.md)
+  charges that alternative the wait to board it, and drops a congestion-free
+  requirement that has no meaning for cargo already at sea. Score
+  `10.350669070475163` (a further `-13.136%`), repairing v13's closure-window
+  regressions.
 
 One architecture change was tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
@@ -120,25 +123,37 @@ read the first boarding wait from live vessel positions and scored
 unobservable-progress estimate is optimistically biased, so the busiest trunk
 services looked most imminent.
 
-The active Round 2 strategy scores `11.915883436787134`, which is `66.05%`
+The active Round 2 strategy scores `10.350669070475163`, which is `70.51%`
 below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
-`1313f8b970b4dd46db306d0b8501bc1b79ddaecf048b21324f97121b46e655c3`.
+`d6c3e6c75cb26e8eb6b2029c7077351f38d670b52186dfec1482926ace843cc6`.
 
 ### Guarding against overfitting
 
-From v11 onward a candidate must also beat the incumbent on a **held-out
-scenario** it was never developed against, built from the organizer's own
-baseline builder and disruption helpers with different closed ports, different
-congested legs, and different durations and multipliers. Both arms share the
-scenario and seed, so cumulative loss ranks them directly. The protocol
-rejected v11 on independent evidence, confirmed v12 with a `-10.32%` held-out
-improvement against its `-10.889%` Round 2 improvement, and exposed that v13 is
-inert outside Round 2 — banked only because that hook provably never mutates
-anything and can only decline a change.
+From v11 onward a candidate must also hold up on **held-out scenarios** it was
+never developed against, built from the organizer's own baseline builder and
+disruption helpers. Both arms share the scenario and seed, so cumulative loss
+ranks them directly, and candidates are never ranked by mean ATT — that
+disagreed in sign with the objective for v11.
+
+Two held-out scenarios are used. `shifted` is harsher than Round 2: closures at
+**Singapore** and **Rotterdam** plus congestion on three other legs. `mild` is
+gentler on purpose — moderate multipliers and short closures at non-hub ports —
+so that replacement paths exist and a replanning decision has something to
+disagree about.
+
+The protocol has changed real decisions. It rejected v11 on independent
+evidence before its authoritative run finished. It confirmed v12 with a
+`-10.32%` held-out improvement against its `-10.889%` Round 2 improvement. And
+it showed that `shifted` cannot test the in-transit hook at all, because there
+the organizer finds no replacement path for any affected shipment and keeps the
+chains itself — which is why `mild` was added, and where taking over that
+decision proved worth `-0.74%` on a scenario it was never tuned for.
 
 The current `UserStrategy` keeps two decisions delegated to the organizer and
 owns two: the initial booking chain for newly generated cargo, and whether to
-leave an in-transit chain alone when a disruption appears after it has sailed. It selects the
+leave an in-transit chain alone when a disruption appears after it has sailed.
+The second is one-sided by construction — it never mutates anything and can
+only decline a change — which bounds its risk on an unseen scenario. It selects the
 chain with the least estimated transport time, computed from live runtime state
 (sailing time at current leg multipliers, one full headway per service route
 boarded, the simulation's fixed berthing time per intermediate port call, and

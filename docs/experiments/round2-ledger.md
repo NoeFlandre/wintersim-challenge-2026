@@ -23,6 +23,7 @@ authoritative baseline ATT
 | v11 | read the first boarding wait from live vessel positions instead of the headway statistic | every first boarding re-costed | `18.3386705330832` | `+3.4416` (`+23.103%`) | 30/0/42 | rejected (also failed held-out) |
 | v12 | treat a port closure as temporary: charge the wait until it reopens instead of deleting the port, and book cargo bound for one rather than holding it | 17 of 72 periods change; congestion windows untouched | `13.27493539992092` | `-1.6221` (`-10.889%`) | 15/55/2 | **accepted** (held-out `-10.32%`) |
 | v13 | keep an in-transit chain when it already beats the best alternative, instead of letting the organizer rebuild it by distance | fires on Round 2; inert on the held-out scenario | `11.915883436787134` | `-1.3591` (`-10.238%`) | 19/32/21 | **accepted** (held-out exact tie) |
+| v14 | charge the alternative the wait to board it, and drop the congestion-free requirement that has no meaning for cargo already at sea | repairs v13's closure regressions; 5 of 6 windows improve | `10.350669070475163` | `-1.5652` (`-13.136%`) | 28/33/11 | **accepted** (held-out `-0.74%` for the intervention) |
 
 ## Lessons carried forward
 
@@ -52,9 +53,9 @@ authoritative baseline ATT
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
 
-## After v13
+## After v14
 
-The incumbent is `11.915883436787134`, `66.05%` below the `35.1039547178493`
+The incumbent is `10.350669070475163`, `70.51%` below the `35.1039547178493`
 that started the round.
 
 7. **Measure the model against the simulation, then correct the mechanism.**
@@ -127,3 +128,17 @@ The protocol has already changed two decisions:
     single un-costable shipment veto the whole call. The same counters showed
     its yardstick was wrong: costing the alternative optimistically flips
     keep-versus-rebuild from `5.3:1` for keeping to `4:1` against it.
+
+16. **Ask whether a held-out scenario can even test the change.** Both held-out
+    ties for the in-transit hook were explained by measurement, not argument:
+    on `shifted` the organizer finds no replacement path for any of `10,959`
+    affected shipments, so it keeps them itself and there is nothing to
+    disagree about. A scenario has to be *mild enough for alternatives to
+    exist* before it can exercise a replanning decision. The `mild` scenario
+    was built for exactly that, and it is what produced the first positive
+    held-out evidence for this line of work.
+17. **Compare against the right control.** `mild` showed v13 and v14 identical,
+    which says only that v14's refinements do not bite there. The informative
+    comparison was v12 against v14 — with and without the intervention at all —
+    which showed `-0.74%`. A tie between two variants of the same idea is not
+    evidence about the idea.

@@ -20,6 +20,8 @@ authoritative baseline ATT
 | v8 | delegate lower-quartile pure-leg multi-transfer holds | — | design only | — | — | never run |
 | v9 | **architecture change:** build the booking chain from estimated transport time instead of delegating to the organizer's distance-based shortest path | 66,070 chains where the incumbent delegated; 285 former holds now booked | `20.248013560766417` | `-14.8559` (`-42.320%`) | 50/0/22 | **accepted** |
 | v10 | charge a full headway per boarding instead of half, the correction derived from the measured per-boarding residual | every chain re-costed; transfers priced twice as dearly relative to sailing | `14.897068731156086` | `-5.3509` (`-26.427%`) | 54/2/16 | **accepted** |
+| v11 | read the first boarding wait from live vessel positions instead of the headway statistic | every first boarding re-costed | `18.3386705330832` | `+3.4416` (`+23.103%`) | 30/0/42 | rejected (also failed held-out) |
+| v12 | treat a port closure as temporary: charge the wait until it reopens instead of deleting the port, and book cargo bound for one rather than holding it | 17 of 72 periods change; congestion windows untouched | `13.27493539992092` | `-1.6221` (`-10.889%`) | 15/55/2 | **accepted** (held-out `-10.32%`) |
 
 ## Lessons carried forward
 
@@ -49,9 +51,9 @@ authoritative baseline ATT
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
 
-## After v10
+## After v12
 
-The incumbent is `14.897068731156086`, `57.56%` below the `35.1039547178493`
+The incumbent is `13.27493539992092`, `62.18%` below the `35.1039547178493`
 that started the round.
 
 7. **Measure the model against the simulation, then correct the mechanism.**
@@ -81,3 +83,33 @@ Open questions are attributed with evidence in
 transit, and no OD pair exceeds `2.2%` of it. The two widest remaining levers
 are reading the next departure from live vessel state instead of estimating it,
 and taking over in-transit replanning.
+
+## Generalisation protocol, added at v11
+
+From v11 onward a candidate must also beat the incumbent on a **held-out
+scenario** it was never developed against, built from the organizer's own
+baseline builder and disruption helpers: the `shifted` scenario closes
+**Singapore** and **Rotterdam** and congests `Singapore->Colombo`,
+`Busan->Los Angeles` and `Rotterdam->Tanger Med`, with different durations and
+multipliers from Round 2. Both arms share the scenario and seed, so the
+organizer baseline supplies the weights and cumulative loss ranks them
+directly.
+
+The protocol has already changed two decisions:
+
+10. **It rejected v11 on independent evidence** before the authoritative run
+    finished, and the authoritative run agreed.
+11. **Rank by the metric, never by mean ATT.** v11 improved mean ATT on both
+    held-out scenarios while making one *worse* on cumulative loss. The
+    objective weights a period by `baseline / ATT^2`, so it cares more about a
+    shipment-hour lost in a good period than in a bad one, and a candidate that
+    wins big on a few bad periods while losing a little on many good ones looks
+    good on an average and bad on the score.
+12. **Held-out runs must outlast their disruption windows.** v11's `r2_seed7`
+    comparison ran 150 measured days, stopped before the Shanghai-Kaohsiung
+    window where most of the incumbent's advantage accrues, and wrongly
+    favoured the candidate. v12's held-out runs use 300 measured days.
+13. **Watch when an effect can show up at all.** Booking cargo instead of
+    holding it cannot move ATT while the cargo is unfinished, because ATT
+    charges its age either way; it moves ATT when the cargo completes. v12's
+    Piraeus window shows no change while the four periods after it do.

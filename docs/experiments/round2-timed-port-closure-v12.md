@@ -1,6 +1,7 @@
 # Round 2: a port closure is temporary, not a wall (v12)
 
-**Status: DESIGN — frozen before the authoritative run.**
+**Status: ACCEPTED — complete. Passed both the Round 2 rule and the held-out
+generalisation rule, and is now the active strategy.**
 
 ## Hypothesis
 
@@ -88,3 +89,90 @@ their disruption windows *and* the recovery tail; v11's misleading held-out
 verdict came from a 150-day horizon that stopped before the effects landed.
 Held-out candidates are ranked by cumulative loss, never by mean ATT, which
 disagreed in sign for v11.
+
+## Full-run result and decision
+
+Exactly one authoritative run used the frozen configuration and the fixed
+command, exiting `0` after `00:20:55` with Period 72, Simulation Day 360 and
+`Simulation completed.` The ATT is proved fresh: the manifest pinned the stale
+pre-run `Output` ATT at mtime `1788475552620326918` with the v10 control's
+hash, and the scored file has mtime `1788499522215734574`.
+
+- candidate ATT SHA-256: `d466899bacfa55c53469bea39879b46a7140e587b981efef1a0b44ad1a983954`;
+- 72 numbered periods; candidate mean ATT `14.455` days against the control's
+  `14.541944444444445`;
+- **candidate cumulative resilience loss: `13.27493539992092`**;
+- accepted v10 control loss: `14.897068731156086`;
+- difference: `-1.6221333312351653`;
+- relative improvement: `10.888943056579961%`;
+- periods better/equal/worse: `15 / 55 / 2`.
+
+```text
+13.27493539992092 < 14.897068731156086 - 1e-9
+```
+
+is true, so the Round 2 rule is met.
+
+## Held-out generalisation result
+
+The `shifted` scenario — closures at **Singapore** and **Rotterdam**, and
+congestion on `Singapore->Colombo`, `Busan->Los Angeles` and
+`Rotterdam->Tanger Med` — was run for 60 measured periods with both arms
+sharing the scenario and seed, and scored against the organizer baseline.
+
+| arm | loss | mean ATT | completed | unbooked |
+| --- | --- | --- | --- | --- |
+| v10 control | `47.5856` | `16.8178` d | 383,616 / 413,312 | `0` |
+| v12 candidate | `42.6751` | `16.4917` d | 385,294 / 413,312 | `0` |
+
+Delta `-4.9105` (`-10.32%`), with 34 periods better, 18 equal and 8 worse, and
+1,678 more shipments delivered.
+
+The held-out improvement of `10.32%` is within half a point of the Round 2
+improvement of `10.89%` on a scenario the change was never tuned against, with
+different closed ports, different congested legs and different durations. That
+is the evidence that this is a better policy rather than a better fit.
+
+Both rules are met, so the candidate is **ACCEPTED**.
+
+## Where the Round 2 gain comes from
+
+| window | periods | changed | v10 | v12 | delta |
+| --- | --- | --- | --- | --- | --- |
+| no active disruption | 33 | 14 | `9.7485` | `8.7463` | `-1.0022` |
+| Tianjin closure | 3 | 3 | `1.3131` | `0.6931` | `-0.6199` |
+| Colombo->New Jersey congestion | 13 | 0 | `-0.8973` | `-0.8973` | `0.0000` |
+| Shanghai->Kaohsiung congestion | 13 | 0 | `3.5510` | `3.5510` | `0.0000` |
+| Qingdao->Busan congestion | 6 | 0 | `0.6122` | `0.6122` | `0.0000` |
+| Piraeus closure | 4 | 0 | `0.5696` | `0.5696` | `0.0000` |
+
+Only 17 of 72 periods change at all, and every one of them is period 56 or
+later. The three congestion windows are untouched, exactly as designed: the
+change is confined to closures.
+
+The timing of the effect is worth understanding, because it looks wrong at
+first. The Piraeus closure occupies periods 52-55 but those periods do not
+move; the first change is period 56. ATT charges an unfinished shipment its
+age at the period end whether it is sitting at its origin or sailing, so
+booking cargo instead of holding it does not alter the metric while the cargo
+is still in flight — it alters it when the cargo *completes*, which for
+Europe-bound cargo is several periods later. The Tianjin closure improves
+inside its own window (periods 64-66, `-0.6199`) because its cargo has shorter
+transits and finishes sooner.
+
+## Post-acceptance verification
+
+- `uv lock --check`, locked sync, Ruff format and lint, mypy, ty: clean;
+- 242 non-integration tests, `91.96%` branch coverage (gate `90%`), including
+  eight new timed-closure behaviour tests that were each checked to
+  discriminate against v10: for a hub reopening in 20 hours v10 takes the long
+  way and v12 rides through, for one reopening in 100 hours both avoid it, and
+  for a closed destination v10 delegates while v12 books;
+- 6 real-context integration tests, including a contract that every planned
+  call at a shut Piraeus is charged the wait it implies;
+- participant and runtime `user_strategy.py` byte-identical at
+  `3e7987b6dfd4a2b3ee0adce5004c0839da7d46b74525e43248630876e119da14`;
+- Round 2 smoke: `smoke: OK`;
+- deterministic participant-only package, twice, SHA-256
+  `5e87c66dfa0fdf8a93d4690cd2413b20513fc4b6e1009f699b72bcd886dd2a41`;
+- restricted-material scan clean; clean Git working tree.

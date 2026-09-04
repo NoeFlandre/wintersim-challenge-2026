@@ -78,41 +78,65 @@ requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
 are documented.
 
-Ten Round 2 experiments are complete. Every experiment, its behavioural delta,
-activation statistics, score, per-period comparison and decision is tabulated in
-the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
+Twelve Round 2 experiments are complete. Every experiment, its behavioural
+delta, activation statistics, score, per-period comparison and decision is
+tabulated in the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
 
-The first eight experiments all tuned one binary predicate: whether to hold new
-cargo at its origin during a disruption. The accepted
+The first eight all tuned one binary predicate: whether to hold new cargo at
+its origin during a disruption. The accepted
 [v1 port-closure hold](docs/experiments/round2-port-closure-one-transfer-full-headway-v1.md)
 reached `35.1039547178493`; relaxing or tightening its margin lost every time.
+Per-period attribution then showed why that family was capped: `47.7%` of the
+loss sat in a congestion window and `38.3%` in periods with no disruption at
+all, while the two port closures the family could act in held `5.8%` between
+them.
 
-The last two changed the architecture and are both accepted:
+The three accepted architecture changes since:
 
 - [v9 time-aware booking assignment](docs/experiments/round2-time-aware-booking-v9.md)
   stops delegating routing to the organizer's distance-based shortest path and
   builds the booking chain itself, minimising estimated transport time. Score
-  `20.248013560766417`, an improvement of `42.320%`.
+  `20.248013560766417` (`-42.320%`).
 - [v10 full-headway boarding cost](docs/experiments/round2-full-headway-boarding-v10.md)
-  charges one full headway per boarding rather than half, a correction derived
-  from [measuring the cost model against realized transit
+  charges one full headway per boarding rather than half, derived from
+  [measuring the cost model against realized transit
   time](docs/experiments/round2-cost-model-fidelity.md). Score
-  `14.897068731156086`, a further `26.427%`.
+  `14.897068731156086` (a further `-26.427%`).
+- [v12 timed port closures](docs/experiments/round2-timed-port-closure-v12.md)
+  treats a closure as temporary: it charges the wait until a shut port reopens
+  instead of deleting the port, and books cargo bound for one rather than
+  holding it. Score `13.27493539992092` (a further `-10.889%`).
 
-The active Round 2 strategy therefore scores `14.897068731156086`, which is
-`57.56%` below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
-`4f22259de77c2e77477ba21f0f7c36c988ee9c5e80cca425984fe65aa0ad6eb4`, reproduced
-byte-identically by two independent full runs.
+One architecture change was tried and rejected:
+[v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
+read the first boarding wait from live vessel positions and scored
+`18.3386705330832`. Taking the minimum over a route's vessels of an
+unobservable-progress estimate is optimistically biased, so the busiest trunk
+services looked most imminent.
+
+The active Round 2 strategy scores `13.27493539992092`, which is `62.18%` below
+the `35.1039547178493` that opened the round. Its ATT SHA-256 is
+`d466899bacfa55c53469bea39879b46a7140e587b981efef1a0b44ad1a983954`.
+
+### Guarding against overfitting
+
+From v11 onward a candidate must also beat the incumbent on a **held-out
+scenario** it was never developed against, built from the organizer's own
+baseline builder and disruption helpers with different closed ports, different
+congested legs, and different durations and multipliers. Both arms share the
+scenario and seed, so cumulative loss ranks them directly. The protocol
+rejected v11 on independent evidence, and confirmed v12 with a `-10.32%`
+held-out improvement against its `-10.889%` Round 2 improvement.
 
 The current `UserStrategy` keeps three decisions delegated to the organizer and
 owns one: the initial booking chain for newly generated cargo. It selects the
 chain with the least estimated transport time, computed from live runtime state
 (sailing time at current leg multipliers, one full headway per service route
-boarded, and the simulation's fixed berthing time per intermediate port call).
-It fails closed to the organizer fallback on closed destinations, paths that can
-only cross a congested leg, disruption-alternative or vessel-less routes, and
-any malformed or ambiguous data. Round 0 and Round 1 evidence remains as
-background only; see the ledger and per-experiment reports for the full record.
+boarded, the simulation's fixed berthing time per intermediate port call, and
+the wait until a shut port reopens). It fails closed to the organizer fallback
+on paths that can only cross a congested leg, closures whose end cannot be
+established, disruption-alternative or vessel-less routes, and any malformed or
+ambiguous data. Round 0 and Round 1 evidence remains as background only.
 
 ## Prerequisites
 

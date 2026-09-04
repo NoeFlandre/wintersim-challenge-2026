@@ -31,7 +31,7 @@ authoritative baseline ATT
 | v19 | bring a rerouted fleet home when a port on its detour shuts | Round 2 bit-identical; `inserted` `22.2326` against a do-nothing `16.7550` | not accepted | — | — | rejected on held-out `inserted` (`+32.69%`) |
 | v20 | never build a detour through a port that a disruption plan will shut inside the window the detour is needed for | Round 2 bit-identical; `inserted` `16.1746`, now `-3.46%` against doing nothing | `4.912139391692661` | `0.0000` (tie, by design) | 28/12/32 | **accepted** (7 held-out scenarios: 4 wins, 3 ties, 0 losses) |
 | v21 | refuse a ride on a temporary rotation that would end after the rotation is withdrawn, so it drains before the fleet comes home | tapers the detour's intake near a window's end | `6.5457552167823945` | `+1.6336` (`+33.26%`) | 18/16/38 | rejected (cost `1.68` inside the window; the tail it targeted got `0.68` worse) |
-| v22 | a fleet moves to escape a live disruption and never merely to come home: keep the incumbent rotation unless the disruptions hurt it more | fleets stay on their detours | `13.632583218221225` | `+8.7204` (`+177.53%`) | 15/24/33 | rejected (target window improved to `-0.4034`, but `33` undisrupted periods cost `+6.53` for a permanently split fleet) |
+| v22 | a fleet moves to escape a live disruption and never merely to come home: keep the incumbent rotation unless the disruptions hurt it more | fleets stay on their detours | `13.632583218221225` | `+8.7204` (`+177.53%`) | 15/24/33 | rejected (target window improved to `-0.4034`, but `33` undisrupted periods cost `+6.53` for a permanently split fleet; held-out `twin` `-2.60%` and `shifted` `-0.74%` disagreed with Round 2) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -260,3 +260,9 @@ The protocol has already changed two decisions:
     residual defect in the accepted policy: about two of 41 vessels sit parked
     on withdrawn rotations for most of the run, worth the `1.2764` that periods
     `41-56` carry.
+38. **Held-out scenarios can disagree with the scored one in sign, and the
+    reason is usually structural.** v22 was better on `twin` and `shifted` and
+    `+177%` worse on Round 2, because the cost of a permanently split fleet
+    scales with how much undisrupted time follows the last window - about `200`
+    days on Round 2 against `70` on `twin`. Check both, and know which
+    structural feature separates them.

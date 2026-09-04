@@ -131,6 +131,30 @@ serves its remaining cargo so slowly that the condition never clears. Two thin
 half-services are far worse than one whole service on either rotation, and
 `33` undisrupted periods paid `+6.53` for it.
 
+## The held-out arms, which disagree with Round 2
+
+The arms that were already running when Round 2 rejected the candidate are
+recorded here because their disagreement is informative:
+
+| scenario | v20 | v22 | delta |
+| --- | --- | --- | --- |
+| `twin` | `40.12987734887265` | `39.087321028127604` | `-1.0426` (`-2.60%`) |
+| `shifted` | `41.62569844636167` | `41.31633769170477` | `-0.3094` (`-0.74%`) |
+| `inserted` | `16.17458575774183` | `16.48955958688245` | `+0.3150` (`+1.95%`) |
+
+So v22 is *better* on two of three held-out scenarios and catastrophically
+worse on the scored one. The reason is how much undisrupted time follows the
+windows: Round 2's last slowdown ends on measured day `240` of `360`, leaving
+about `200` days for a split fleet to bleed, while `twin`'s run to day `230` of
+`300` and `long`'s to day `150` leave far less. The penalty scales with the
+tail, and Round 2 has the longest one.
+
+That is a warning about the held-out set rather than a reason to reconsider:
+the decision rule is strict on the scored scenario, and a candidate that wins
+elsewhere by leaving a permanent defect in place is exactly what the scored
+run is for. It also means the next candidate must be checked on both, since
+the two disagree in sign.
+
 ## The residual defect this exposes
 
 The accepted policy has the same disease, in the mirror image. v20's own route

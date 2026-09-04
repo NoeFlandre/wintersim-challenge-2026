@@ -980,15 +980,73 @@ def test_a_veto_delegates_when_the_arrival_segment_is_unknown() -> None:
     assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
 
 
-def test_a_veto_delegates_when_the_destination_is_unreachable_without_congestion() -> None:
-    context, vessel, _shipment = _in_transit_fixture(8.0)
-    # Congest the only bypass so no congestion-free alternative exists.
-    for segment in context.service_routes[1].segments:
-        segment.associated_leg.sailing_time_multiplier = 5.0
-    for segment in context.service_routes[0].segments:
-        segment.associated_leg.sailing_time_multiplier = 5.0
+def test_a_fully_congested_network_still_gets_a_decision() -> None:
+    """Cargo already at sea needs no congestion-free alternative to exist.
 
-    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is None
+    Insisting on one is right when *booking* cargo, because committing it to a
+    leg with no way round is a choice. Here the cargo is aboard already, so
+    whatever alternative exists is simply costed and compared.
+    """
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    for route in context.service_routes:
+        for segment in route.segments:
+            segment.associated_leg.sailing_time_multiplier = 5.0
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
+
+
+def _fair_cost_fixture() -> tuple[Any, Any, Any]:
+    """Staying aboard beats transferring, but not the transfer's sailing alone.
+
+      keep      = MAIN Mid->Shut->Dest: 15 + 15 h sailing + 3 h call  = 33 h
+      bypass    = 20 h of sailing, plus 20 h to board BYPASS          = 40 h
+                  (sailing alone, ignoring the wait, would be only 20 h)
+
+    So costing the alternative fairly keeps the cargo aboard, while costing it
+    with no boarding wait would hand the replan back to the organizer.
+    """
+    origin = _port("Origin")
+    mid = _port("Mid")
+    shut = _port("Shut", closed=True)
+    dest = _port("Dest")
+    main = _route("MAIN", [origin, mid, shut, dest], [100.0, 300.0, 300.0, 100.0], vessels=1)
+    bypass = _route("BYPASS", [mid, dest], [400.0, 400.0], vessels=2)
+    context = _context([origin, mid, shut, dest], [main, bypass])
+    context.disruption_plans = [_closure_plan(shut, 1.0)]
+
+    shipment = SimpleNamespace(
+        teu_size=10.0,
+        demand=SimpleNamespace(origin_port=origin, destination_port=dest),
+        associated_bookings=[],
+        current_booking_index=1,
+    )
+    shipment.associated_bookings.append(_booking(1, shipment, main, 1, 3))
+    vessel = SimpleNamespace(
+        index=0,
+        vessel_class=SimpleNamespace(sailing_speed=20.0),
+        assigned_service_route=main,
+        current_segment=main.segments[0],
+        current_berth=None,
+        carried_shipments=[shipment],
+    )
+    return context, vessel, shipment
+
+
+def test_the_alternative_pays_the_wait_to_board_a_different_service() -> None:
+    context, vessel, shipment = _fair_cost_fixture()
+    before = _freeze_chain(shipment)
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
+    assert _freeze_chain(shipment) == before
+
+
+def test_no_alternative_at_all_keeps_the_chain() -> None:
+    # BYPASS removed: nothing else reaches the destination, so the organizer
+    # would leave the chain alone too and keeping is the right call.
+    context, vessel, _shipment = _in_transit_fixture(8.0)
+    context.service_routes = [context.service_routes[0]]
+
+    assert UserStrategy.adjust_bookings_before_cargo_handling(context, NOW, vessel) is True
 
 
 def test_a_veto_delegates_when_the_network_cannot_be_built() -> None:

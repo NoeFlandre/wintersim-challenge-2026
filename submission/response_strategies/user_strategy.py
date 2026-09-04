@@ -680,10 +680,13 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
     only when the booked chain is at least as fast as the best alternative from
     here, judged by the same cost model that chose the chain in the first place.
 
-    The alternative is costed optimistically, with no wait to board its first
-    service, so a chain is kept only when it beats even the most favourable
-    rebuild. Anything uncertain delegates, which restores the organizer's
-    behaviour exactly.
+    The alternative is costed the way it would actually be sailed: leaving the
+    current service costs the wait for the next one, and only a rebuild that
+    continues on the route the cargo is already riding avoids that wait, which
+    is exactly what the organizer's merge does. Anything uncertain delegates,
+    which restores the organizer's behaviour exactly - including a chain riding
+    a disruption-alternative route, which this model does not carry and which
+    the organizer may withdraw at recovery.
     """
     current_segment = getattr(vessel, "current_segment", None)
     leg = getattr(current_segment, "associated_leg", None)
@@ -765,12 +768,15 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
         keep_hours = _rides_hours(network, rides)
         if keep_hours is None:
             return None
-        clean = _fastest_path(network, current_index, destination_index, allow_congestion=False)
-        if clean is None:
-            return None
+        # The cargo is already at sea, so unlike a booking decision there is no
+        # reason to insist on a congestion-free alternative: whatever exists is
+        # costed and compared on its merits.
         best = _fastest_path(network, current_index, destination_index, allow_congestion=True)
         if not best:
-            return None
+            # With no alternative at all the organizer's own rebuild would find
+            # none either and would leave the chain alone, so keeping is right.
+            decided += 1
+            continue
         alternative = _rides_hours(
             network,
             tuple(
@@ -784,6 +790,11 @@ def _keep_booked_chains(context: Any, now: Any, vessel: Any) -> bool | None:
         )
         if alternative is None:
             return None
+        if network.routes[best[0].route_index] is not current_booking.service_route:
+            # Leaving this service costs the wait for the next one. Only a
+            # rebuild that continues on the route the cargo is already riding
+            # avoids that wait, which is what the organizer's merge does.
+            alternative += network.boarding_hours[best[0].route_index]
         if keep_hours > alternative:
             return None
         decided += 1

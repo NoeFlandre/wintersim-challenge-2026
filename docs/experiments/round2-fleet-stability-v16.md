@@ -1,6 +1,7 @@
 # Round 2: keep the fleet on its rotations (v16)
 
-**Status: DESIGN — frozen before the authoritative run.**
+**Status: ACCEPTED — complete. It improves Round 2 by `5.65%`, regresses
+neither held-out scenario, and strands no cargo anywhere.**
 
 ## Hypothesis
 
@@ -95,3 +96,95 @@ candidate_loss < 10.347110679813037 - 1e-9
 Acceptance additionally requires no regression on either held-out scenario,
 where the accepted control scores `42.6642` on `shifted` and `5.3684` on
 `mild`, and requires that no arm strand cargo — `unbooked` must stay `0`.
+
+## Full-run result
+
+One authoritative run completed all 72 periods in `00:18:28`, with the ATT
+proved fresh against the pinned stale mtime `1788516612935704258`.
+
+- candidate ATT SHA-256: `beace437a6c0d55bce87d35b38bfcfe25c897aa7749e17fc3425a2fa7e1de885`;
+- **candidate cumulative resilience loss: `9.762649496857325`**;
+- accepted v15 control loss: `10.347110679813037`;
+- difference: `-0.584461182955712` (`-5.6485448067737565%`);
+- periods better/equal/worse: `34 / 22 / 16`.
+
+```text
+9.762649496857325 < 10.347110679813037 - 1e-9
+```
+
+is true, so the Round 2 rule is met. This is the first result under `10`.
+
+Mean ATT actually rises slightly, from `14.3053` to `14.3251` days, while the
+loss falls. That is the metric behaving as defined rather than an inconsistency:
+a period contributes `(1 - baseline / ATT) * days`, whose derivative in ATT is
+`baseline / ATT^2`, so an hour saved in a good period is worth more than an
+hour lost in a bad one. The same effect is why mean ATT was abandoned as a
+ranking statistic after v11.
+
+### The mechanism, confirmed in the output
+
+Service-route utilisation from this run contains **no alternative routes at
+all**, and the affected services have their full fleets back:
+
+| route | v15 avg capacity TEU | v16 avg capacity TEU |
+| --- | --- | --- |
+| S4 Transpacific-South | `43,355` | **`50,919`** |
+| S5 Asia-US-East | `104,964` | **`115,161`** |
+| S4-ALT-1 | `12,945` (carrying `2` TEU) | absent |
+| S5-ALT-1 | `12,971` (carrying `0` TEU) | absent |
+
+### By window
+
+| window | periods | v15 | v16 | delta |
+| --- | --- | --- | --- | --- |
+| Qingdao->Busan congestion | 6 | `0.8436` | `-1.1689` | `-2.0124` |
+| no active disruption | 33 | `5.8592` | `3.9546` | `-1.9046` |
+| Piraeus closure | 4 | `0.3711` | `-0.3479` | `-0.7191` |
+| Tianjin closure | 3 | `0.8200` | `0.4714` | `-0.3486` |
+| Colombo->New Jersey congestion | 13 | `-0.8973` | `-0.8973` | `+0.0000` |
+| Shanghai->Kaohsiung congestion | 13 | `3.3504` | `7.7506` | `+4.4002` |
+
+## Held-out results
+
+| held-out scenario | v15 | v16 | delta | unbooked |
+| --- | --- | --- | --- | --- |
+| `shifted` | `42.6642` | `42.6642` | `0.0000` | `0` |
+| `mild` | `5.3684` | `5.3634` | `-0.0050` (`-0.09%`) | `0` |
+
+The `shifted` tie is the important one, because that scenario was the stated
+risk: it shuts the Singapore hub on which five of the nine services depend, and
+suppressing avoiding routes removes the only way the organizer's own booking
+logic can serve a pair with no undisrupted nominal path. **No cargo was
+stranded** — `unbooked` is `0`, and the same `385,405` shipments complete as
+under the control. The risk did not materialise, which is consistent with v12
+having already stopped treating closed ports as walls: nominal paths exist
+through them at the cost of waiting for the reopening, so the avoiding routes
+were not carrying anything the strategy needed.
+
+## Why it is accepted
+
+- the Round 2 gain is `5.65%`, the largest since v12;
+- neither held-out scenario regresses and one improves;
+- no arm strands cargo, which was a required gate rather than an afterthought;
+- the reasoning rests on two structural facts with no constants — one vessel on
+  a longer loop cannot offer a competitive headway, and a service that gives up
+  a vessel loses a proportionate share of its departures — and both get worse,
+  not better, on services with fewer vessels;
+- the decision creates, moves, and modifies nothing, and the organizer's own
+  validator passes after it.
+
+## Post-acceptance verification
+
+- `uv lock --check`, locked sync, Ruff format and lint, mypy, ty: clean;
+- 284 non-integration tests, `91.22%` branch coverage (gate `90%`);
+- 7 real-context integration tests, including one asserting the organizer's
+  validator accepts the decision, that route, vessel and per-route deployment
+  counts are unchanged, that no vessel carries a pending assignment and no
+  alternative route exists, and that the fallback on an identical context does
+  build routes and does reserve a vessel;
+- participant and runtime `user_strategy.py` byte-identical at
+  `603435e065e2cff7853412a917da83f314a73b384b42899ac3e50a8ff28157f8`;
+- Round 2 smoke: `smoke: OK`;
+- deterministic participant-only package, twice, SHA-256
+  `57b0d12cb3a271f3989c1ef457b7e2f6f4cac6566b0add8ca970b7aada175ef1`;
+- restricted-material scan clean; clean Git working tree.

@@ -25,6 +25,7 @@ authoritative baseline ATT
 | v13 | keep an in-transit chain when it already beats the best alternative, instead of letting the organizer rebuild it by distance | fires on Round 2; inert on the held-out scenario | `11.915883436787134` | `-1.3591` (`-10.238%`) | 19/32/21 | **accepted** (held-out exact tie) |
 | v14 | charge the alternative the wait to board it, and drop the congestion-free requirement that has no meaning for cargo already at sea | repairs v13's closure regressions; 5 of 6 windows improve | `10.350669070475163` | `-1.5652` (`-13.136%`) | 28/33/11 | **accepted** (held-out `-0.74%` for the intervention) |
 | v15 | time a congestion slowdown as v12 timed a closure: a leg sailed after it clears is costed at normal speed | both 60-day windows unchanged; the 25-day window improves | `10.347110679813037` | `-0.0036` (`-0.034%`) | 17/45/10 | **accepted** (held-out `-15.79%` on short windows) |
+| v16 | keep every vessel on its rotation instead of letting the organizer reserve one per affected service onto a single-vessel avoiding route | no alternative routes exist; S4 regains 25% of its frequency | `9.762649496857325` | `-0.5845` (`-5.649%`) | 34/22/16 | **accepted** (held-out tie and `-0.09%`, no cargo stranded) |
 
 ## Lessons carried forward
 
@@ -54,10 +55,10 @@ authoritative baseline ATT
    congestion cost — and choosing services by distance, which ignores departure
    frequency, leaves real time on the table. This is the observation v9 acts on.
 
-## After v15
+## After v16
 
-The incumbent is `10.347110679813037`, `70.52%` below the `35.1039547178493`
-that started the round.
+The incumbent is `9.762649496857325`, `72.19%` below the `35.1039547178493`
+that started the round, and the first result under `10`.
 
 7. **Measure the model against the simulation, then correct the mechanism.**
    v10 was a one-line change worth `-5.35`. It came from pairing each
@@ -157,3 +158,15 @@ The protocol has already changed two decisions:
     suspect; one that gains almost nothing on the scored scenario and a lot on
     an unseen one is the reverse, and is worth accepting on the strength of the
     mechanism.
+
+20. **Check what the organizer's own response costs you.** The fallback's
+    shipping-line response reserved one vessel per affected service onto an
+    avoiding route that carried `2` and `0` TEU while the services losing those
+    vessels gave up up to `25%` of their departures. Declining that trade was
+    worth `-5.65%`. A delegated hook is not a neutral default; it is an active
+    policy whose side effects are worth measuring.
+21. **Name the failure mode before the run, then gate on it.** Suppressing
+    avoiding routes could have stranded cargo whose only path needed one, so
+    `unbooked == 0` was made an explicit acceptance condition and the held-out
+    scenario chosen for having a hub closure. It came back `0`, which is a
+    result rather than an assumption.

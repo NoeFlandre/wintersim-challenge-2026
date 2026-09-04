@@ -78,7 +78,7 @@ requires normal event-driven logistics, forbids bypassing event logic, and
 allows additional dependencies only when their installation and runtime use
 are documented.
 
-Fifteen Round 2 experiments are complete. Every experiment, its behavioural
+Sixteen Round 2 experiments are complete. Every experiment, its behavioural
 delta, activation statistics, score, per-period comparison and decision is
 tabulated in the [Round 2 experiment ledger](docs/experiments/round2-ledger.md).
 
@@ -115,6 +115,12 @@ The three accepted architecture changes since:
   requirement that has no meaning for cargo already at sea. Score
   `10.350669070475163` (a further `-13.136%`), repairing v13's closure-window
   regressions.
+- [v16 fleet stability](docs/experiments/round2-fleet-stability-v16.md)
+  keeps every vessel on its rotation instead of letting the organizer reserve
+  one per affected service onto a single-vessel avoiding route. Those routes
+  carried `2` and `0` TEU while the services losing the vessels gave up as much
+  as `25%` of their departures. Score `9.762649496857325` (a further
+  `-5.649%`).
 - [v15 timed congestion](docs/experiments/round2-timed-congestion-v15.md)
   times a slowdown as v12 timed a closure: a leg sailed after the congestion
   clears is costed at normal speed. Score `10.347110679813037`, only
@@ -129,9 +135,9 @@ read the first boarding wait from live vessel positions and scored
 unobservable-progress estimate is optimistically biased, so the busiest trunk
 services looked most imminent.
 
-The active Round 2 strategy scores `10.347110679813037`, which is `70.52%`
+The active Round 2 strategy scores `9.762649496857325`, which is `72.19%`
 below the `35.1039547178493` that opened the round. Its ATT SHA-256 is
-`a2084e82fc9badbd13542b9ebab183cfcdc8978da8a00d1065b807bd341bf4c6`.
+`beace437a6c0d55bce87d35b38bfcfe25c897aa7749e17fc3425a2fa7e1de885`.
 
 ### Guarding against overfitting
 
@@ -163,11 +169,13 @@ scored scenario and a lot on an unseen one is the opposite of the overfitting
 signature, and judging it on the Round 2 delta alone would have discarded the
 largest held-out gain of the round.
 
-The current `UserStrategy` keeps two decisions delegated to the organizer and
-owns two: the initial booking chain for newly generated cargo, and whether to
-leave an in-transit chain alone when a disruption appears after it has sailed.
-The second is one-sided by construction — it never mutates anything and can
-only decline a change — which bounds its risk on an unseen scenario. It selects the
+The current `UserStrategy` delegates only berth selection and owns three
+decisions: the initial booking chain for newly generated cargo, whether to
+leave an in-transit chain alone when a disruption appears after it has sailed,
+and whether to move vessels between services in response to a disruption. The
+last two are one-sided by construction — neither mutates anything, one only
+declines a replan and the other only declines a vessel transfer — which bounds
+their risk on an unseen scenario. It selects the
 chain with the least estimated transport time, computed from live runtime state
 (sailing time at the leg multipliers that will still be in force when the cargo
 sails, one full headway per service route boarded, the simulation's fixed

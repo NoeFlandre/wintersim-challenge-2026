@@ -50,6 +50,8 @@ it in a submission archive.
 - Every Round 2 experiment is tabulated in the
   [experiment ledger](experiments/round2-ledger.md).
 - The active strategy is the accepted
+  [v16 fleet stability](experiments/round2-fleet-stability-v16.md),
+  built on the accepted
   [v15 timed congestion](experiments/round2-timed-congestion-v15.md),
   built on the accepted
   [v14 fair in-transit cost](experiments/round2-in-transit-fair-cost-v14.md),
@@ -60,8 +62,8 @@ it in a submission archive.
   built on the accepted
   [v10 full-headway boarding cost](experiments/round2-full-headway-boarding-v10.md)
   and [v9 time-aware booking assignment](experiments/round2-time-aware-booking-v9.md).
-- Its cumulative resilience loss is `10.347110679813037` over 72 periods,
-  `70.52%` below the `35.1039547178493` reached by the earlier hold-based v1
+- Its cumulative resilience loss is `9.762649496857325` over 72 periods,
+  `72.19%` below the `35.1039547178493` reached by the earlier hold-based v1
   policy. The v1 control was reproduced bit for bit in the current environment
   before the comparison.
 - Candidates are additionally required to hold up on held-out scenarios they

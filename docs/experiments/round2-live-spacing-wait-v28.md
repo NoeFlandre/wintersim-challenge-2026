@@ -82,7 +82,18 @@ Authoritative run, 72 periods, `Simulation completed.`
   `+6.348339417761348` (`+131.04%`, worse);
 - periods better/equal/worse: `19 / 0 / 53`.
 
-Rejected, and the held-out arms were not needed.
+Rejected. The held-out arms that were already running confirm it everywhere,
+which is worth recording because it does *not* split the way v22 did:
+
+| scenario | v23 | v28 | delta |
+| --- | --- | --- | --- |
+| `shifted` | `41.62569844636167` | `56.31328913639045` | `+35.3%` |
+| `inserted` | `15.534240459359498` | `19.265321685886413` | `+24.0%` |
+| `twin` | `40.12987734887265` | `41.73123402599675` | `+4.0%` |
+
+`unbooked` stayed `0` on every arm, so nothing was stranded: the estimator was
+simply wrong everywhere. A defect that shows up on the scored scenario *and*
+every held-out one is a property of the estimator, not of a scenario shape.
 
 ## Why it failed: a convexity bias, not a winner's curse
 

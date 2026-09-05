@@ -1282,7 +1282,13 @@ def _service_targets(
 
 
 def _has_live_bookings(route: Any) -> bool:
-    """Whether any unfinished shipment is still counting on this rotation."""
+    """Whether any shipment still needs this rotation to sail for it.
+
+    A shipment needs it only for the bookings it has not passed yet. Cargo that
+    has already sailed its leg here and is now several services further along
+    is unfinished, but nothing it has left to do depends on this rotation, so
+    holding a vessel here for it parks that vessel for the rest of the run.
+    """
     bookings = getattr(route, "associated_bookings", None)
     if not isinstance(bookings, list):
         return True
@@ -1290,7 +1296,16 @@ def _has_live_bookings(route: Any) -> bool:
     # only full scan is the one that finds it finally drained.
     for booking in reversed(bookings):
         shipment = getattr(booking, "shipment", None)
-        if shipment is None or getattr(shipment, "completion_time", None) is None:
+        if shipment is None:
+            return True
+        if getattr(shipment, "completion_time", None) is not None:
+            continue
+        reached = getattr(shipment, "current_booking_index", None)
+        sequence = getattr(booking, "sequence_index", None)
+        if not isinstance(reached, int) or not isinstance(sequence, int):
+            # Unreadable progress: assume the cargo still needs this rotation.
+            return True
+        if sequence >= reached:
             return True
     return False
 

@@ -351,8 +351,8 @@ def test_a_vessel_at_a_port_the_detour_does_not_call_stays_put() -> None:
 
 def test_the_last_vessel_stays_while_cargo_is_still_booked_on_the_rotation() -> None:
     fixture = _fixture()
-    unfinished = SimpleNamespace(completion_time=None)
-    fixture.route.associated_bookings = [SimpleNamespace(shipment=unfinished)]
+    unfinished = SimpleNamespace(completion_time=None, current_booking_index=1)
+    fixture.route.associated_bookings = [SimpleNamespace(shipment=unfinished, sequence_index=1)]
     UserStrategy.create_alternative_service_routes(fixture.context, NOW)
     detour = fixture.context.service_routes[-1]
 
@@ -365,10 +365,48 @@ def test_the_last_vessel_stays_while_cargo_is_still_booked_on_the_rotation() -> 
     assert fixture.route.deployed_vessels[0].pending_assigned_service_route is None
 
 
+def test_cargo_that_has_passed_this_rotation_does_not_hold_its_last_vessel() -> None:
+    """A shipment three legs further along no longer needs this rotation.
+
+    It is unfinished, but its booking here is behind it, so holding a vessel
+    for it would park that vessel for the rest of the run.
+    """
+    fixture = _fixture()
+    passed = SimpleNamespace(completion_time=None, current_booking_index=3)
+    fixture.route.associated_bookings = [
+        SimpleNamespace(shipment=passed, sequence_index=1),
+    ]
+    UserStrategy.create_alternative_service_routes(fixture.context, NOW)
+    detour = fixture.context.service_routes[-1]
+    for vessel in fixture.context.vessels:
+        vessel.current_segment = fixture.route.segments[2]
+        UserStrategy.create_alternative_service_routes(fixture.context, NOW, vessel)
+
+    assert fixture.route.deployed_vessels == []
+    assert len(detour.deployed_vessels) == 3
+
+
+def test_cargo_that_has_not_reached_this_rotation_still_holds_it() -> None:
+    """A later leg booked here is still owed a vessel."""
+    fixture = _fixture()
+    pending = SimpleNamespace(completion_time=None, current_booking_index=1)
+    fixture.route.associated_bookings = [
+        SimpleNamespace(shipment=pending, sequence_index=2),
+    ]
+    UserStrategy.create_alternative_service_routes(fixture.context, NOW)
+    detour = fixture.context.service_routes[-1]
+    for vessel in fixture.context.vessels:
+        vessel.current_segment = fixture.route.segments[2]
+        UserStrategy.create_alternative_service_routes(fixture.context, NOW, vessel)
+
+    assert len(fixture.route.deployed_vessels) == 1
+    assert len(detour.deployed_vessels) == 2
+
+
 def test_the_last_vessel_leaves_once_the_rotation_has_drained() -> None:
     fixture = _fixture()
-    finished = SimpleNamespace(completion_time=NOW)
-    fixture.route.associated_bookings = [SimpleNamespace(shipment=finished)]
+    finished = SimpleNamespace(completion_time=NOW, current_booking_index=1)
+    fixture.route.associated_bookings = [SimpleNamespace(shipment=finished, sequence_index=1)]
     UserStrategy.create_alternative_service_routes(fixture.context, NOW)
     detour = fixture.context.service_routes[-1]
 

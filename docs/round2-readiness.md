@@ -50,6 +50,8 @@ it in a submission archive.
 - Every Round 2 experiment is tabulated in the
   [experiment ledger](experiments/round2-ledger.md).
 - The active strategy is the accepted
+  [v23 drain condition](experiments/round2-drain-condition-v23.md),
+  built on the accepted
   [v20 closure-safe detours](experiments/round2-closure-safe-detours-v20.md),
   built on the accepted
   [v18 changeover cost](experiments/round2-changeover-cost-v18.md),
@@ -66,9 +68,9 @@ it in a submission archive.
   built on the accepted
   [v10 full-headway boarding cost](experiments/round2-full-headway-boarding-v10.md)
   and [v9 time-aware booking assignment](experiments/round2-time-aware-booking-v9.md).
-- Its cumulative resilience loss is `4.912139391692661` over 72 periods,
-  `86.01%` below the `35.1039547178493` reached by the earlier hold-based v1
-  policy - `7.15x` lower. The v1 control was reproduced bit for bit in the current environment
+- Its cumulative resilience loss is `4.844560541925512` over 72 periods,
+  `86.20%` below the `35.1039547178493` reached by the earlier hold-based v1
+  policy - `7.25x` lower. The v1 control was reproduced bit for bit in the current environment
   before the comparison.
 - Candidates are additionally required to hold up on held-out scenarios they
   were not developed against. v12 improves the harsher `shifted` scenario by
@@ -82,7 +84,7 @@ it in a submission archive.
 - Because those two scenarios had shaped every candidate from v13 to v18, four
   further adversarial scenarios were added after v18 and every one is run with
   a **do-nothing arm** that never moves a vessel. Against that arm the accepted
-  policy is `-49.68%` on Round 2, `-4.85%` on `twin`, `-3.46%` on `inserted`,
+  policy is `-50.38%` on Round 2, `-7.29%` on `inserted`, `-4.85%` on `twin`,
   `-2.43%` on `shifted`, `-1.99%` on `long`, and an exact tie on `mild`,
   `brief` and `undisrupted`: four wins, three ties, no losses, with `unbooked`
   `0` on every arm. See the

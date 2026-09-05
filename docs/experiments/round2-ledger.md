@@ -32,6 +32,7 @@ authoritative baseline ATT
 | v20 | never build a detour through a port that a disruption plan will shut inside the window the detour is needed for | Round 2 bit-identical; `inserted` `16.1746`, now `-3.46%` against doing nothing | `4.912139391692661` | `0.0000` (tie, by design) | 28/12/32 | **accepted** (7 held-out scenarios: 4 wins, 3 ties, 0 losses) |
 | v21 | refuse a ride on a temporary rotation that would end after the rotation is withdrawn, so it drains before the fleet comes home | tapers the detour's intake near a window's end | `6.5457552167823945` | `+1.6336` (`+33.26%`) | 18/16/38 | rejected (cost `1.68` inside the window; the tail it targeted got `0.68` worse) |
 | v22 | a fleet moves to escape a live disruption and never merely to come home: keep the incumbent rotation unless the disruptions hurt it more | fleets stay on their detours | `13.632583218221225` | `+8.7204` (`+177.53%`) | 15/24/33 | rejected (target window improved to `-0.4034`, but `33` undisrupted periods cost `+6.53` for a permanently split fleet; held-out `twin` `-2.60%` and `shifted` `-0.74%` disagreed with Round 2) |
+| v23 | a rotation is owed a vessel only for bookings the cargo has not passed yet, not for every unfinished shipment that ever used it | all three congestion windows bit-identical; `S4-UALT-1` parked capacity `13,389` -> `11,768` | `4.844560541925512` | `-0.0676` (`-1.376%`) | 12/52/8 | **accepted** (6 held-out exact ties, `inserted` `-3.96%`) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -44,9 +45,9 @@ so each row answers "does owning the fleet decision pay here?" rather than only
 
 | scenario | do nothing | accepted (v20) | delta | unbooked |
 | --- | --- | --- | --- | --- |
-| Round 2 (scored) | `9.7626` | `4.912139391692661` | `-49.68%` | `0` |
+| Round 2 (scored) | `9.7626` | `4.844560541925512` | `-50.38%` | `0` |
 | `twin` | `42.1737` | `40.12987734887265` | `-4.85%` | `0` |
-| `inserted` | `16.7550` | `16.17458575774183` | `-3.46%` | `0` |
+| `inserted` | `16.7550` | `15.534240459359498` | `-7.29%` | `0` |
 | `shifted` | `42.6642` | `41.62569844636167` | `-2.43%` | `0` |
 | `long` | `79.2269` | `77.65274459580378` | `-1.99%` | `0` |
 | `mild` | `5.3634` | `5.363436801272705` | tie | `0` |
@@ -266,3 +267,10 @@ The protocol has already changed two decisions:
     scales with how much undisrupted time follows the last window - about `200`
     days on Round 2 against `70` on `twin`. Check both, and know which
     structural feature separates them.
+39. **Check whether a safety rule is stated as strongly as it is meant.** The
+    never-strand rule was right; its predicate asked "is this shipment
+    unfinished?" when the property it protects is "does this shipment still
+    need this rotation?". The gap parked two of 41 vessels for most of a run.
+40. **A change that alters no decision should leave every window identical, and
+    that is testable.** v23's three congestion windows came back `0.0000` and
+    `52` of `72` periods bit-identical.

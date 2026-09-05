@@ -144,6 +144,15 @@ The three accepted architecture changes since:
   moving a vessel, and this returns it to `3.46%` better. Score
   `4.912139391692661` (unchanged, by design).
 
+- [v23 drain condition](docs/experiments/round2-drain-condition-v23.md)
+  corrects the rule that decides when a rotation may be left without vessels.
+  It asked whether any *unfinished* shipment held a booking there, which is true
+  of cargo that sailed its leg weeks ago and is now three services further
+  along, so each detour kept its last vessel parked for the rest of the run. A
+  rotation is now owed a vessel only for bookings the cargo has not passed yet.
+  Score `4.844560541925512` (a further `-1.376%`), with all three congestion
+  windows bit-identical and six held-out scenarios exact ties.
+
 Five architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
@@ -171,8 +180,8 @@ between two half-fleets. Its route statistics identified the residual defect in
 the accepted policy: about two of the `41` vessels sit parked on withdrawn
 rotations for most of the run.
 
-The active Round 2 strategy scores `4.912139391692661`, which is `86.01%`
-below the `35.1039547178493` that opened the round - `7.15x` lower. Its ATT SHA-256 is
+The active Round 2 strategy scores `4.844560541925512`, which is `86.20%`
+below the `35.1039547178493` that opened the round - `7.25x` lower. Its ATT SHA-256 is
 `d6eb1590f3317d9f8a918efc8d3a188529dd99c6bcc82b04295deef001e00f22`.
 
 ### Guarding against overfitting

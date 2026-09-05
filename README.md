@@ -153,7 +153,7 @@ The three accepted architecture changes since:
   Score `4.844560541925512` (a further `-1.376%`), with all three congestion
   windows bit-identical and six held-out scenarios exact ties.
 
-Five architecture changes were tried and rejected:
+Seven architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
@@ -179,6 +179,15 @@ it improved the window it aimed at to `-0.4034`, it cost `+6.53` across the
 between two half-fleets. Its route statistics identified the residual defect in
 the accepted policy: about two of the `41` vessels sit parked on withdrawn
 rotations for most of the run.
+[v24 owned in-transit rebuild](docs/experiments/round2-owned-in-transit-rebuild-v24.md)
+replaced the organizer's distance-based in-transit rebuild with a time-based
+one; it is unreachable on Round 2 (byte-identical ATT) and `17.93%` worse on
+`inserted` where it does fire.
+[v25 sailing network](docs/experiments/round2-sailing-network-v25.md) let the
+in-transit veto cost a ride on a rotation the fleet is leaving, and scored
+`5.541576684632464` (`+14.39%`): the model prices such a rotation by the fleet
+it has rather than the one vessel it is about to have, so it holds cargo on a
+service that is collapsing.
 
 The active Round 2 strategy scores `4.844560541925512`, which is `86.20%`
 below the `35.1039547178493` that opened the round - `7.25x` lower. Its ATT SHA-256 is

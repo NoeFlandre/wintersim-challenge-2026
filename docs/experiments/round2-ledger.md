@@ -33,6 +33,8 @@ authoritative baseline ATT
 | v21 | refuse a ride on a temporary rotation that would end after the rotation is withdrawn, so it drains before the fleet comes home | tapers the detour's intake near a window's end | `6.5457552167823945` | `+1.6336` (`+33.26%`) | 18/16/38 | rejected (cost `1.68` inside the window; the tail it targeted got `0.68` worse) |
 | v22 | a fleet moves to escape a live disruption and never merely to come home: keep the incumbent rotation unless the disruptions hurt it more | fleets stay on their detours | `13.632583218221225` | `+8.7204` (`+177.53%`) | 15/24/33 | rejected (target window improved to `-0.4034`, but `33` undisrupted periods cost `+6.53` for a permanently split fleet; held-out `twin` `-2.60%` and `shifted` `-0.74%` disagreed with Round 2) |
 | v23 | a rotation is owed a vessel only for bookings the cargo has not passed yet, not for every unfinished shipment that ever used it | all three congestion windows bit-identical; `S4-UALT-1` parked capacity `13,389` -> `11,768` | `4.844560541925512` | `-0.0676` (`-1.376%`) | 12/52/8 | **accepted** (6 held-out exact ties, `inserted` `-3.96%`) |
+| v24 | own the in-transit rebuild: when a booked chain loses, rebuild it by time instead of handing it to the organizer's distance search | unreachable on Round 2; fires on `inserted` | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (tie on Round 2, and `inserted` `+17.93%` where it did fire) |
+| v25 | cost an in-transit ride on the rotation it is actually sailing, even when that rotation takes no new bookings | the veto keeps chains it used to delegate | `5.541576684632464` | `+0.6970` (`+14.39%`) | 14/30/28 | rejected (keeping cargo on a rotation the fleet is abandoning is worse than the organizer's rebuild) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -274,3 +276,17 @@ The protocol has already changed two decisions:
 40. **A change that alters no decision should leave every window identical, and
     that is testable.** v23's three congestion windows came back `0.0000` and
     `52` of `72` periods bit-identical.
+41. **An inert result is still a result, and "why is it inert?" is the question
+    worth asking.** v24's byte-identical ATT proved its branch unreachable, and
+    finding out why located a live category error in the network the veto uses.
+42. **Replacing a plan has a cost the comparison must carry.** Rebuilding onto a
+    different service discharges the cargo to wait; comparing only the two
+    journey estimates makes every marginal difference look worth acting on.
+43. **A defect being real does not make the obvious fix right.** v25 corrected a
+    genuine category error and cost `14%`, because a second error - pricing a
+    rotation by the fleet it currently has - was cancelling it.
+44. **Check what a vessel count will be, not what it is.** Every headway reads
+    `deployed_vessels` at the instant of the estimate: correct for a stable
+    service, wrong for one mid-changeover, which is when the veto fires most.
+45. **Accidentally-right behaviour is still load-bearing.** The uncostable-ride
+    delegation was firing "for the wrong reason" and was doing real work.

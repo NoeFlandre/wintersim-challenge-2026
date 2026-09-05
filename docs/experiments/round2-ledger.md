@@ -309,3 +309,14 @@ The protocol has already changed two decisions:
     full headway - the direction v10 measured as `26%` worse. Deriving a
     quantity honestly is not enough; it has to survive the calibration that is
     already in evidence.
+49. **A per-OD loss table is not a defect list.** On a calm network `197` of
+    `380` OD pairs are worse than the organizer's distance routing while the
+    policy still wins `0.157` days of mean transport time overall: a global
+    optimum on a weighted mean necessarily trades some traffic for other
+    traffic. See `round2-calm-network-routing-audit.md`.
+50. **Check identical-choice cases before theorising about a choice.** The OD
+    pairs the strategy loses most on receive the *same chain* from both
+    policies, which eliminated routing quality as the cause in one step.
+51. **Do the arithmetic on a mechanism before building it.** Port-call handling
+    time was a plausible story for those gaps until it came out ten times too
+    small - one calculation instead of one authoritative run.

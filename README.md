@@ -153,7 +153,7 @@ The three accepted architecture changes since:
   Score `4.844560541925512` (a further `-1.376%`), with all three congestion
   windows bit-identical and six held-out scenarios exact ties.
 
-Seven architecture changes were tried and rejected:
+Nine architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
@@ -188,6 +188,15 @@ in-transit veto cost a ride on a rotation the fleet is leaving, and scored
 `5.541576684632464` (`+14.39%`): the model prices such a rotation by the fleet
 it has rather than the one vessel it is about to have, so it holds cargo on a
 service that is collapsing.
+[v26 staying vessels](docs/experiments/round2-staying-vessels-v26.md) added the
+missing half - price every rotation by the vessels staying on it - and came back
+an exact tie across all 72 periods: with an honest headway the veto releases
+that cargo on the merits, reaching the accepted policy's behaviour by a
+different route.
+[v27 first-leg detours](docs/experiments/round2-first-leg-detours-v27.md)
+allowed a disruption rotation only as a chain's first booking, scored
+`5.660405309175495` (`+16.84%`), and freed the vessel it targeted: the bookings
+given up are worth several times the vessel.
 
 The active Round 2 strategy scores `4.844560541925512`, which is `86.20%`
 below the `35.1039547178493` that opened the round - `7.25x` lower. Its ATT SHA-256 is

@@ -35,6 +35,8 @@ authoritative baseline ATT
 | v23 | a rotation is owed a vessel only for bookings the cargo has not passed yet, not for every unfinished shipment that ever used it | all three congestion windows bit-identical; `S4-UALT-1` parked capacity `13,389` -> `11,768` | `4.844560541925512` | `-0.0676` (`-1.376%`) | 12/52/8 | **accepted** (6 held-out exact ties, `inserted` `-3.96%`) |
 | v24 | own the in-transit rebuild: when a booked chain loses, rebuild it by time instead of handing it to the organizer's distance search | unreachable on Round 2; fires on `inserted` | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (tie on Round 2, and `inserted` `+17.93%` where it did fire) |
 | v25 | cost an in-transit ride on the rotation it is actually sailing, even when that rotation takes no new bookings | the veto keeps chains it used to delegate | `5.541576684632464` | `+0.6970` (`+14.39%`) | 14/30/28 | rejected (keeping cargo on a rotation the fleet is abandoning is worse than the organizer's rebuild) |
+| v26 | v25 plus an honest headway: price every rotation by the vessels staying on it, not the ones already reserved away | the veto lets draining cargo go on the merits instead of by failing closed | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality; converges on the incumbent's behaviour exactly) |
+| v27 | a rotation built for a disruption may only be the *first* booking of a chain | `S5-UALT-1` carried `332` -> `232` TEU, its last vessel rejoins sooner | `5.660405309175495` | `+0.8158` (`+16.84%`) | 29/14/29 | rejected (the bookings given up are worth several times the vessel freed) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -290,3 +292,20 @@ The protocol has already changed two decisions:
     service, wrong for one mid-changeover, which is when the veto fires most.
 45. **Accidentally-right behaviour is still load-bearing.** The uncostable-ride
     delegation was firing "for the wrong reason" and was doing real work.
+46. **Converging on the incumbent is evidence, not failure.** v26 reached the
+    accepted policy's 72 identical periods by a completely different route,
+    which says that behaviour is the model's considered answer rather than an
+    artefact of a fail-closed path.
+47. **Three failures of the same shape are a result about the search space.**
+    v21 (`+33%`), v27 (`+17%`) and their siblings all traded detour bookings
+    for fleet tidiness and all lost by a factor. A detour's value is the cargo
+    it carries, not the vessels it ties up; the accepted policy sits at that
+    optimum.
+48. **Two core-model approximations were examined and left alone, on
+    inspection rather than by running.** Charging a port call per boarding
+    double-counts, because a headway already measures departure-to-departure.
+    And the exact boarding wait implied by the simulation's own seven-day
+    vessel-release schedule, `sum(gap^2) / (2 * cycle)`, comes out *below* a
+    full headway - the direction v10 measured as `26%` worse. Deriving a
+    quantity honestly is not enough; it has to survive the calibration that is
+    already in evidence.

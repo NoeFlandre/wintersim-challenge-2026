@@ -153,7 +153,7 @@ The three accepted architecture changes since:
   Score `4.844560541925512` (a further `-1.376%`), with all three congestion
   windows bit-identical and six held-out scenarios exact ties.
 
-Nine architecture changes were tried and rejected:
+Ten architecture changes were tried and rejected:
 [v11 live departure phase](docs/experiments/round2-live-departure-phase-v11.md)
 read the first boarding wait from live vessel positions and scored
 `18.3386705330832`. Taking the minimum over a route's vessels of an
@@ -197,6 +197,13 @@ different route.
 allowed a disruption rotation only as a chain's first booking, scored
 `5.660405309175495` (`+16.84%`), and freed the vessel it targeted: the bookings
 given up are worth several times the vessel.
+[v28 live spacing wait](docs/experiments/round2-live-spacing-wait-v28.md) priced
+a boarding from where the vessels actually are, `sum(gap^2) / (2 * cycle)`,
+doubled so it reduces exactly to v10 on an evenly spaced loop. It scored
+`11.19289995968686` (`+131%`): the functional is convex, so unbiased error in
+the vessel positions reads as bunching and overcharges every route unevenly.
+With v11 that is live vessel positions rejected twice, by both natural
+estimators.
 
 The active Round 2 strategy scores `4.844560541925512`, which is `86.20%`
 below the `35.1039547178493` that opened the round - `7.25x` lower. Its ATT SHA-256 is

@@ -37,6 +37,7 @@ authoritative baseline ATT
 | v25 | cost an in-transit ride on the rotation it is actually sailing, even when that rotation takes no new bookings | the veto keeps chains it used to delegate | `5.541576684632464` | `+0.6970` (`+14.39%`) | 14/30/28 | rejected (keeping cargo on a rotation the fleet is abandoning is worse than the organizer's rebuild) |
 | v26 | v25 plus an honest headway: price every rotation by the vessels staying on it, not the ones already reserved away | the veto lets draining cargo go on the merits instead of by failing closed | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality; converges on the incumbent's behaviour exactly) |
 | v27 | a rotation built for a disruption may only be the *first* booking of a chain | `S5-UALT-1` carried `332` -> `232` TEU, its last vessel rejoins sooner | `5.660405309175495` | `+0.8158` (`+16.84%`) | 29/14/29 | rejected (the bookings given up are worth several times the vessel freed) |
+| v28 | price a boarding from live vessel spacing, `sum(gap^2) / (2 * cycle)` doubled so it reduces to v10 on an evenly spaced loop | every boarding on every route re-costed | `11.19289995968686` | `+6.3483` (`+131.04%`) | 19/0/53 | rejected (the functional is convex, so noisy phases read as bunching) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -320,3 +321,11 @@ The protocol has already changed two decisions:
 51. **Do the arithmetic on a mechanism before building it.** Port-call handling
     time was a plausible story for those gaps until it came out ten times too
     small - one calculation instead of one authoritative run.
+52. **Convex functionals of noisy state are biased upward.** v11 established
+    that a minimum over noisy per-vessel estimates is optimistic; v28 shows the
+    complementary trap, since `sum(gap^2)` is convex and the same noise makes
+    every route look bunched. Live vessel positions have now been rejected
+    twice, by the two natural estimators, at `+23%` and `+131%`.
+53. **A calibrated approximation can beat an exact formula fed noisy inputs.**
+    The full-headway statistic ignores vessel drift entirely and still beats a
+    formula that measures drift with half-a-leg of error, by a factor of two.

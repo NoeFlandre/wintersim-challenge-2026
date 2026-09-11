@@ -38,6 +38,7 @@ authoritative baseline ATT
 | v26 | v25 plus an honest headway: price every rotation by the vessels staying on it, not the ones already reserved away | the veto lets draining cargo go on the merits instead of by failing closed | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality; converges on the incumbent's behaviour exactly) |
 | v27 | a rotation built for a disruption may only be the *first* booking of a chain | `S5-UALT-1` carried `332` -> `232` TEU, its last vessel rejoins sooner | `5.660405309175495` | `+0.8158` (`+16.84%`) | 29/14/29 | rejected (the bookings given up are worth several times the vessel freed) |
 | v28 | price a boarding from live vessel spacing, `sum(gap^2) / (2 * cycle)` doubled so it reduces to v10 on an evenly spaced loop | every boarding on every route re-costed | `11.19289995968686` | `+6.3483` (`+131.04%`) | 19/0/53 | rejected (convex functional, so noisy phases read as bunching; also worse on all three held-out arms run: `+35%`, `+24%`, `+4%`) |
+| v29 | charge a ride for the port calls at both of its ends, not only the calls in between, so a transfer stops looking cheaper than riding through | Round 2 bit-identical; `inserted` flips chains | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality, and `inserted` `+8.21%`, below its do-nothing arm) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -329,3 +330,27 @@ The protocol has already changed two decisions:
 53. **A calibrated approximation can beat an exact formula fed noisy inputs.**
     The full-headway statistic ignores vessel drift entirely and still beats a
     formula that measures drift with half-a-leg of error, by a factor of two.
+54. **Size a term against the term it competes with, before running it.** The
+    port-call constant in dispute was `3 h`; the boarding headway it has to
+    out-argue is about `113 h`. One division would have predicted the exact tie
+    on Round 2 and saved an authoritative run. See
+    `round2-port-call-bracket-v29.md`.
+55. **A change too small to help can still be big enough to hurt.** v29 moved
+    no period on Round 2 and still cost `inserted` `8.21%`, dropping it below
+    doing nothing: inert on the wide margins of the graded scenario, decisive
+    on the narrow ones elsewhere. Held-out regression gates catch exactly this,
+    and a Round 2 tie would have hidden it.
+56. **Most of the transport time is not negotiable.** Instrumenting the
+    organizer's three shipment activities splits the realized `18.75 d` into
+    `11.75 d` of nominal sailing, `5.57 d` of waiting for departures, and about
+    `1.4 d` of port calls. Time aboard is `94%` irreducible distance, and the
+    two waiting terms are already priced within `13%` and `20%` of what is
+    realized. The controllable budget is far smaller than the score implies.
+57. **A green suite is only evidence if it imported the file you edited.** The
+    organizer tree carries its own synced copy of the strategy, integration
+    tests are collected first and cache it under the same module name, so the
+    whole unit suite had been able to pass against a stale copy. v29's first
+    run did exactly that — `317 passed` on an edit no test had seen.
+    `tests/unit/test_submission_is_the_unit_under_test.py` now compares the
+    imported file's hash to the submission's and fails on any drift.
+

@@ -36,9 +36,12 @@ def _bootstrap_or_skip() -> Path:
 
 
 def _prepare_imports(source: Path) -> None:
+    # Appended, never prepended: the organizer tree carries its own synced copy
+    # of ``response_strategies``, and putting it first would silently test that
+    # copy instead of the submission whenever the two have drifted.
     for path in (str(source), str(source / "o2despy")):
         if path not in sys.path:
-            sys.path.insert(0, path)
+            sys.path.append(path)
     prefixes = (
         "config",
         "main",

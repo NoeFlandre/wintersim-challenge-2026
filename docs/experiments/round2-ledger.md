@@ -40,6 +40,7 @@ authoritative baseline ATT
 | v28 | price a boarding from live vessel spacing, `sum(gap^2) / (2 * cycle)` doubled so it reduces to v10 on an evenly spaced loop | every boarding on every route re-costed | `11.19289995968686` | `+6.3483` (`+131.04%`) | 19/0/53 | rejected (convex functional, so noisy phases read as bunching; also worse on all three held-out arms run: `+35%`, `+24%`, `+4%`) |
 | v29 | charge a ride for the port calls at both of its ends, not only the calls in between, so a transfer stops looking cheaper than riding through | Round 2 bit-identical; `inserted` flips chains | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality, and `inserted` `+8.21%`, below its do-nothing arm) |
 | v30 | price a closure the ride will meet, not only one already in force: every window not yet over is charged to the call that lands inside it | days 1-250 bit-identical; every period from the Piraeus closure on changes | `5.226163836397828` | `+0.3816` (`+7.877%`) | 3/52/17 | rejected (also `inserted` `+15.30%` and `shifted` `+6.94%`, both below their do-nothing arms) |
+| v31 | v30 narrowed to closures already open when the ride sets off, so a window in force is unchanged and one opening later is ignored | recovers most of v30 on `inserted`, none of it on `shifted` | `5.151596587162278` | `+0.3070` (`+6.338%`) | 4/53/15 | rejected (`shifted` `+8.17%`, below its do-nothing arm; `inserted` `+0.53%`) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -377,4 +378,24 @@ The protocol has already changed two decisions:
     periods (`0.379` at `att = 13.8`) than in the worst ones (`0.279` at
     `att = 16.0`). Shifting delay between periods cannot pay; only removing it
     can.
+62. **The closure lever is measured at three settings and v12 is the optimum.**
+    Pricing only the closures in force scores `4.8446`; adding those that open
+    before the ride departs costs `+6.34%`; adding every window not yet over
+    costs `+7.88%`. The penalty rises monotonically with how much forecast is
+    admitted, so there is no horizon — not even hours — at which a closure
+    forecast pays. Price exactly what the live berths confirm.
+63. **A narrowed rule is not automatically a safer rule.** v31 is strictly
+    between v23 and v30, and on `shifted` it is worse than both (`+8.17%`
+    against v30's `+6.94%`). Charging some closures and not others splits cargo
+    between two policies, and the mixture can lose to either pure one. Bracket
+    a lever at its extremes before assuming the middle is safe.
+64. **Neither the fleet nor a held origin is the residual.** Tracing vessel
+    assignments every five days: `S5` is home from its detour by day 170 and
+    `S4` by day 246, so the last 114 days run at nominal strength; and the
+    unbooked backlog is `0 TEU` in all 72 periods. The tail is the closures'
+    echo working through a pipeline, not damage left standing.
+65. **Know how far from perfect you are before choosing a lever.** The
+    accepted run's period-mean ATT is `1.35%` above baseline — `4.5 hours` on
+    `14.07 days`. Every candidate from v29 on was worth hours, which is the
+    right size; the difficulty was never magnitude, it was sign.
 

@@ -41,6 +41,7 @@ authoritative baseline ATT
 | v29 | charge a ride for the port calls at both of its ends, not only the calls in between, so a transfer stops looking cheaper than riding through | Round 2 bit-identical; `inserted` flips chains | `4.844560541925512` | `0.0000` (tie) | 0/72/0 | rejected (equality, and `inserted` `+8.21%`, below its do-nothing arm) |
 | v30 | price a closure the ride will meet, not only one already in force: every window not yet over is charged to the call that lands inside it | days 1-250 bit-identical; every period from the Piraeus closure on changes | `5.226163836397828` | `+0.3816` (`+7.877%`) | 3/52/17 | rejected (also `inserted` `+15.30%` and `shifted` `+6.94%`, both below their do-nothing arms) |
 | v31 | v30 narrowed to closures already open when the ride sets off, so a window in force is unchanged and one opening later is ignored | recovers most of v30 on `inserted`, none of it on `shifted` | `5.151596587162278` | `+0.3070` (`+6.338%`) | 4/53/15 | rejected (`shifted` `+8.17%`, below its do-nothing arm; `inserted` `+0.53%`) |
+| v32 | let a service close its own rotation up around a shut port when its own legs reconnect into a strictly shorter cycle, never dropping the last service calling it | `S7` `28.18 d` -> `13.60 d` at Piraeus; `inserted` bit-identical | `5.846536658227643` | `+1.0020` (`+20.682%`) | 5/52/15 | rejected (worst since v28; `brief` `+18.75%` and `shifted` `+8.06%`, both below their do-nothing arms) |
 
 Round 2 progression: `35.1039547178493` (v1) to `4.912139391692661` (v18,
 unchanged by v20), a `-86.01%` reduction — `7.15x` lower.
@@ -398,4 +399,20 @@ The protocol has already changed two decisions:
     accepted run's period-mean ATT is `1.35%` above baseline — `4.5 hours` on
     `14.07 days`. Every candidate from v29 on was worth hours, which is the
     right size; the difficulty was never magnitude, it was sign.
+66. **Waiting out a closure beats routing around it, from either hook.** The
+    booking model was tried (v30 `+7.88%`, v31 `+6.34%`) and so was the fleet
+    (v32 `+20.68%`). A shut port's traffic cannot be re-served more cheaply
+    than it can be waited for, because the services that call it are the ones
+    that connect it at all. v12's rule is the whole of the closure policy.
+67. **Size does not predict sign.** v29 was rejected as a `3 h` term against a
+    `113 h` headway; v32 halved a service's cycle for a fortnight and was the
+    worst of the eleven. Every candidate since v23 has been the right size.
+    What none of them got right was the direction.
+68. **Check what a change removes, not only what it adds.** v32's arithmetic,
+    validation and firing pattern were all verified before the run, and all of
+    it was correct. What went unchecked was that `S7` is the only service
+    joining the Gulf and the Eastern Mediterranean to Asia, so dropping its
+    Piraeus call severs a connection rather than shortening a loop. Ask which
+    origin-destination pairs lose their only path before building the change,
+    not after.
 
